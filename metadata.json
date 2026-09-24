@@ -1,0 +1,6 @@
+{
+  "name": "Korisko - Sistema de Gestão para Padaria",
+  "description": "Sistema completo para a Padaria Korisko com controle de estoque, comandas, fornadas quentes, PDV multi-moeda (BRL, PYG, USD), fechamento de caixa cego, metas mensais e backup em nuvem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
