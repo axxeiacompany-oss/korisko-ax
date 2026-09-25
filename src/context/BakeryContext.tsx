@@ -19,7 +19,8 @@ import {
   Customer,
   CustomerAccountEntry,
   LiveRateStatus,
-  PaymentMethod
+  PaymentMethod,
+  AppFeature
 } from '../types';
 import { StorageService, INITIAL_EMPLOYEES } from '../services/storageService';
 import { toBrl } from '../utils/currency';
@@ -32,6 +33,21 @@ interface BakeryContextType {
   switchUser: (employeeId: string, pin?: string) => boolean;
   updateEmployeePin: (employeeId: string, newPin: string) => void;
   hasPermission: (requiredRoles: UserRole[]) => boolean;
+  isFeatureAllowed: (feature: AppFeature) => boolean;
+
+  // Gestão de Afiliados / Membros (Painel do Admin Ax)
+  addEmployee: (emp: Omit<Employee, 'id'>) => Employee;
+  updateEmployee: (emp: Employee) => void;
+  deleteEmployee: (id: string) => void;
+  updateEmployeePermissions: (id: string, allowedFeatures: AppFeature[]) => void;
+
+  // Venda Direta / Rápida (Apenas Valor & Confirme)
+  registerDirectSale: (
+    amountBrl: number,
+    description: string,
+    paymentMethod: PaymentMethod,
+    customerId?: string
+  ) => Sale;
 
   // Multi-Currency & Real-Time Live Rates
   exchangeRates: ExchangeRates;
@@ -158,6 +174,36 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return requiredRoles.includes(currentUser.role);
   }, [currentUser]);
 
+  // Feature permission check helper (supports custom allowed features per affiliate/employee)
+  const isFeatureAllowed = useCallback((feature: AppFeature): boolean => {
+    // Painel de Gestão de Afiliados é exclusivo do Admin Ax
+    if (feature === 'afiliados') {
+      return currentUser.id === 'emp-admin-ax' || 
+             currentUser.email === 'axxeiacompany@gmail.com' || 
+             currentUser.name === 'Ax';
+    }
+
+    if (currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com') {
+      return true;
+    }
+
+    if (currentUser.allowedFeatures && currentUser.allowedFeatures.length > 0) {
+      return currentUser.allowedFeatures.includes(feature);
+    }
+    // Default fallback based on role
+    if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
+    if (currentUser.role === 'caixa') {
+      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
+    }
+    if (currentUser.role === 'padeiro') {
+      return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);
+    }
+    if (currentUser.role === 'afiliado') {
+      return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
+    }
+    return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
+  }, [currentUser]);
+
   // Switch employee
   const switchUser = useCallback((employeeId: string, pin?: string): boolean => {
     const target = data.employees.find(e => e.id === employeeId);
@@ -176,6 +222,52 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       employees: prev.employees.map(e => e.id === employeeId ? { ...e, pin: newPin } : e)
     }));
   }, []);
+
+  // Affiliates / Team Member Management (Painel do Admin Ax)
+  const addEmployee = useCallback((empData: Omit<Employee, 'id'>): Employee => {
+    const newEmp: Employee = {
+      ...empData,
+      id: `emp-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      avatarColor: empData.avatarColor || 'bg-indigo-600',
+    };
+    setData(prev => ({
+      ...prev,
+      employees: [...prev.employees, newEmp]
+    }));
+    return newEmp;
+  }, []);
+
+  const updateEmployee = useCallback((emp: Employee) => {
+    setData(prev => ({
+      ...prev,
+      employees: prev.employees.map(e => e.id === emp.id ? emp : e)
+    }));
+    if (currentUser.id === emp.id) {
+      setCurrentUser(emp);
+    }
+  }, [currentUser.id]);
+
+  const deleteEmployee = useCallback((id: string) => {
+    if (id === 'emp-admin-ax') {
+      alert('Não é possível remover o administrador principal (Ax).');
+      return;
+    }
+    setData(prev => ({
+      ...prev,
+      employees: prev.employees.filter(e => e.id !== id)
+    }));
+  }, []);
+
+  const updateEmployeePermissions = useCallback((id: string, allowedFeatures: AppFeature[]) => {
+    setData(prev => ({
+      ...prev,
+      employees: prev.employees.map(e => e.id === id ? { ...e, allowedFeatures } : e)
+    }));
+    if (currentUser.id === id) {
+      setCurrentUser(prev => ({ ...prev, allowedFeatures }));
+    }
+  }, [currentUser.id]);
 
   // Update exchange rates
   const updateExchangeRates = useCallback((rates: Partial<ExchangeRates>) => {
@@ -820,6 +912,58 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return newSale;
   }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, data.sales]);
 
+  // Venda Direta Rápida (Apenas Valor & Confirme)
+  const registerDirectSale = useCallback((
+    amountBrl: number,
+    description: string,
+    paymentMethod: PaymentMethod,
+    customerId?: string
+  ): Sale => {
+    const directProduct: Product = {
+      id: `prod-vd-${Date.now()}`,
+      code: 'VD-001',
+      name: description.trim() || 'Venda Direta Balcão',
+      category: 'paes',
+      priceBrl: amountBrl,
+      costPriceBrl: Math.round(amountBrl * 0.4 * 100) / 100,
+      stock: 9999,
+      minStock: 0,
+      unit: 'un',
+      active: true,
+    };
+
+    const items: CartItem[] = [
+      {
+        product: directProduct,
+        quantity: 1,
+        unitPriceBrl: amountBrl,
+        subtotalBrl: amountBrl,
+      }
+    ];
+
+    const payments: PaymentEntry[] = [
+      {
+        id: `pay-${Date.now()}`,
+        currency: 'BRL',
+        amountReceived: amountBrl,
+        exchangeRateUsed: 1,
+        equivalentBrl: amountBrl,
+        method: paymentMethod,
+      }
+    ];
+
+    return completeSale(
+      items,
+      payments,
+      undefined,
+      undefined,
+      undefined,
+      0,
+      amountBrl,
+      customerId
+    );
+  }, [completeSale]);
+
   // Open Register
   const openRegister = useCallback((initialFloat: { brl: number; pyg: number; usd: number }) => {
     const nextSessionNumber = (data.currentSession.sessionNumber || 100) + 1;
@@ -1000,6 +1144,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchUser,
     updateEmployeePin,
     hasPermission,
+    isFeatureAllowed,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+    updateEmployeePermissions,
+    registerDirectSale,
     exchangeRates: data.exchangeRates,
     updateExchangeRates,
     liveRateStatus,
@@ -1058,6 +1208,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchUser,
     updateEmployeePin,
     hasPermission,
+    isFeatureAllowed,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+    updateEmployeePermissions,
+    registerDirectSale,
     data.exchangeRates,
     updateExchangeRates,
     liveRateStatus,

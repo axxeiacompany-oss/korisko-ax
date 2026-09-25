@@ -24,13 +24,13 @@ interface Props {
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const { employees, switchUser, currentUser } = useBakery();
 
-  const [email, setEmail] = useState('roberto@korisko.com.br');
-  const [password, setPassword] = useState('1234');
+  const [email, setEmail] = useState('axxeiacompany@gmail.com');
+  const [password, setPassword] = useState('9APG_47z-EgF4yz');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedQuickRole, setSelectedQuickRole] = useState<string>('emp-1');
+  const [selectedQuickRole, setSelectedQuickRole] = useState<string>('emp-admin-ax');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,14 +38,17 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     setTimeout(() => {
-      // Find employee by email or name or matching PIN
+      // Find employee by email or PIN or password
       const emp = employees.find(
-        e => (e.email && e.email.toLowerCase() === email.trim().toLowerCase()) ||
-             e.pin === password.trim()
+        e => (e.email && e.email.toLowerCase() === email.trim().toLowerCase())
       );
 
       if (emp) {
-        if (emp.pin && password.trim() !== emp.pin && password.trim() !== 'admin') {
+        const matchesPin = emp.pin && password.trim() === emp.pin;
+        const matchesPwd = emp.password && password.trim() === emp.password;
+        const isMaster = password.trim() === '9APG_47z-EgF4yz' && emp.email === 'axxeiacompany@gmail.com';
+
+        if (!matchesPin && !matchesPwd && !isMaster) {
           setErrorMsg('Senha ou PIN incorreto para este usuário.');
           setIsLoading(false);
           return;
@@ -55,18 +58,18 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         setIsLoading(false);
         onLoginSuccess();
       } else {
-        // Fallback: match by PIN alone
-        const empByPin = employees.find(e => e.pin === password.trim());
+        // Fallback: match by PIN alone or password alone
+        const empByPin = employees.find(e => e.pin === password.trim() || e.password === password.trim());
         if (empByPin) {
           switchUser(empByPin.id, empByPin.pin);
           setIsLoading(false);
           onLoginSuccess();
         } else {
-          setErrorMsg('Credenciais não encontradas. Verifique o e-mail ou utilize um dos perfis de acesso rápido.');
+          setErrorMsg('Credenciais não encontradas. Verifique o Gmail ou senha.');
           setIsLoading(false);
         }
       }
-    }, 450);
+    }, 400);
   };
 
   const handleQuickLogin = (emp: Employee) => {
@@ -292,7 +295,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-semibold truncate leading-tight">{emp.name}</p>
-                        <p className="text-[9px] text-neutral-500 capitalize">{emp.role} · PIN: {emp.pin}</p>
+                        <p className="text-[9px] text-neutral-500 capitalize">{emp.role}</p>
                       </div>
                     </button>
                   );

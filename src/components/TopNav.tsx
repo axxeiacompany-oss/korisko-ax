@@ -15,18 +15,22 @@ import {
   Layers,
   Sparkles,
   Command,
-  X
+  X,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
 import { SwitchEmployeeModal } from './modals/SwitchEmployeeModal';
 import { FornadaModal } from './modals/FornadaModal';
+import { DirectSaleModal } from './modals/DirectSaleModal';
 
 interface Props {
   activeTab: TabType;
   onSelectTab: (tab: TabType) => void;
   onLogout: () => void;
   isSidebarCollapsed: boolean;
+  onOpenProfile?: () => void;
 }
 
 export const TopNav: React.FC<Props> = ({
@@ -34,6 +38,7 @@ export const TopNav: React.FC<Props> = ({
   onSelectTab,
   onLogout,
   isSidebarCollapsed,
+  onOpenProfile,
 }) => {
   const { 
     currentUser, 
@@ -50,6 +55,7 @@ export const TopNav: React.FC<Props> = ({
   const [isRatesOpen, setIsRatesOpen] = useState(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState(false);
   const [isFornadaOpen, setIsFornadaOpen] = useState(false);
+  const [isDirectSaleOpen, setIsDirectSaleOpen] = useState(false);
   
   // Quick Search Modal state (Command + K)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -59,6 +65,7 @@ export const TopNav: React.FC<Props> = ({
   const tabTitles: Record<TabType, { title: string; subtitle: string }> = {
     dashboard: { title: 'Painel Geral & Métricas', subtitle: 'Visão consolidada em tempo real da padaria' },
     pdv: { title: 'Ponto de Venda (PDV)', subtitle: 'Frente de caixa, pesagem e recebimento multi-moeda' },
+    venda_direta: { title: 'Venda Direta Expressa', subtitle: 'Lançamento rápido digitando apenas o valor e confirmando' },
     estoque: { title: 'Controle de Estoque', subtitle: 'Insumos, produtos acabados e alertas de validade' },
     fichas_tecnicas: { title: 'Fichas Técnicas & Custos', subtitle: 'Receituário mestre, margens e ordens de fornada' },
     crm: { title: 'CRM & Gestão de Clientes', subtitle: 'Caderneta de fiado, limites de crédito e fidelidade' },
@@ -67,6 +74,7 @@ export const TopNav: React.FC<Props> = ({
     metas: { title: 'Metas & Performance', subtitle: 'Acompanhamento do objetivo financeiro do mês' },
     cambio: { title: 'Cotação & Multi-Moedas', subtitle: 'Flutuação cambial em tempo real (Real, Guaraní, Dólar)' },
     backup: { title: 'Nuvem & Segurança', subtitle: 'Pontos de restauração e cópia local' },
+    afiliados: { title: 'Gestão de Afiliados & Membros', subtitle: 'Painel do Administrador Geral Ax para liberação de funções' },
   };
 
   const currentTabInfo = tabTitles[activeTab] || { title: 'Korisko ERP', subtitle: 'Gestão Inteligente' };
@@ -149,22 +157,53 @@ export const TopNav: React.FC<Props> = ({
             <span className="hidden sm:inline">Fornada</span>
           </button>
 
+          {/* Venda Direta Rápida (1-Clique: Apenas Valor e Confirme) */}
+          <button
+            type="button"
+            onClick={() => setIsDirectSaleOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Venda Direta Rápida: Apenas digite o valor e confirme"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span className="hidden sm:inline">Venda Direta</span>
+            <span className="sm:hidden">Rápida</span>
+          </button>
+
           {/* Nova Venda Action */}
           <button
             type="button"
             onClick={() => onSelectTab('pdv')}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Nova Venda</span>
+            <span className="hidden sm:inline">Nova Venda</span>
           </button>
 
-          {/* Quick Lock / UTMify Login Toggle */}
+          {/* User Profile Online & Password View Pill */}
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#151D30] hover:border-indigo-500/40 text-neutral-300 transition-all cursor-pointer"
+            title="Meu Perfil Online (Ver minha senha e PIN)"
+          >
+            <div className="relative">
+              <div className={`w-6 h-6 rounded-lg ${currentUser.avatarColor || 'bg-indigo-600'} text-white flex items-center justify-center text-[11px] font-bold`}>
+                {currentUser.name.charAt(0)}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-[#0E1422] animate-pulse" />
+            </div>
+            <div className="text-left hidden lg:block leading-tight">
+              <span className="text-[11px] font-bold text-white block truncate max-w-[85px]">{currentUser.name}</span>
+              <span className="text-[9px] text-emerald-400 block font-medium">Online · Ver Senha</span>
+            </div>
+          </button>
+
+          {/* Quick Lock / Logout */}
           <button
             type="button"
             onClick={onLogout}
-            className="p-2 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#182032] text-neutral-400 hover:text-white transition-colors"
-            title="Visualizar Tela de Login (UTMify)"
+            className="p-2 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#182032] text-neutral-400 hover:text-white transition-colors cursor-pointer"
+            title="Bloquear Sessão / Sair"
           >
             <Lock className="w-4 h-4" />
           </button>
@@ -285,6 +324,12 @@ export const TopNav: React.FC<Props> = ({
       <FornadaModal
         isOpen={isFornadaOpen}
         onClose={() => setIsFornadaOpen(false)}
+      />
+
+      {/* Direct Sale Modal */}
+      <DirectSaleModal
+        isOpen={isDirectSaleOpen}
+        onClose={() => setIsDirectSaleOpen(false)}
       />
 
     </>

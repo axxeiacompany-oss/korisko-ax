@@ -17,6 +17,7 @@ import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
 export type TabType = 
   | 'dashboard' 
   | 'pdv' 
+  | 'venda_direta'
   | 'estoque' 
   | 'fichas_tecnicas'
   | 'crm'
@@ -24,7 +25,8 @@ export type TabType =
   | 'mais_vendidos' 
   | 'metas' 
   | 'cambio' 
-  | 'backup';
+  | 'backup'
+  | 'afiliados';
 
 interface Props {
   activeTab: TabType;

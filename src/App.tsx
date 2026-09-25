@@ -19,9 +19,14 @@ import { CurrencyReportsView } from './components/views/CurrencyReportsView';
 import { BackupView } from './components/views/BackupView';
 import { FichaTecnicaView } from './components/views/FichaTecnicaView';
 import { CustomersView } from './components/views/CustomersView';
+import { DirectSaleView } from './components/views/DirectSaleView';
+import { AfiliadosView } from './components/views/AfiliadosView';
 import { SwitchEmployeeModal } from './components/modals/SwitchEmployeeModal';
+import { UserProfileModal } from './components/modals/UserProfileModal';
+import { Lock, ShieldAlert } from 'lucide-react';
 
 function MainAppShell() {
+  const { isFeatureAllowed, currentUser } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     // Check if user previously logged in this session
     const saved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
@@ -31,6 +36,7 @@ function MainAppShell() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
+  const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -70,6 +76,7 @@ function MainAppShell() {
         onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         onLogout={handleLogout}
         onOpenSwitchUser={() => setIsSwitchUserOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
       />
 
       {/* Top Header */}
@@ -78,6 +85,7 @@ function MainAppShell() {
         onSelectTab={setActiveTab}
         onLogout={handleLogout}
         isSidebarCollapsed={isSidebarCollapsed}
+        onOpenProfile={() => setIsProfileOpen(true)}
       />
 
       {/* Main Content Area with adaptive left padding based on sidebar */}
@@ -87,16 +95,39 @@ function MainAppShell() {
         }`}
       >
         <div className="max-w-7xl mx-auto">
-          {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
-          {activeTab === 'pdv' && <PdvView />}
-          {activeTab === 'estoque' && <InventoryView />}
-          {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
-          {activeTab === 'crm' && <CustomersView />}
-          {activeTab === 'caixa' && <CashRegisterView />}
-          {activeTab === 'mais_vendidos' && <MonthlyTopProductsView />}
-          {activeTab === 'metas' && <GoalsView />}
-          {activeTab === 'cambio' && <CurrencyReportsView />}
-          {activeTab === 'backup' && <BackupView />}
+          {!isFeatureAllowed(activeTab as any) ? (
+            <div className="p-8 rounded-2xl bg-[#0D121E] border border-[#1E273A] text-center max-w-lg mx-auto my-12 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-white">Módulo Restrito</h2>
+              <p className="text-xs text-neutral-400">
+                O seu perfil de afiliado/colaborador ({currentUser.name}) não possui liberação para este módulo. Solicite ao Administrador Geral (Ax) a liberação desta função.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+              >
+                Voltar ao Dashboard
+              </button>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
+              {activeTab === 'pdv' && <PdvView />}
+              {activeTab === 'venda_direta' && <DirectSaleView />}
+              {activeTab === 'estoque' && <InventoryView />}
+              {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
+              {activeTab === 'crm' && <CustomersView />}
+              {activeTab === 'caixa' && <CashRegisterView />}
+              {activeTab === 'mais_vendidos' && <MonthlyTopProductsView />}
+              {activeTab === 'metas' && <GoalsView />}
+              {activeTab === 'cambio' && <CurrencyReportsView />}
+              {activeTab === 'backup' && <BackupView />}
+              {activeTab === 'afiliados' && <AfiliadosView onNavigate={setActiveTab} />}
+            </>
+          )}
         </div>
       </main>
 
@@ -116,13 +147,6 @@ function MainAppShell() {
             <span>🇺🇸 USD</span>
             <span className="text-neutral-600">|</span>
             <span className="text-emerald-400">● Backup Automático Ativo</span>
-            <span className="text-neutral-600">|</span>
-            <button
-              onClick={handleLogout}
-              className="text-indigo-400 hover:text-indigo-300 underline font-sans cursor-pointer"
-            >
-              Ver Tela de Login (UTMify)
-            </button>
           </div>
         </div>
       </footer>
@@ -131,6 +155,12 @@ function MainAppShell() {
       <SwitchEmployeeModal
         isOpen={isSwitchUserOpen}
         onClose={() => setIsSwitchUserOpen(false)}
+      />
+
+      {/* Online User Profile & Password/PIN Modal */}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
       />
 
     </div>

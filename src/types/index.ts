@@ -1,6 +1,20 @@
 export type Currency = 'BRL' | 'PYG' | 'USD';
 
-export type UserRole = 'admin' | 'gerente' | 'caixa' | 'padeiro';
+export type UserRole = 'admin' | 'gerente' | 'caixa' | 'padeiro' | 'afiliado';
+
+export type AppFeature = 
+  | 'dashboard' 
+  | 'pdv' 
+  | 'venda_direta'
+  | 'estoque' 
+  | 'fichas_tecnicas'
+  | 'crm'
+  | 'caixa' 
+  | 'mais_vendidos' 
+  | 'metas' 
+  | 'cambio' 
+  | 'backup'
+  | 'afiliados';
 
 export interface ExchangeRates {
   BRL_TO_PYG: number; // e.g. 1380 PYG per 1 BRL
@@ -16,6 +30,9 @@ export interface Employee {
   pin: string;
   avatarColor: string;
   email?: string;
+  password?: string;
+  allowedFeatures?: AppFeature[];
+  createdAt?: string;
 }
 
 export type ProductCategory = 

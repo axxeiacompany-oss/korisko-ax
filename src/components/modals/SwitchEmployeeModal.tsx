@@ -148,10 +148,10 @@ export const SwitchEmployeeModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
                   <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                  PIN de Acesso (4 dígitos)
+                  PIN de Acesso
                 </label>
-                <span className="text-[11px] text-neutral-400">
-                  Padrão: <span className="font-mono text-amber-300">{selectedEmp?.pin || currentUser.pin}</span>
+                <span className="text-[11px] text-neutral-500">
+                  Insira o PIN de segurança
                 </span>
               </div>
               <input

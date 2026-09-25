@@ -23,12 +23,36 @@ const LEGACY_BACKUPS_KEY = 'PANETTIERE_BACKUP_POINTS_V1';
 
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
+    id: 'emp-admin-ax',
+    name: 'Ax',
+    role: 'admin',
+    pin: '9APG_47z-EgF4yz',
+    avatarColor: 'bg-indigo-600',
+    email: 'axxeiacompany@gmail.com',
+    password: '9APG_47z-EgF4yz',
+    allowedFeatures: [
+      'dashboard', 
+      'pdv', 
+      'venda_direta',
+      'estoque', 
+      'fichas_tecnicas', 
+      'crm', 
+      'caixa', 
+      'mais_vendidos', 
+      'metas', 
+      'cambio', 
+      'backup', 
+      'afiliados'
+    ],
+  },
+  {
     id: 'emp-1',
     name: 'Roberto Silveira',
     role: 'admin',
     pin: '1234',
     avatarColor: 'bg-amber-600',
     email: 'roberto@korisko.com.br',
+    password: '1234',
   },
   {
     id: 'emp-2',
@@ -37,6 +61,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pin: '5678',
     avatarColor: 'bg-emerald-600',
     email: 'luciana@korisko.com.br',
+    password: '5678',
   },
   {
     id: 'emp-3',
@@ -45,6 +70,8 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pin: '1111',
     avatarColor: 'bg-blue-600',
     email: 'carlos.caixa@korisko.com.br',
+    password: '1111',
+    allowedFeatures: ['dashboard', 'pdv', 'venda_direta', 'crm'],
   },
   {
     id: 'emp-4',
@@ -53,6 +80,8 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pin: '2222',
     avatarColor: 'bg-orange-600',
     email: 'ze.padeiro@korisko.com.br',
+    password: '2222',
+    allowedFeatures: ['dashboard', 'fichas_tecnicas', 'estoque'],
   },
 ];
 
@@ -1214,6 +1243,26 @@ export class StorageService {
           if (!parsed.fichasTecnicas || parsed.fichasTecnicas.length === 0) parsed.fichasTecnicas = INITIAL_FICHAS_TECNICAS;
           if (!parsed.customers || parsed.customers.length === 0) parsed.customers = INITIAL_CUSTOMERS;
           if (!parsed.customerEntries || parsed.customerEntries.length === 0) parsed.customerEntries = INITIAL_CUSTOMER_ENTRIES;
+          if (!parsed.employees || parsed.employees.length === 0) {
+            parsed.employees = INITIAL_EMPLOYEES;
+          } else {
+            // Ensure Ax admin is always present and updated
+            const hasAx = parsed.employees.some((e: any) => e.email === 'axxeiacompany@gmail.com');
+            if (!hasAx) {
+              parsed.employees = [INITIAL_EMPLOYEES[0], ...parsed.employees];
+            } else {
+              parsed.employees = parsed.employees.map((e: any) => 
+                e.email === 'axxeiacompany@gmail.com' ? { 
+                  ...INITIAL_EMPLOYEES[0], 
+                  ...e, 
+                  name: 'Ax',
+                  role: 'admin',
+                  pin: '9APG_47z-EgF4yz', 
+                  password: '9APG_47z-EgF4yz' 
+                } : e
+              );
+            }
+          }
           return parsed;
         }
       }

@@ -15,12 +15,14 @@ import {
   UtensilsCrossed,
   Flame,
   Tag,
-  Bookmark
+  Bookmark,
+  Zap
 } from 'lucide-react';
 import { PaymentModal } from '../modals/PaymentModal';
 import { ReceiptModal } from '../modals/ReceiptModal';
 import { FornadaModal } from '../modals/FornadaModal';
 import { ComandasModal } from '../modals/ComandasModal';
+import { DirectSaleModal } from '../modals/DirectSaleModal';
 
 export const PdvView: React.FC = () => {
   const { products, exchangeRates, openComandas } = useBakery();
@@ -34,6 +36,7 @@ export const PdvView: React.FC = () => {
   const [lastCompletedSale, setLastCompletedSale] = useState<Sale | null>(null);
   const [isComandasOpen, setIsComandasOpen] = useState(false);
   const [isFornadaOpen, setIsFornadaOpen] = useState(false);
+  const [isDirectSaleOpen, setIsDirectSaleOpen] = useState(false);
 
   // Active comanda linked to current cart
   const [activeComandaNumber, setActiveComandaNumber] = useState<string | null>(null);
@@ -208,6 +211,17 @@ export const PdvView: React.FC = () => {
                   {openComandas.length}
                 </span>
               )}
+            </button>
+
+            {/* Quick Action: Venda Direta Rápida (Apenas Valor & Confirme) */}
+            <button
+              type="button"
+              onClick={() => setIsDirectSaleOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 text-xs text-emerald-300 font-semibold flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm"
+              title="Venda Direta: apenas digite o valor e confirme"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current text-emerald-400" />
+              <span>Venda Direta ⚡</span>
             </button>
 
             {/* Quick Action: Nova Fornada de Pão */}
@@ -569,6 +583,12 @@ export const PdvView: React.FC = () => {
       <FornadaModal
         isOpen={isFornadaOpen}
         onClose={() => setIsFornadaOpen(false)}
+      />
+
+      {/* Direct Sale modal */}
+      <DirectSaleModal
+        isOpen={isDirectSaleOpen}
+        onClose={() => setIsDirectSaleOpen(false)}
       />
 
     </div>

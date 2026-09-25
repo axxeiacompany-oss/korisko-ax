@@ -16,7 +16,9 @@ import {
   Flame,
   UtensilsCrossed,
   ChefHat,
-  Users
+  Users,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { formatCurrency, fromBrl } from '../../utils/currency';
 import { Sale } from '../../types';
@@ -29,6 +31,7 @@ interface Props {
 
 export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
   const { 
+    currentUser,
     sales, 
     products, 
     exchangeRates, 
@@ -39,6 +42,8 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
     fichasTecnicas,
     customers
   } = useBakery();
+
+  const isAx = currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com' || currentUser.name === 'Ax';
 
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
 
@@ -167,19 +172,37 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate('venda_direta')}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Zap className="w-4 h-4 fill-current text-white" />
+            Venda Direta (1-Clique)
+          </button>
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
             className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center gap-1.5"
           >
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-            Abrir PDV / Nova Venda
+            Abrir PDV
           </button>
+          {isAx && (
+            <button
+              type="button"
+              onClick={() => onNavigate('afiliados')}
+              className="px-3.5 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Afiliados & Funções
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onNavigate('caixa')}
-            className="px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium transition-colors"
+            className="px-3.5 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium transition-colors"
           >
             Ver Caixa
           </button>
