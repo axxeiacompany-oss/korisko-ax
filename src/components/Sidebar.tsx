@@ -58,7 +58,9 @@ export const Sidebar: React.FC<Props> = ({
     customers, 
     products,
     liveRateStatus,
-    isFeatureAllowed
+    isFeatureAllowed,
+    t,
+    language
   } = useBakery();
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
@@ -66,101 +68,101 @@ export const Sidebar: React.FC<Props> = ({
 
   const navSections = [
     {
-      group: 'Principal',
+      group: t.navGroupMain,
       items: [
         {
           id: 'dashboard' as TabType,
-          label: 'Dashboard',
+          label: t.tabDashboard,
           icon: LayoutDashboard,
           badge: null,
         },
         {
           id: 'pdv' as TabType,
-          label: 'PDV & Caixa',
+          label: t.tabPdv,
           icon: ShoppingBag,
           badge: openComandas.length > 0 ? `${openComandas.length} cmd` : null,
           badgeColor: 'bg-amber-500/20 text-amber-300',
         },
         {
           id: 'venda_direta' as TabType,
-          label: 'Venda Direta',
+          label: t.tabDirectSale,
           icon: Zap,
-          badge: '1-Clique',
+          badge: language === 'es' ? '1-Clic' : '1-Clique',
           badgeColor: 'bg-emerald-500/20 text-emerald-300',
         },
       ]
     },
     {
-      group: 'Produção & Estoque',
+      group: t.navGroupProduction,
       items: [
         {
           id: 'estoque' as TabType,
-          label: 'Estoque & Insumos',
+          label: t.tabInventory,
           icon: Boxes,
-          badge: lowStockCount > 0 ? `${lowStockCount} alertas` : null,
+          badge: lowStockCount > 0 ? `${lowStockCount} ${language === 'es' ? 'alertas' : 'alertas'}` : null,
           badgeColor: 'bg-rose-500/20 text-rose-300',
         },
         {
           id: 'fichas_tecnicas' as TabType,
-          label: 'Fichas Técnicas',
+          label: t.tabRecipes,
           icon: ChefHat,
           badge: `${fichasTecnicas.length}`,
           badgeColor: 'bg-sky-500/20 text-sky-300',
         },
         {
           id: 'crm' as TabType,
-          label: 'CRM & Fiado',
+          label: t.tabCrm,
           icon: Users,
-          badge: customersWithDebt > 0 ? `${customersWithDebt} a receber` : null,
+          badge: customersWithDebt > 0 ? `${customersWithDebt} ${language === 'es' ? 'a cobrar' : 'a receber'}` : null,
           badgeColor: 'bg-amber-500/20 text-amber-300',
         },
       ]
     },
     {
-      group: 'Gestão Financeira',
+      group: t.navGroupFinancial,
       items: [
         {
           id: 'caixa' as TabType,
-          label: 'Fechamento Caixa',
+          label: t.tabCashRegister,
           icon: Vault,
-          badge: currentSession.status === 'aberto' ? 'Aberto' : 'Fechado',
+          badge: currentSession.status === 'aberto' ? (language === 'es' ? 'Abierta' : 'Aberto') : (language === 'es' ? 'Cerrada' : 'Fechado'),
           badgeColor: currentSession.status === 'aberto' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-neutral-800 text-neutral-400',
         },
         {
           id: 'mais_vendidos' as TabType,
-          label: 'Mais Vendidos',
+          label: t.tabTopProducts,
           icon: TrendingUp,
           badge: null,
         },
         {
           id: 'metas' as TabType,
-          label: 'Metas do Mês',
+          label: t.tabGoals,
           icon: Target,
           badge: null,
         },
         {
           id: 'cambio' as TabType,
-          label: 'Multi-Moedas & Câmbio',
+          label: t.tabCurrency,
           icon: Coins,
           badge: 'BRL/PYG/USD',
           badgeColor: 'bg-indigo-500/20 text-indigo-300',
         },
         {
           id: 'backup' as TabType,
-          label: 'Backup & Nuvem',
+          label: t.tabBackup,
           icon: Cloud,
           badge: null,
         },
       ]
     },
     {
-      group: 'Administração & Afiliados',
+      group: t.navGroupAdmin,
       items: [
         {
           id: 'afiliados' as TabType,
-          label: 'Afiliados & Funções',
+          label: t.tabAffiliates,
           icon: ShieldCheck,
-          badge: currentUser.role === 'admin' ? 'Painel Ax' : null,
+          badge: currentUser.role === 'admin' ? (language === 'es' ? 'Panel Ax' : 'Painel Ax') : null,
           badgeColor: 'bg-indigo-500/20 text-indigo-300',
         },
       ]
@@ -277,7 +279,7 @@ export const Sidebar: React.FC<Props> = ({
           className={`p-2.5 rounded-xl bg-[#0F1422] border border-[#1E273A] hover:border-indigo-500/50 cursor-pointer transition-all flex items-center gap-2.5 group ${
             isCollapsed ? 'justify-center' : ''
           }`}
-          title="Ver Meu Perfil & Senha Individual"
+          title={`${t.myProfile} & ${t.myPassword}`}
         >
           <div className="relative">
             <div className={`w-8 h-8 rounded-lg ${currentUser.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-md`}>
@@ -295,8 +297,8 @@ export const Sidebar: React.FC<Props> = ({
                 <span className="text-[9px] text-emerald-400 font-bold">ONLINE</span>
               </div>
               <p className="text-[10px] text-neutral-400 flex items-center justify-between mt-0.5">
-                <span className="capitalize">{currentUser.role === 'admin' ? 'Admin Ax' : currentUser.role}</span>
-                <span className="text-indigo-400 group-hover:underline text-[9px] font-semibold">Minha Senha 👤</span>
+                <span className="capitalize">{currentUser.role === 'admin' ? (language === 'es' ? 'Admin Ax' : 'Admin Ax') : currentUser.role}</span>
+                <span className="text-indigo-400 group-hover:underline text-[9px] font-semibold">{t.myPassword}</span>
               </p>
             </div>
           )}
@@ -310,10 +312,10 @@ export const Sidebar: React.FC<Props> = ({
             className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors border border-transparent hover:border-[#1E273A] ${
               isCollapsed ? 'col-span-2' : ''
             }`}
-            title="Alternar Operador"
+            title={language === 'es' ? 'Cambiar Operador' : 'Alternar Operador'}
           >
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
-            {!isCollapsed && <span>Trocar</span>}
+            {!isCollapsed && <span>{t.switchOperator}</span>}
           </button>
 
           <button
@@ -322,10 +324,10 @@ export const Sidebar: React.FC<Props> = ({
             className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20 ${
               isCollapsed ? 'col-span-2' : ''
             }`}
-            title="Bloquear Tela / Voltar para Login"
+            title={language === 'es' ? 'Bloquear Pantalla / Volver al Login' : 'Bloquear Tela / Voltar para Login'}
           >
             <Lock className="w-3.5 h-3.5 shrink-0" />
-            {!isCollapsed && <span>Sair</span>}
+            {!isCollapsed && <span>{t.logout}</span>}
           </button>
         </div>
 

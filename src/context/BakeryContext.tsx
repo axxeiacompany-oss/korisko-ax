@@ -20,13 +20,20 @@ import {
   CustomerAccountEntry,
   LiveRateStatus,
   PaymentMethod,
-  AppFeature
+  AppFeature,
+  AppLanguage
 } from '../types';
+import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES } from '../services/storageService';
 import { toBrl } from '../utils/currency';
 import { fetchLiveExchangeRates } from '../services/exchangeRateService';
 
 interface BakeryContextType {
+  // Localization & Language
+  language: AppLanguage;
+  setLanguage: (lang: AppLanguage) => void;
+  t: I18nDictionary;
+
   // Authentication & Profile
   currentUser: Employee;
   employees: Employee[];
@@ -132,11 +139,41 @@ interface BakeryContextType {
   importDatabaseBackup: (jsonData: any) => boolean;
   restoreFromPoint: (backupId: string) => void;
   resetToSampleData: () => void;
+  dbStatus: {
+    connected: boolean;
+    mode: string;
+    railwayDetected: boolean;
+    checking: boolean;
+  };
 }
 
 const BakeryContext = createContext<BakeryContextType | null>(null);
 
 export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguageState] = useState<AppLanguage>(() => {
+    try {
+      const saved = localStorage.getItem('KORISKO_LANG');
+      if (saved === 'es' || saved === 'pt') return saved;
+    } catch {
+      // ignore
+    }
+    // Default to Spanish as requested by the user
+    return 'es';
+  });
+
+  const setLanguage = useCallback((newLang: AppLanguage) => {
+    setLanguageState(newLang);
+    try {
+      localStorage.setItem('KORISKO_LANG', newLang);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const t = useMemo(() => {
+    return translations[language] || translations.es;
+  }, [language]);
+
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
   const [currentUser, setCurrentUser] = useState<Employee>(() => {
     return data.employees[0] || INITIAL_EMPLOYEES[0];
@@ -147,6 +184,47 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const points = StorageService.loadBackupPoints();
     return points.length > 0 ? points[0].timestamp : null;
   });
+  const [dbStatus, setDbStatus] = useState<{
+    connected: boolean;
+    mode: string;
+    railwayDetected: boolean;
+    checking: boolean;
+  }>({
+    connected: false,
+    mode: 'local_storage',
+    railwayDetected: false,
+    checking: true,
+  });
+
+  // On mount: fetch database health and hydrate from server/Railway database
+  useEffect(() => {
+    let isMounted = true;
+    async function initSync() {
+      try {
+        const health = await StorageService.checkDatabaseHealth();
+        if (isMounted) {
+          setDbStatus({
+            connected: health.connected,
+            mode: health.mode,
+            railwayDetected: health.railwayDetected,
+            checking: false,
+          });
+        }
+
+        const serverData = await StorageService.fetchServerState();
+        if (serverData && isMounted) {
+          setData(serverData);
+        }
+      } catch {
+        if (isMounted) {
+          setDbStatus(prev => ({ ...prev, checking: false }));
+        }
+      }
+    }
+
+    initSync();
+    return () => { isMounted = false; };
+  }, []);
 
   // Sync state to local storage whenever data changes
   useEffect(() => {
@@ -1139,6 +1217,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const value = useMemo(() => ({
+    language,
+    setLanguage,
+    t,
     currentUser,
     employees: data.employees,
     switchUser,
@@ -1202,6 +1283,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     importDatabaseBackup,
     restoreFromPoint,
     resetToSampleData,
+    dbStatus,
   }), [
     currentUser,
     data.employees,
@@ -1262,6 +1344,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     importDatabaseBackup,
     restoreFromPoint,
     resetToSampleData,
+    dbStatus,
+    language,
+    setLanguage,
+    t,
   ]);
 
   return (

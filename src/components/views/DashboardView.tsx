@@ -40,7 +40,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
     fornadas,
     openComandas,
     fichasTecnicas,
-    customers
+    customers,
+    t,
+    language
   } = useBakery();
 
   const isAx = currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com' || currentUser.name === 'Ax';
@@ -158,17 +160,21 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         <div>
           <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1">
             <Calendar className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            <span className="capitalize">
+              {new Date().toLocaleDateString(language === 'es' ? 'es-PY' : 'pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
             <span aria-hidden="true">·</span>
-            <span>Caixa #{currentSession.sessionNumber} ({currentSession.status === 'aberto' ? 'Aberto' : 'Fechado'})</span>
+            <span>
+              {language === 'es' ? 'Caja' : 'Caixa'} #{currentSession.sessionNumber} ({currentSession.status === 'aberto' ? (language === 'es' ? 'Abierta' : 'Aberto') : (language === 'es' ? 'Cerrada' : 'Fechado')})
+            </span>
           </div>
           <h1 className="text-xl font-bold tracking-tight text-neutral-100">
-            Painel Financeiro em Tempo Real
+            {language === 'es' ? 'Panel Financiero en Tiempo Real' : 'Painel Financeiro em Tempo Real'}
           </h1>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Monitoramento das vendas diárias, fluxo em 3 moedas e desempenho de metas.
+            {language === 'es'
+              ? 'Monitoreo de ventas diarias, flujo en 3 monedas y cumplimiento de metas.'
+              : 'Monitoramento das vendas diárias, fluxo em 3 moedas e desempenho de metas.'}
           </p>
         </div>
 
@@ -179,15 +185,15 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Zap className="w-4 h-4 fill-current text-white" />
-            Venda Direta (1-Clique)
+            {language === 'es' ? 'Venta Directa (1-Clic)' : 'Venda Direta (1-Clique)'}
           </button>
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
-            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-            Abrir PDV
+            {language === 'es' ? 'Abrir PDV' : 'Abrir PDV'}
           </button>
           {isAx && (
             <button
@@ -196,15 +202,15 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               className="px-3.5 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <ShieldCheck className="w-4 h-4" />
-              Afiliados & Funções
+              {t.tabAffiliates}
             </button>
           )}
           <button
             type="button"
             onClick={() => onNavigate('caixa')}
-            className="px-3.5 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium transition-colors"
+            className="px-3.5 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium transition-colors cursor-pointer"
           >
-            Ver Caixa
+            {language === 'es' ? 'Ver Caja' : 'Ver Caixa'}
           </button>
         </div>
       </div>
@@ -215,7 +221,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Card 1: Faturamento Hoje (Consolidado) */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Faturamento Hoje</span>
+            <span className="text-xs font-medium text-neutral-400">
+              {language === 'es' ? 'Ingresos de Hoy' : 'Faturamento Hoje'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -235,17 +243,22 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Card 2: Clientes & Atendimentos */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Atendimentos Hoje</span>
+            <span className="text-xs font-medium text-neutral-400">
+              {language === 'es' ? 'Atenciones de Hoy' : 'Atendimentos Hoje'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
           <div>
             <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
-              {todaySales.length} <span className="text-sm font-normal text-neutral-400">vendas</span>
+              {todaySales.length} <span className="text-sm font-normal text-neutral-400">{language === 'es' ? 'ventas' : 'vendas'}</span>
             </div>
             <div className="text-[11px] text-neutral-400 mt-1">
-              Ritmo de {todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes por hora
+              {language === 'es' 
+                ? `Ritmo de ${todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes por hora`
+                : `Ritmo de ${todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes por hora`
+              }
             </div>
           </div>
         </div>
@@ -253,7 +266,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Card 3: Ticket Médio */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Ticket Médio</span>
+            <span className="text-xs font-medium text-neutral-400">
+              {language === 'es' ? 'Ticket Promedio' : 'Ticket Médio'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
               <Receipt className="w-4 h-4" />
             </div>
@@ -263,7 +278,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               {formatCurrency(ticketMedio, 'BRL')}
             </div>
             <div className="text-[11px] text-neutral-400 mt-1">
-              Meta estipulada: {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
+              {language === 'es' ? 'Objetivo fijado:' : 'Meta estipulada:'} {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
             </div>
           </div>
         </div>
@@ -271,7 +286,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Card 4: Lucro Bruto Estimado */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Lucro Bruto Estimado</span>
+            <span className="text-xs font-medium text-neutral-400">
+              {language === 'es' ? 'Margen Bruto Estimado' : 'Lucro Bruto Estimado'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
               <Sparkles className="w-4 h-4" />
             </div>
@@ -281,7 +298,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               {formatCurrency(todayGrossProfit, 'BRL')}
             </div>
             <div className="text-[11px] text-neutral-400 mt-1">
-              Margem de contribuição: <strong className="text-emerald-400">{profitMarginPercent}%</strong>
+              {language === 'es' ? 'Margen de contribución:' : 'Margem de contribuição:'} <strong className="text-emerald-400">{profitMarginPercent}%</strong>
             </div>
           </div>
         </div>
@@ -294,7 +311,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Real */}
         <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-neutral-400 block font-medium">Recebido Hoje em Real</span>
+            <span className="text-xs text-neutral-400 block font-medium">
+              {language === 'es' ? 'Cobrado Hoy en Real' : 'Recebido Hoje em Real'}
+            </span>
             <span className="text-lg font-bold text-neutral-100 font-mono-nums">
               {formatCurrency(currencyBreakdown.brlTotal, 'BRL')}
             </span>
@@ -307,7 +326,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Guaraní */}
         <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-neutral-400 block font-medium">Recebido Hoje em Guaraní</span>
+            <span className="text-xs text-neutral-400 block font-medium">
+              {language === 'es' ? 'Cobrado Hoy en Guaraní' : 'Recebido Hoje em Guaraní'}
+            </span>
             <span className="text-lg font-bold text-amber-400 font-mono-nums">
               {formatCurrency(currencyBreakdown.pygTotal, 'PYG')}
             </span>
@@ -320,7 +341,9 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
         {/* Dólar */}
         <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-neutral-400 block font-medium">Recebido Hoje em Dólar</span>
+            <span className="text-xs text-neutral-400 block font-medium">
+              {language === 'es' ? 'Cobrado Hoy en Dólar' : 'Recebido Hoje em Dólar'}
+            </span>
             <span className="text-lg font-bold text-emerald-400 font-mono-nums">
               {formatCurrency(currencyBreakdown.usdTotal, 'USD')}
             </span>
@@ -343,24 +366,26 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-neutral-200">Fornadas Hoje</span>
+                <span className="text-xs font-bold text-neutral-200">
+                  {language === 'es' ? 'Horneadas Hoy' : 'Fornadas Hoje'}
+                </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono-nums font-bold">
                   {fornadas.length}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-0.5 line-clamp-1">
                 {fornadas.length > 0
-                  ? `Última: ${fornadas[0].quantity} ${fornadas[0].unit} ${fornadas[0].productName}`
-                  : 'Nenhuma fornada ainda'}
+                  ? `${language === 'es' ? 'Última:' : 'Última:'} ${fornadas[0].quantity} ${fornadas[0].unit} ${fornadas[0].productName}`
+                  : (language === 'es' ? 'Ninguna horneada aún' : 'Nenhuma fornada ainda')}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
-            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium rounded-xl transition-colors text-center"
+            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium rounded-xl transition-colors text-center cursor-pointer"
           >
-            Lançar no PDV
+            {language === 'es' ? 'Registrar en PDV' : 'Lançar no PDV'}
           </button>
         </div>
 
@@ -372,22 +397,24 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-neutral-200">Comandas Salão</span>
+                <span className="text-xs font-bold text-neutral-200">
+                  {language === 'es' ? 'Comandas Salón' : 'Comandas Salão'}
+                </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono-nums font-bold">
                   {openComandas.length}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-0.5 font-mono-nums">
-                Consumo: {formatCurrency(openComandasTotalBrl, 'BRL')}
+                {language === 'es' ? 'Consumo:' : 'Consumo:'} {formatCurrency(openComandasTotalBrl, 'BRL')}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
-            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium rounded-xl transition-colors text-center"
+            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium rounded-xl transition-colors text-center cursor-pointer"
           >
-            Ver Comandas
+            {language === 'es' ? 'Ver Comandas' : 'Ver Comandas'}
           </button>
         </div>
 
@@ -399,22 +426,24 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-neutral-200">Fichas Técnicas</span>
+                <span className="text-xs font-bold text-neutral-200">
+                  {language === 'es' ? 'Fichas Técnicas' : 'Fichas Técnicas'}
+                </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-mono-nums font-bold">
                   {fichasTecnicas.length}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-0.5">
-                Custos, receitas & lotes
+                {language === 'es' ? 'Costos, recetas & lotes' : 'Custos, receitas & lotes'}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onNavigate('fichas_tecnicas')}
-            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-sky-300 text-xs font-medium rounded-xl transition-colors text-center"
+            className="w-full py-1.5 bg-neutral-800 hover:bg-neutral-700 text-sky-300 text-xs font-medium rounded-xl transition-colors text-center cursor-pointer"
           >
-            Acessar Receituário
+            {language === 'es' ? 'Ver Recetario' : 'Acessar Receituário'}
           </button>
         </div>
 
@@ -429,24 +458,28 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-neutral-200">CRM & Fiado</span>
+                    <span className="text-xs font-bold text-neutral-200">
+                      {language === 'es' ? 'CRM & Créditos' : 'CRM & Fiado'}
+                    </span>
                     {totalDebt > 0 && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono-nums font-bold">
-                        A Receber
+                        {language === 'es' ? 'Por Cobrar' : 'A Receber'}
                       </span>
                     )}
                   </div>
                   <p className="text-[11px] text-neutral-400 mt-0.5 font-mono-nums">
-                    {totalDebt > 0 ? formatCurrency(totalDebt, 'BRL') : `${customers.length} clientes em dia`}
+                    {totalDebt > 0 
+                      ? formatCurrency(totalDebt, 'BRL') 
+                      : (language === 'es' ? `${customers.length} clientes al día` : `${customers.length} clientes em dia`)}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate('crm')}
-                className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl transition-colors text-center"
+                className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl transition-colors text-center cursor-pointer"
               >
-                Gerenciar Clientes
+                {language === 'es' ? 'Gestionar Clientes' : 'Gerenciar Clientes'}
               </button>
             </div>
           );
@@ -463,13 +496,15 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             <div>
               <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-400" />
-                Vendas por Horário (Picos da Padaria)
+                {language === 'es' ? 'Ventas por Horario (Picos de la Panadería)' : 'Vendas por Horário (Picos da Padaria)'}
               </h3>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Picos típicos: café matinal (06h-09h) e pão da tarde (16h-19h)
+                {language === 'es'
+                  ? 'Picos típicos: desayuno (06h-09h) y merienda de la tarde (16h-19h)'
+                  : 'Picos típicos: café matinal (06h-09h) e pão da tarde (16h-19h)'}
               </p>
             </div>
-            <span className="text-xs font-mono-nums text-neutral-400">Hoje</span>
+            <span className="text-xs font-mono-nums text-neutral-400">{language === 'es' ? 'Hoy' : 'Hoje'}</span>
           </div>
 
           {/* Clean CSS/SVG Bar Chart */}
@@ -503,14 +538,14 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
                 <Target className="w-4 h-4 text-amber-400" />
-                Meta Mensal de Vendas
+                {language === 'es' ? 'Meta Mensual de Ventas' : 'Meta Mensal de Vendas'}
               </span>
               <button
                 type="button"
                 onClick={() => onNavigate('metas')}
-                className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+                className="text-xs text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
               >
-                Detalhes
+                {language === 'es' ? 'Detalles' : 'Detalhes'}
               </button>
             </div>
 
@@ -520,7 +555,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                   {formatCurrency(monthRevenueBrl, 'BRL')}
                 </span>
                 <span className="text-xs text-neutral-400 font-mono-nums">
-                  de {formatCurrency(currentGoal.targetRevenueBrl, 'BRL')}
+                  {language === 'es' ? 'de' : 'de'} {formatCurrency(currentGoal.targetRevenueBrl, 'BRL')}
                 </span>
               </div>
 
@@ -533,20 +568,20 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               </div>
 
               <div className="flex items-center justify-between text-xs text-neutral-400 mt-2 font-mono-nums">
-                <span>{goalPercent}% alcançado</span>
-                <span>Faltam {formatCurrency(Math.max(0, currentGoal.targetRevenueBrl - monthRevenueBrl), 'BRL')}</span>
+                <span>{goalPercent}% {language === 'es' ? 'alcanzado' : 'alcançado'}</span>
+                <span>{language === 'es' ? 'Faltan' : 'Faltam'} {formatCurrency(Math.max(0, currentGoal.targetRevenueBrl - monthRevenueBrl), 'BRL')}</span>
               </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-neutral-800/80 space-y-2 text-xs">
               <div className="flex justify-between text-neutral-400">
-                <span>Média diária esperada:</span>
+                <span>{language === 'es' ? 'Promedio diario esperado:' : 'Média diária esperada:'}</span>
                 <strong className="text-neutral-200 font-mono-nums">
                   {formatCurrency(currentGoal.targetDailyAverageBrl, 'BRL')}
                 </strong>
               </div>
               <div className="flex justify-between text-neutral-400">
-                <span>Atendimentos no mês:</span>
+                <span>{language === 'es' ? 'Atenciones en el mes:' : 'Atendimentos no mês:'}</span>
                 <strong className="text-neutral-200 font-mono-nums">
                   {currentMonthSales.length} / {currentGoal.targetTransactions}
                 </strong>
@@ -555,8 +590,12 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </div>
 
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-between">
-            <span>Diagnóstico do mês</span>
-            <strong className="font-semibold">{goalPercent >= 50 ? 'Em ritmo excelente!' : 'Acelerando vendas'}</strong>
+            <span>{language === 'es' ? 'Diagnóstico del mes' : 'Diagnóstico do mês'}</span>
+            <strong className="font-semibold">
+              {goalPercent >= 50 
+                ? (language === 'es' ? '¡A ritmo excelente!' : 'Em ritmo excelente!') 
+                : (language === 'es' ? 'Acelerando ventas' : 'Acelerando vendas')}
+            </strong>
           </div>
         </div>
 
@@ -570,21 +609,21 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-400" />
-              Alertas de Estoque & Validade
+              {language === 'es' ? 'Alertas de Stock & Vencimiento' : 'Alertas de Estoque & Validade'}
             </h3>
             <button
               type="button"
               onClick={() => onNavigate('estoque')}
-              className="text-xs text-amber-400 hover:text-amber-300"
+              className="text-xs text-amber-400 hover:text-amber-300 cursor-pointer"
             >
-              Gerenciar
+              {language === 'es' ? 'Gestionar' : 'Gerenciar'}
             </button>
           </div>
 
           <div className="space-y-2">
             {lowStockProducts.length === 0 && expiringProducts.length === 0 ? (
               <p className="text-xs text-neutral-500 py-4 text-center">
-                Todos os produtos estão com estoque regularizado.
+                {language === 'es' ? 'Todos los productos tienen stock regularizado.' : 'Todos os produtos estão com estoque regularizado.'}
               </p>
             ) : (
               <>
@@ -596,11 +635,11 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                     <div>
                       <span className="font-medium text-neutral-200 block">{p.name}</span>
                       <span className="text-[11px] text-rose-400 font-mono-nums">
-                        Estoque: {p.stock} {p.unit} (Mínimo: {p.minStock} {p.unit})
+                        {language === 'es' ? 'Stock:' : 'Estoque:'} {p.stock} {p.unit} ({language === 'es' ? 'Mínimo:' : 'Mínimo:'} {p.minStock} {p.unit})
                       </span>
                     </div>
                     <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
-                      Baixo
+                      {language === 'es' ? 'Bajo' : 'Baixo'}
                     </span>
                   </div>
                 ))}
@@ -613,11 +652,11 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                     <div>
                       <span className="font-medium text-neutral-200 block">{p.name}</span>
                       <span className="text-[11px] text-amber-400 font-mono-nums">
-                        Vence em: {p.expirationDate}
+                        {language === 'es' ? 'Vence el:' : 'Vence em:'} {p.expirationDate}
                       </span>
                     </div>
                     <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-                      Validade
+                      {language === 'es' ? 'Vencimiento' : 'Validade'}
                     </span>
                   </div>
                 ))}
@@ -631,22 +670,22 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-emerald-400" />
-              Últimas Vendas Realizadas
+              {language === 'es' ? 'Últimas Ventas Realizadas' : 'Últimas Vendas Realizadas'}
             </h3>
-            <span className="text-xs text-neutral-500">Feed ao vivo</span>
+            <span className="text-xs text-neutral-500">{language === 'es' ? 'Feed en vivo' : 'Feed ao vivo'}</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-neutral-800 text-neutral-500 text-[11px]">
-                  <th className="pb-2 font-medium">Venda #</th>
-                  <th className="pb-2 font-medium">Horário</th>
-                  <th className="pb-2 font-medium">Operador</th>
-                  <th className="pb-2 font-medium">Itens</th>
-                  <th className="pb-2 font-medium">Moeda / Forma</th>
+                  <th className="pb-2 font-medium">{language === 'es' ? 'Venta #' : 'Venda #'}</th>
+                  <th className="pb-2 font-medium">{language === 'es' ? 'Horario' : 'Horário'}</th>
+                  <th className="pb-2 font-medium">{language === 'es' ? 'Operador' : 'Operador'}</th>
+                  <th className="pb-2 font-medium">{language === 'es' ? 'Ítems' : 'Itens'}</th>
+                  <th className="pb-2 font-medium">{language === 'es' ? 'Moneda / Método' : 'Moeda / Forma'}</th>
                   <th className="pb-2 font-medium text-right">Total (BRL)</th>
-                  <th className="pb-2 font-medium text-right">Ações</th>
+                  <th className="pb-2 font-medium text-right">{language === 'es' ? 'Acciones' : 'Ações'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-800/60">
@@ -666,7 +705,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                         {s.employeeName}
                       </td>
                       <td className="py-2.5 text-neutral-400">
-                        {s.items.length} {s.items.length === 1 ? 'item' : 'itens'}
+                        {s.items.length} {s.items.length === 1 ? (language === 'es' ? 'ítem' : 'item') : (language === 'es' ? 'ítems' : 'itens')}
                       </td>
                       <td className="py-2.5">
                         {primaryPayment && (
@@ -683,8 +722,8 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                         <button
                           type="button"
                           onClick={() => setInspectSale(s)}
-                          className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition-colors"
-                          title="Ver Cupom / Detalhes"
+                          className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition-colors cursor-pointer"
+                          title={language === 'es' ? 'Ver Comprobante / Detalles' : 'Ver Cupom / Detalhes'}
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>

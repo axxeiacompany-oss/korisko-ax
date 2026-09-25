@@ -10,20 +10,21 @@ import {
   CloudOff, 
   RefreshCw, 
   Bell, 
-  ExternalLink,
-  Lock,
-  Layers,
-  Sparkles,
-  Command,
-  X,
-  Zap,
-  ShieldCheck
+  ExternalLink, 
+  Lock, 
+  Layers, 
+  Sparkles, 
+  Command, 
+  X, 
+  Zap, 
+  ShieldCheck 
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
 import { SwitchEmployeeModal } from './modals/SwitchEmployeeModal';
 import { FornadaModal } from './modals/FornadaModal';
 import { DirectSaleModal } from './modals/DirectSaleModal';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface Props {
   activeTab: TabType;
@@ -49,7 +50,9 @@ export const TopNav: React.FC<Props> = ({
     customers, 
     openComandas,
     liveRateStatus,
-    fetchLiveRates
+    fetchLiveRates,
+    t,
+    language
   } = useBakery();
 
   const [isRatesOpen, setIsRatesOpen] = useState(false);
@@ -61,20 +64,20 @@ export const TopNav: React.FC<Props> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Tab Titles map
+  // Tab Titles map dynamically localized
   const tabTitles: Record<TabType, { title: string; subtitle: string }> = {
-    dashboard: { title: 'Painel Geral & Métricas', subtitle: 'Visão consolidada em tempo real da padaria' },
-    pdv: { title: 'Ponto de Venda (PDV)', subtitle: 'Frente de caixa, pesagem e recebimento multi-moeda' },
-    venda_direta: { title: 'Venda Direta Expressa', subtitle: 'Lançamento rápido digitando apenas o valor e confirmando' },
-    estoque: { title: 'Controle de Estoque', subtitle: 'Insumos, produtos acabados e alertas de validade' },
-    fichas_tecnicas: { title: 'Fichas Técnicas & Custos', subtitle: 'Receituário mestre, margens e ordens de fornada' },
-    crm: { title: 'CRM & Gestão de Clientes', subtitle: 'Caderneta de fiado, limites de crédito e fidelidade' },
-    caixa: { title: 'Fechamento de Caixa Cego', subtitle: 'Conferência de sangrias, suprimentos e trocos' },
-    mais_vendidos: { title: 'Curva ABC & Produtos', subtitle: 'Ranking de giro diário e mensal' },
-    metas: { title: 'Metas & Performance', subtitle: 'Acompanhamento do objetivo financeiro do mês' },
-    cambio: { title: 'Cotação & Multi-Moedas', subtitle: 'Flutuação cambial em tempo real (Real, Guaraní, Dólar)' },
-    backup: { title: 'Nuvem & Segurança', subtitle: 'Pontos de restauração e cópia local' },
-    afiliados: { title: 'Gestão de Afiliados & Membros', subtitle: 'Painel do Administrador Geral Ax para liberação de funções' },
+    dashboard: { title: `${t.tabDashboard} & ${language === 'es' ? 'Métricas' : 'Métricas'}`, subtitle: t.subDashboard },
+    pdv: { title: t.tabPdv, subtitle: t.subPdv },
+    venda_direta: { title: t.tabDirectSale, subtitle: t.subDirectSale },
+    estoque: { title: t.tabInventory, subtitle: t.subInventory },
+    fichas_tecnicas: { title: t.tabRecipes, subtitle: t.subRecipes },
+    crm: { title: t.tabCrm, subtitle: t.subCrm },
+    caixa: { title: t.tabCashRegister, subtitle: t.subCashRegister },
+    mais_vendidos: { title: t.tabTopProducts, subtitle: t.subTopProducts },
+    metas: { title: t.tabGoals, subtitle: t.subGoals },
+    cambio: { title: t.tabCurrency, subtitle: t.subCurrency },
+    backup: { title: t.tabBackup, subtitle: t.subBackup },
+    afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
   };
 
   const currentTabInfo = tabTitles[activeTab] || { title: 'Korisko ERP', subtitle: 'Gestão Inteligente' };
@@ -120,7 +123,7 @@ export const TopNav: React.FC<Props> = ({
           >
             <div className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-neutral-500" />
-              <span>Buscar produto, cliente ou comanda...</span>
+              <span>{t.searchPlaceholder}</span>
             </div>
             <kbd className="px-1.5 py-0.5 rounded bg-[#161E30] text-[10px] font-mono text-neutral-400 border border-[#232D44]">
               ⌘K
@@ -128,15 +131,18 @@ export const TopNav: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* Right: Currency ticker, Actions & User */}
+        {/* Right: Currency ticker, Language Switcher, Actions & User */}
         <div className="flex items-center gap-2.5">
           
+          {/* Language Selector Switcher (ES / PT) */}
+          <LanguageSwitcher />
+
           {/* Real-time Exchange Rates Ticker Pill */}
           <button
             type="button"
             onClick={() => setIsRatesOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#151D30] text-xs text-neutral-300 transition-colors flex items-center gap-2 font-mono-nums"
-            title="Cotações em tempo real: BRL, PYG, USD"
+            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#151D30] text-xs text-neutral-300 transition-colors items-center gap-2 font-mono-nums"
+            title={t.ratesTicker}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <div className="flex items-center gap-2 text-[11px]">
@@ -154,7 +160,7 @@ export const TopNav: React.FC<Props> = ({
             title="Registrar Fornada do Padeiro"
           >
             <Flame className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Fornada</span>
+            <span className="hidden sm:inline">{t.quickActionFornada}</span>
           </button>
 
           {/* Venda Direta Rápida (1-Clique: Apenas Valor e Confirme) */}
@@ -162,11 +168,11 @@ export const TopNav: React.FC<Props> = ({
             type="button"
             onClick={() => setIsDirectSaleOpen(true)}
             className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Venda Direta Rápida: Apenas digite o valor e confirme"
+            title={t.directSaleSubtitle}
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
-            <span className="hidden sm:inline">Venda Direta</span>
-            <span className="sm:hidden">Rápida</span>
+            <span className="hidden sm:inline">{t.quickActionDirectSale}</span>
+            <span className="sm:hidden">⚡</span>
           </button>
 
           {/* Nova Venda Action */}
@@ -176,7 +182,7 @@ export const TopNav: React.FC<Props> = ({
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span className="hidden sm:inline">Nova Venda</span>
+            <span className="hidden sm:inline">{t.quickActionNewSale}</span>
           </button>
 
           {/* User Profile Online & Password View Pill */}
@@ -184,7 +190,7 @@ export const TopNav: React.FC<Props> = ({
             type="button"
             onClick={onOpenProfile}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#151D30] hover:border-indigo-500/40 text-neutral-300 transition-all cursor-pointer"
-            title="Meu Perfil Online (Ver minha senha e PIN)"
+            title={`${t.myProfile} (${t.myPassword})`}
           >
             <div className="relative">
               <div className={`w-6 h-6 rounded-lg ${currentUser.avatarColor || 'bg-indigo-600'} text-white flex items-center justify-center text-[11px] font-bold`}>
@@ -194,7 +200,7 @@ export const TopNav: React.FC<Props> = ({
             </div>
             <div className="text-left hidden lg:block leading-tight">
               <span className="text-[11px] font-bold text-white block truncate max-w-[85px]">{currentUser.name}</span>
-              <span className="text-[9px] text-emerald-400 block font-medium">Online · Ver Senha</span>
+              <span className="text-[9px] text-emerald-400 block font-medium">Online · {language === 'es' ? 'Ver Clave' : 'Ver Senha'}</span>
             </div>
           </button>
 
@@ -203,7 +209,7 @@ export const TopNav: React.FC<Props> = ({
             type="button"
             onClick={onLogout}
             className="p-2 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#182032] text-neutral-400 hover:text-white transition-colors cursor-pointer"
-            title="Bloquear Sessão / Sair"
+            title={t.lockSession}
           >
             <Lock className="w-4 h-4" />
           </button>
@@ -241,7 +247,7 @@ export const TopNav: React.FC<Props> = ({
                 <>
                   {searchResults.products.length > 0 && (
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">Produtos</span>
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">{t.searchProducts}</span>
                       {searchResults.products.map(p => (
                         <div 
                           key={p.id}
@@ -257,7 +263,7 @@ export const TopNav: React.FC<Props> = ({
 
                   {searchResults.customers.length > 0 && (
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">Clientes</span>
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">{t.searchCustomers}</span>
                       {searchResults.customers.map(c => (
                         <div 
                           key={c.id}
@@ -273,7 +279,7 @@ export const TopNav: React.FC<Props> = ({
 
                   {searchResults.comandas.length > 0 && (
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">Comandas Salão</span>
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2">{t.searchComandas}</span>
                       {searchResults.comandas.map(cmd => (
                         <div 
                           key={cmd.id}
@@ -281,26 +287,26 @@ export const TopNav: React.FC<Props> = ({
                           className="flex items-center justify-between p-2 rounded-xl hover:bg-[#141B2B] cursor-pointer text-xs"
                         >
                           <span className="text-neutral-200 font-medium">Comanda #{cmd.number} {cmd.customerName ? `(${cmd.customerName})` : ''}</span>
-                          <span className="text-emerald-400 font-mono-nums">{cmd.items.length} itens</span>
+                          <span className="text-emerald-400 font-mono-nums">{cmd.items.length} {language === 'es' ? 'ítems' : 'itens'}</span>
                         </div>
                       ))}
                     </div>
                   )}
 
                   {searchResults.products.length === 0 && searchResults.customers.length === 0 && searchResults.comandas.length === 0 && (
-                    <p className="text-xs text-neutral-500 text-center py-6">Nenhum resultado encontrado para "{searchQuery}".</p>
+                    <p className="text-xs text-neutral-500 text-center py-6">{t.noResultsFound} "{searchQuery}".</p>
                   )}
                 </>
               ) : (
                 <div className="text-center py-6 space-y-1">
-                  <p className="text-xs text-neutral-400 font-medium">Atalhos de busca rápida no Korisko</p>
-                  <p className="text-[11px] text-neutral-500">Digite o nome de qualquer pão, doce, cliente ou número de comanda.</p>
+                  <p className="text-xs text-neutral-400 font-medium">{t.searchTitle}</p>
+                  <p className="text-[11px] text-neutral-500">{t.searchHint}</p>
                 </div>
               )}
             </div>
 
             <div className="p-2.5 border-t border-[#1A2234] bg-[#0A0D15] flex items-center justify-between text-[11px] text-neutral-500">
-              <span>Pressione <kbd className="px-1 rounded bg-[#161E30] text-neutral-300">ESC</kbd> para fechar</span>
+              <span>{language === 'es' ? 'Presione' : 'Pressione'} <kbd className="px-1 rounded bg-[#161E30] text-neutral-300">ESC</kbd> {language === 'es' ? 'para cerrar' : 'para fechar'}</span>
               <span>Korisko ERP</span>
             </div>
 

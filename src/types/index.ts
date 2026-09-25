@@ -1,5 +1,7 @@
 export type Currency = 'BRL' | 'PYG' | 'USD';
 
+export type AppLanguage = 'pt' | 'es';
+
 export type UserRole = 'admin' | 'gerente' | 'caixa' | 'padeiro' | 'afiliado';
 
 export type AppFeature = 

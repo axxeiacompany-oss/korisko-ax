@@ -25,7 +25,7 @@ import { ComandasModal } from '../modals/ComandasModal';
 import { DirectSaleModal } from '../modals/DirectSaleModal';
 
 export const PdvView: React.FC = () => {
-  const { products, exchangeRates, openComandas } = useBakery();
+  const { products, exchangeRates, openComandas, t, language } = useBakery();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
@@ -47,12 +47,12 @@ export const PdvView: React.FC = () => {
   const [customWeightInput, setCustomWeightInput] = useState('0.500');
 
   const categories: Array<{ id: string; label: string }> = [
-    { id: 'todos', label: 'Todos os Itens' },
-    { id: 'paes', label: 'Pães Frescos' },
-    { id: 'salgados', label: 'Salgados & Lanches' },
-    { id: 'confeitaria', label: 'Confeitaria & Bolos' },
-    { id: 'bebidas', label: 'Cafeteria & Bebidas' },
-    { id: 'frios', label: 'Frios & Queijos' },
+    { id: 'todos', label: language === 'es' ? 'Todos los Productos' : 'Todos os Itens' },
+    { id: 'paes', label: language === 'es' ? 'Panes Frescos' : 'Pães Frescos' },
+    { id: 'salgados', label: language === 'es' ? 'Salados & Bocadillos' : 'Salgados & Lanches' },
+    { id: 'confeitaria', label: language === 'es' ? 'Confitería & Tortas' : 'Confeitaria & Bolos' },
+    { id: 'bebidas', label: language === 'es' ? 'Cafetería & Bebidas' : 'Cafeteria & Bebidas' },
+    { id: 'frios', label: language === 'es' ? 'Fiambrería & Quesos' : 'Frios & Queijos' },
   ];
 
   // Filter products
@@ -185,7 +185,7 @@ export const PdvView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nome, código SKU ou código de barras..."
+                placeholder={language === 'es' ? 'Buscar por nombre, código SKU o código de barras...' : 'Buscar por nome, código SKU ou código de barras...'}
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
               />
               {searchQuery && (
@@ -202,10 +202,10 @@ export const PdvView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsComandasOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 hover:bg-neutral-850 text-xs text-neutral-200 font-semibold flex items-center justify-center gap-2 transition-all shrink-0"
+              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 hover:bg-neutral-850 text-xs text-neutral-200 font-semibold flex items-center justify-center gap-2 transition-all shrink-0 cursor-pointer"
             >
               <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
-              <span>Comandas</span>
+              <span>{t.tabCrm ? (language === 'es' ? 'Comandas' : 'Comandas') : 'Comandas'}</span>
               {openComandas.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono-nums font-bold">
                   {openComandas.length}
@@ -218,20 +218,20 @@ export const PdvView: React.FC = () => {
               type="button"
               onClick={() => setIsDirectSaleOpen(true)}
               className="px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 text-xs text-emerald-300 font-semibold flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm"
-              title="Venda Direta: apenas digite o valor e confirme"
+              title={t.directSaleSubtitle}
             >
               <Zap className="w-3.5 h-3.5 fill-current text-emerald-400" />
-              <span>Venda Direta ⚡</span>
+              <span>{language === 'es' ? 'Venta Directa ⚡' : 'Venda Direta ⚡'}</span>
             </button>
 
             {/* Quick Action: Nova Fornada de Pão */}
             <button
               type="button"
               onClick={() => setIsFornadaOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-xs text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-all shrink-0"
+              className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-xs text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer"
             >
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>Nova Fornada 🔥</span>
+              <span>{language === 'es' ? 'Nueva Horneada 🔥' : 'Nova Fornada 🔥'}</span>
             </button>
           </div>
 
@@ -328,16 +328,16 @@ export const PdvView: React.FC = () => {
           <div className="flex items-center gap-2">
             <ShoppingBag className="w-4 h-4 text-amber-400" />
             <h3 className="text-xs font-semibold text-neutral-100 uppercase tracking-wider">
-              {activeComandaNumber ? `Comanda #${activeComandaNumber}` : 'Carrinho de Venda'} ({cart.length})
+              {activeComandaNumber ? `Comanda #${activeComandaNumber}` : (language === 'es' ? 'Carrito de Venta' : 'Carrinho de Venda')} ({cart.length})
             </h3>
           </div>
           {cart.length > 0 && (
             <button
               type="button"
               onClick={handleClearCart}
-              className="text-[11px] text-neutral-500 hover:text-rose-400 transition-colors"
+              className="text-[11px] text-neutral-500 hover:text-rose-400 transition-colors cursor-pointer"
             >
-              Limpar tudo
+              {language === 'es' ? 'Vaciar todo' : 'Limpar tudo'}
             </button>
           )}
         </div>
@@ -348,16 +348,16 @@ export const PdvView: React.FC = () => {
             <div className="flex items-center gap-1.5 text-amber-300 font-medium">
               <Bookmark className="w-3.5 h-3.5 text-amber-400" />
               <span>
-                Vinculada à <strong>Comanda #{activeComandaNumber}</strong>
+                {language === 'es' ? 'Vinculada a la' : 'Vinculada à'} <strong>Comanda #{activeComandaNumber}</strong>
                 {activeCustomerName ? ` (${activeCustomerName})` : ''}
               </span>
             </div>
             <button
               type="button"
               onClick={() => { setActiveComandaNumber(null); setActiveCustomerName(''); }}
-              className="text-[11px] text-neutral-400 hover:text-neutral-200 underline"
+              className="text-[11px] text-neutral-400 hover:text-neutral-200 underline cursor-pointer"
             >
-              Desvincular
+              {language === 'es' ? 'Desvincular' : 'Desvincular'}
             </button>
           </div>
         )}
@@ -367,9 +367,11 @@ export const PdvView: React.FC = () => {
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-neutral-500 space-y-2 text-center p-4">
               <ShoppingBag className="w-10 h-10 opacity-30 stroke-[1.5]" />
-              <p className="text-xs text-neutral-400 font-medium">O carrinho está vazio</p>
+              <p className="text-xs text-neutral-400 font-medium">
+                {language === 'es' ? 'El carrito está vacío' : 'O carrinho está vazio'}
+              </p>
               <p className="text-[11px] text-neutral-600">
-                Selecione os produtos ao lado para iniciar a venda no balcão.
+                {language === 'es' ? 'Seleccione los productos al lado para iniciar la venta en mostrador.' : 'Selecione os produtos ao lado para iniciar a venda no balcão.'}
               </p>
             </div>
           ) : (
@@ -390,19 +392,19 @@ export const PdvView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleRemoveFromCart(item.product.id)}
-                    className="text-neutral-500 hover:text-rose-400 p-1"
+                    className="text-neutral-500 hover:text-rose-400 p-1 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between pt-1 border-t border-neutral-850">
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-855">
                   {/* Quantity controls */}
                   <div className="flex items-center gap-1.5 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
                     <button
                       type="button"
                       onClick={() => handleUpdateQuantity(item.product.id, -1)}
-                      className="w-5 h-5 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
+                      className="w-5 h-5 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 cursor-pointer"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
@@ -412,7 +414,7 @@ export const PdvView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleUpdateQuantity(item.product.id, 1)}
-                      className="w-5 h-5 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
+                      className="w-5 h-5 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
@@ -436,7 +438,9 @@ export const PdvView: React.FC = () => {
           {/* Multi-currency breakdown preview */}
           <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1.5">
             <div className="flex items-baseline justify-between">
-              <span className="text-xs font-medium text-neutral-400">Total a Pagar (BRL)</span>
+              <span className="text-xs font-medium text-neutral-400">
+                {language === 'es' ? 'Total a Cobrar (BRL)' : 'Total a Pagar (BRL)'}
+              </span>
               <span className="text-lg font-bold text-neutral-100 font-mono-nums">
                 {formatCurrency(cartTotalBrl, 'BRL')}
               </span>
@@ -454,20 +458,20 @@ export const PdvView: React.FC = () => {
               type="button"
               disabled={cart.length === 0}
               onClick={() => setIsComandasOpen(true)}
-              className="py-3 px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0"
-              title="Salvar comanda para mesa ou balcão"
+              className="py-3 px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              title={language === 'es' ? 'Guardar comanda para mesa o salón' : 'Salvar comanda para mesa ou balcão'}
             >
               <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
-              <span>Comanda</span>
+              <span>{language === 'es' ? 'Comanda' : 'Comanda'}</span>
             </button>
             <button
               type="button"
               disabled={cart.length === 0}
               onClick={() => setIsPaymentOpen(true)}
-              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <CreditCard className="w-4 h-4 stroke-[2.5]" />
-              Finalizar Venda (Multi-Moeda)
+              {language === 'es' ? 'Cobrar Venta (Multi-Moneda)' : 'Finalizar Venda (Multi-Moeda)'}
             </button>
           </div>
 
@@ -482,11 +486,13 @@ export const PdvView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Scale className="w-4 h-4 text-amber-400" />
-                <h4 className="text-sm font-semibold text-neutral-100">Pesagem de Produto</h4>
+                <h4 className="text-sm font-semibold text-neutral-100">
+                  {language === 'es' ? 'Pesaje de Producto' : 'Pesagem de Produto'}
+                </h4>
               </div>
               <button
                 onClick={() => setWeightProduct(null)}
-                className="text-neutral-500 hover:text-neutral-200"
+                className="text-neutral-500 hover:text-neutral-200 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -495,13 +501,15 @@ export const PdvView: React.FC = () => {
             <div>
               <p className="text-xs text-neutral-300 font-medium">{weightProduct.name}</p>
               <p className="text-[11px] text-neutral-500 font-mono-nums">
-                Preço: {formatCurrency(weightProduct.priceBrl, 'BRL')} / kg
+                {language === 'es' ? 'Precio:' : 'Preço:'} {formatCurrency(weightProduct.priceBrl, 'BRL')} / kg
               </p>
             </div>
 
             <form onSubmit={handleConfirmWeight} className="space-y-3">
               <div>
-                <label className="text-xs text-neutral-400 block mb-1">Peso em Quilogramas (kg)</label>
+                <label className="text-xs text-neutral-400 block mb-1">
+                  {language === 'es' ? 'Peso en Kilogramos (kg)' : 'Peso em Quilogramas (kg)'}
+                </label>
                 <input
                   type="number"
                   step="0.005"
@@ -520,7 +528,7 @@ export const PdvView: React.FC = () => {
                     key={w}
                     type="button"
                     onClick={() => setCustomWeightInput(w)}
-                    className="py-1 px-2 rounded bg-neutral-800 hover:bg-neutral-700 text-[11px] font-mono-nums text-neutral-300"
+                    className="py-1 px-2 rounded bg-neutral-800 hover:bg-neutral-700 text-[11px] font-mono-nums text-neutral-300 cursor-pointer"
                   >
                     {parseFloat(w) * 1000}g
                   </button>
@@ -528,7 +536,9 @@ export const PdvView: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-800 font-mono-nums">
-                <span className="text-neutral-400">Subtotal estimado:</span>
+                <span className="text-neutral-400">
+                  {language === 'es' ? 'Subtotal estimado:' : 'Subtotal estimado:'}
+                </span>
                 <strong className="text-neutral-100 font-bold">
                   {formatCurrency((parseFloat(customWeightInput) || 0) * weightProduct.priceBrl, 'BRL')}
                 </strong>
@@ -538,15 +548,15 @@ export const PdvView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setWeightProduct(null)}
-                  className="flex-1 py-2 rounded-xl border border-neutral-800 text-xs text-neutral-400 hover:bg-neutral-800"
+                  className="flex-1 py-2 rounded-xl border border-neutral-800 text-xs text-neutral-400 hover:bg-neutral-800 cursor-pointer"
                 >
-                  Cancelar
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold"
+                  className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold cursor-pointer"
                 >
-                  Adicionar ao Carrinho
+                  {language === 'es' ? 'Agregar al Carrito' : 'Adicionar ao Carrinho'}
                 </button>
               </div>
             </form>

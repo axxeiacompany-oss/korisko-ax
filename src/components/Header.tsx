@@ -13,6 +13,7 @@ import {
 import { formatCurrency } from '../utils/currency';
 import { SwitchEmployeeModal } from './modals/SwitchEmployeeModal';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export type TabType = 
   | 'dashboard' 
@@ -39,23 +40,26 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
     exchangeRates, 
     isCloudSyncing, 
     lastBackupTime, 
-    currentSession 
+    currentSession,
+    dbStatus,
+    t,
+    language 
   } = useBakery();
 
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState(false);
   const [isRatesOpen, setIsRatesOpen] = useState(false);
 
   const navItems: Array<{ id: TabType; label: string }> = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'pdv', label: 'PDV Vendas' },
-    { id: 'estoque', label: 'Estoque' },
-    { id: 'fichas_tecnicas', label: 'Fichas Técnicas' },
-    { id: 'crm', label: 'Clientes (CRM)' },
-    { id: 'caixa', label: 'Caixa' },
-    { id: 'mais_vendidos', label: 'Mais Vendidos' },
-    { id: 'metas', label: 'Metas' },
-    { id: 'cambio', label: 'Multi-Moedas' },
-    { id: 'backup', label: 'Nuvem' },
+    { id: 'dashboard', label: t.tabDashboard },
+    { id: 'pdv', label: t.tabPdv },
+    { id: 'estoque', label: t.tabInventory },
+    { id: 'fichas_tecnicas', label: t.tabRecipes },
+    { id: 'crm', label: t.tabCrm },
+    { id: 'caixa', label: t.tabCashRegister },
+    { id: 'mais_vendidos', label: t.tabTopProducts },
+    { id: 'metas', label: t.tabGoals },
+    { id: 'cambio', label: t.tabCurrency },
+    { id: 'backup', label: t.tabBackup },
   ];
 
   return (
@@ -73,9 +77,9 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
           </div>
           <div>
             <div className="text-base font-bold tracking-tight text-neutral-100 group-hover:text-amber-400 transition-colors leading-none">
-              Korisko
+              {t.appName}
             </div>
-            <span className="text-[10px] text-neutral-500 font-medium">Padaria & Confeitaria</span>
+            <span className="text-[10px] text-neutral-500 font-medium">{t.appSlogan}</span>
           </div>
         </a>
 
@@ -103,6 +107,9 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
         {/* Zone 3: Primary Actions & Status */}
         <div className="flex items-center gap-3">
           
+          {/* Language Switcher */}
+          <LanguageSwitcher compact />
+          
           {/* Multi-Currency Ticker Button */}
           <button
             type="button"
@@ -118,20 +125,32 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
             </div>
           </button>
 
-          {/* Cloud Sync Status Indicator */}
+          {/* Cloud / Database Sync Status Indicator */}
           <button
             type="button"
             onClick={() => onSelectTab('backup')}
-            title={lastBackupTime ? `Último backup em nuvem: ${new Date(lastBackupTime).toLocaleTimeString('pt-BR')}` : 'Sincronização em nuvem'}
+            title={
+              dbStatus.connected
+                ? 'Banco de Dados Railway Conectado (PostgreSQL)'
+                : lastBackupTime
+                ? `Último backup: ${new Date(lastBackupTime).toLocaleTimeString('pt-BR')}`
+                : 'Sincronização em nuvem'
+            }
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800/60 transition-colors text-xs text-neutral-400"
           >
             {isCloudSyncing ? (
               <RefreshCw className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-            ) : (
+            ) : dbStatus.connected ? (
               <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 text-amber-400" />
             )}
             <span className="hidden md:inline text-[11px]">
-              {isCloudSyncing ? 'Sincronizando...' : 'Nuvem OK'}
+              {isCloudSyncing
+                ? 'Sincronizando...'
+                : dbStatus.connected
+                ? 'Railway BD'
+                : 'Nuvem OK'}
             </span>
           </button>
 

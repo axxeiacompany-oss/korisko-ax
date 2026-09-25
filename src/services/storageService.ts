@@ -1228,6 +1228,8 @@ export const INITIAL_CUSTOMER_ENTRIES: CustomerAccountEntry[] = [
   },
 ];
 
+let saveTimer: any = null;
+
 export class StorageService {
   /**
    * Load entire state or initialize with defaults
@@ -1293,14 +1295,74 @@ export class StorageService {
   }
 
   /**
-   * Persist state to local storage
+   * Persist state to local storage and asynchronously sync to server database
    */
-  static saveState(data: SystemBackupData): void {
+  static saveState(data: SystemBackupData, syncServer: boolean = true): void {
     try {
       data.timestamp = new Date().toISOString();
       localStorage.setItem(DB_KEY, JSON.stringify(data));
     } catch (e) {
       console.error('Failed to persist state to localStorage', e);
+    }
+
+    if (syncServer) {
+      StorageService.queueServerSync(data);
+    }
+  }
+
+  /**
+   * Queue debounced persistence to server database (PostgreSQL on Railway)
+   */
+  static queueServerSync(data: SystemBackupData): void {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(async () => {
+      try {
+        await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data }),
+        });
+      } catch {
+        // Fallback silently to client storage if server is currently unreachable
+      }
+    }, 600);
+  }
+
+  /**
+   * Fetch current state from server / Railway database
+   */
+  static async fetchServerState(): Promise<SystemBackupData | null> {
+    try {
+      const res = await fetch('/api/state');
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json && json.data && json.data.products && json.data.sales) {
+        StorageService.saveState(json.data, false);
+        return json.data;
+      }
+    } catch (err) {
+      console.warn('Could not fetch state from server, continuing with local storage:', err);
+    }
+    return null;
+  }
+
+  /**
+   * Check connection status to Railway database or local server storage
+   */
+  static async checkDatabaseHealth(): Promise<{ connected: boolean; mode: string; railwayDetected: boolean }> {
+    try {
+      const res = await fetch('/api/health');
+      if (!res.ok) return { connected: false, mode: 'local_storage', railwayDetected: false };
+      const json = await res.json();
+      return {
+        connected: Boolean(json.databaseConnected),
+        mode: json.mode || 'local_storage',
+        railwayDetected: Boolean(json.railwayDetected),
+      };
+    } catch {
+      return { connected: false, mode: 'local_storage', railwayDetected: false };
     }
   }
 
@@ -1364,6 +1426,14 @@ export class StorageService {
 
     const updated = [newPoint, ...currentPoints].slice(0, 20); // keep last 20
     localStorage.setItem(BACKUPS_KEY, JSON.stringify(updated));
+
+    // Send backup point to server
+    fetch('/api/backups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ point: newPoint }),
+    }).catch(() => {});
+
     return newPoint;
   }
 

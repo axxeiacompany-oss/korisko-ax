@@ -16,13 +16,14 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Employee } from '../../types';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 interface Props {
   onLoginSuccess: () => void;
 }
 
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
-  const { employees, switchUser, currentUser } = useBakery();
+  const { employees, switchUser, currentUser, t, language } = useBakery();
 
   const [email, setEmail] = useState('axxeiacompany@gmail.com');
   const [password, setPassword] = useState('9APG_47z-EgF4yz');
@@ -127,16 +128,18 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         </div>
 
         <div className="flex items-center gap-3 text-xs text-neutral-400">
+          <LanguageSwitcher />
+
           <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono-nums text-neutral-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Servidores Online (v2.4)
+            {language === 'es' ? 'Servidores Online (v2.4)' : 'Servidores Online (v2.4)'}
           </span>
           <a 
             href="#demo"
             onClick={(e) => { e.preventDefault(); onLoginSuccess(); }}
             className="px-3.5 py-1.5 rounded-lg border border-[#1E2638] bg-[#0E131F] hover:bg-[#151D30] text-neutral-300 hover:text-white text-xs font-medium transition-colors"
           >
-            Acessar Direto
+            {language === 'es' ? 'Acceso Directo' : 'Acessar Direto'}
           </a>
         </div>
       </header>
@@ -154,10 +157,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             {/* Header Text */}
             <div className="space-y-1.5 mb-7 text-center sm:text-left">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                Bem-vindo de volta!
+                {t.loginTitle}
               </h1>
               <p className="text-xs text-neutral-400">
-                Insira seu e-mail e senha para começar ou acesse com seu perfil.
+                {t.loginSubtitle}
               </p>
             </div>
 
@@ -175,7 +178,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               {/* Email Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-neutral-300 block">
-                  E-mail de Acesso
+                  {t.loginEmailLabel}
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">
@@ -196,17 +199,19 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-neutral-300">
-                    Senha ou PIN
+                    {t.loginPasswordLabel}
                   </label>
                   <a
                     href="#esqueci"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Para recuperar o PIN ou senha, solicite ao Administrador (Roberto Silveira) no painel de gestão.');
+                      alert(language === 'es' 
+                        ? 'Para recuperar su PIN o contraseña, comuníquese con el Administrador (Ax) en el panel de gestión.' 
+                        : 'Para recuperar o PIN ou senha, solicite ao Administrador (Ax) no painel de gestão.');
                     }}
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
-                    Esqueceu a senha?
+                    {language === 'es' ? '¿Olvidó su contraseña?' : 'Esqueceu a senha?'}
                   </a>
                 </div>
                 <div className="relative group">
@@ -240,7 +245,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded border-[#273248] bg-[#090D15] text-indigo-600 focus:ring-indigo-500/30"
                   />
-                  <span>Lembrar de mim por 30 dias</span>
+                  <span>{t.loginRememberMe}</span>
                 </label>
               </div>
 
@@ -254,7 +259,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Entrar na plataforma</span>
+                    <span>{t.loginButton}</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </>
                 )}
@@ -269,7 +274,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               </div>
               <div className="relative flex justify-center text-[10px] uppercase font-semibold tracking-wider">
                 <span className="bg-[#0D121D] px-2.5 text-neutral-500">
-                  Ou selecione perfil de acesso rápido
+                  {t.loginQuickRoles}
                 </span>
               </div>
             </div>
@@ -279,6 +284,16 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <div className="grid grid-cols-2 gap-2">
                 {employees.map((emp) => {
                   const isSelected = selectedQuickRole === emp.id;
+                  const roleLabel = emp.role === 'admin' 
+                    ? t.roleAdmin 
+                    : emp.role === 'gerente' 
+                    ? t.roleManager 
+                    : emp.role === 'caixa' 
+                    ? t.roleCashier 
+                    : emp.role === 'padeiro' 
+                    ? t.roleBaker 
+                    : t.roleAffiliate;
+
                   return (
                     <button
                       key={emp.id}
@@ -295,7 +310,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-semibold truncate leading-tight">{emp.name}</p>
-                        <p className="text-[9px] text-neutral-500 capitalize">{emp.role}</p>
+                        <p className="text-[9px] text-neutral-500">{roleLabel}</p>
                       </div>
                     </button>
                   );
@@ -306,7 +321,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             {/* Security notice */}
             <div className="mt-6 pt-4 border-t border-[#1A2234] flex items-center justify-center gap-2 text-[11px] text-neutral-500">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Conexão criptografada TLS 256-bit ponta a ponta</span>
+              <span>{t.loginSecurityNotice}</span>
             </div>
 
           </div>
@@ -314,16 +329,18 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           {/* Bottom helper */}
           <div className="text-center text-xs text-neutral-500 space-y-1">
             <p>
-              Ainda não tem conta no Korisko?{' '}
+              {language === 'es' ? '¿Aún no tiene cuenta en Korisko?' : 'Ainda não tem conta no Korisko?'}{' '}
               <a
                 href="#solicitar"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert('O sistema Korisko está configurado com 4 perfis operacionais prontos para uso: Administrador, Gerente, Caixa e Padeiro.');
+                  alert(language === 'es' 
+                    ? 'El sistema Korisko está configurado con perfiles operativos listos para usar: Administrador Ax, Gerente, Caja y Panadero.' 
+                    : 'O sistema Korisko está configurado com 4 perfis operacionais prontos para uso: Administrador, Gerente, Caixa e Padeiro.');
                 }}
                 className="text-indigo-400 hover:text-indigo-300 font-medium"
               >
-                Solicitar Acesso
+                {language === 'es' ? 'Solicitar Acceso' : 'Solicitar Acesso'}
               </a>
             </p>
           </div>

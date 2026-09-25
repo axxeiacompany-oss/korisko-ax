@@ -23,15 +23,34 @@ export const BackupView: React.FC = () => {
     backupPoints,
     products,
     sales,
-    stockMovements 
+    stockMovements,
+    dbStatus
   } = useBakery();
 
   const [notification, setNotification] = useState<string | null>(null);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleRecheckDatabase = async () => {
+    setIsCheckingDb(true);
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      if (data.databaseConnected) {
+        showNotification('Banco de Dados Railway (PostgreSQL) conectado e operacional!');
+      } else {
+        showNotification('Servidor ativo em modo armazenamento seguro. Para PostgreSQL, configure DATABASE_URL no Railway.');
+      }
+    } catch {
+      showNotification('Não foi possível verificar a conexão com o servidor.');
+    } finally {
+      setIsCheckingDb(false);
+    }
   };
 
   const handleManualBackup = () => {
@@ -155,6 +174,66 @@ export const BackupView: React.FC = () => {
           </p>
         </div>
 
+      </div>
+
+      {/* Railway PostgreSQL Database Integration Card */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-850 border border-neutral-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              dbStatus.connected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            }`}>
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-neutral-100">
+                  Banco de Dados Railway (PostgreSQL)
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                  dbStatus.connected
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {dbStatus.connected ? '● PostgreSQL Ativo' : '● Modo Local Seguro'}
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                {dbStatus.connected
+                  ? 'Conectado à instância PostgreSQL no Railway. Todas as vendas, produtos e comandas são salvos no banco em tempo real.'
+                  : 'Pronto para Railway: adicione um serviço de PostgreSQL no seu projeto Railway para ativar a persistência em nuvem.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isCheckingDb}
+            onClick={handleRecheckDatabase}
+            className="px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-2 shrink-0 self-start sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingDb ? 'animate-spin text-sky-400' : ''}`} />
+            {isCheckingDb ? 'Verificando...' : 'Testar Conexão'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 border-t border-neutral-800/80 text-xs">
+          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-850">
+            <span className="text-[11px] text-neutral-500 block">Variável de Conexão</span>
+            <span className="font-mono text-neutral-300 text-[11px] font-medium">DATABASE_URL</span>
+            <span className="text-[10px] text-neutral-500 block mt-0.5">Injetada automaticamente pelo Railway ao adicionar PostgreSQL</span>
+          </div>
+          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-850">
+            <span className="text-[11px] text-neutral-500 block">Porta de Execução</span>
+            <span className="font-mono text-neutral-300 text-[11px] font-medium">process.env.PORT</span>
+            <span className="text-[10px] text-neutral-500 block mt-0.5">Configurada dinamicamente pelo Railway para tráfego web</span>
+          </div>
+          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-850">
+            <span className="text-[11px] text-neutral-500 block">Persistência Multi-Dispositivo</span>
+            <span className="text-emerald-400 text-[11px] font-medium block">Sincronização Ativa</span>
+            <span className="text-[10px] text-neutral-500 block mt-0.5">Vendas e caixa compartilhados entre todos os caixas e celulares</span>
+          </div>
+        </div>
       </div>
 
       {/* 2-Column: Backup Operations + Cloud Snapshots History */}

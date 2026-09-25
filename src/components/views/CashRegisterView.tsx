@@ -19,7 +19,7 @@ import { CloseRegisterModal } from '../modals/CloseRegisterModal';
 import { OpenRegisterModal } from '../modals/OpenRegisterModal';
 
 export const CashRegisterView: React.FC = () => {
-  const { currentSession, sessionHistory, sales, hasPermission } = useBakery();
+  const { currentSession, sessionHistory, sales, hasPermission, t, language } = useBakery();
 
   const [isSangriaOpen, setIsSangriaOpen] = useState(false);
   const [isSuprimentoOpen, setIsSuprimentoOpen] = useState(false);
@@ -100,20 +100,22 @@ export const CashRegisterView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-neutral-100">
-                Caixa #{currentSession.sessionNumber}
+                {language === 'es' ? 'Caja' : 'Caixa'} #{currentSession.sessionNumber}
               </h2>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
                 isRegisterOpen 
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                   : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
               }`}>
-                {currentSession.status}
+                {isRegisterOpen 
+                  ? (language === 'es' ? 'ABIERTA' : 'ABERTO') 
+                  : (language === 'es' ? 'CERRADA' : 'FECHADO')}
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-0.5 flex items-center gap-2">
-              <span>Aberto por: <strong className="text-neutral-300">{currentSession.openedBy}</strong></span>
+              <span>{language === 'es' ? 'Abierta por:' : 'Aberto por:'} <strong className="text-neutral-300">{currentSession.openedBy}</strong></span>
               <span aria-hidden="true">·</span>
-              <span>Início: {new Date(currentSession.openedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>{language === 'es' ? 'Inicio:' : 'Início:'} {new Date(currentSession.openedAt).toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
         </div>
@@ -125,27 +127,27 @@ export const CashRegisterView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSuprimentoOpen(true)}
-                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-                Suprimento (Entrada)
+                {language === 'es' ? 'Ingreso / Suplido' : 'Suprimento (Entrada)'}
               </button>
               <button
                 type="button"
                 onClick={() => setIsSangriaOpen(true)}
-                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowDownRight className="w-4 h-4 text-rose-400" />
-                Sangria (Retirada)
+                {language === 'es' ? 'Retiro / Sangría' : 'Sangria (Retirada)'}
               </button>
               {canManageRegister && (
                 <button
                   type="button"
                   onClick={() => setIsCloseRegisterOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Lock className="w-4 h-4" />
-                  Fechar Caixa
+                  {language === 'es' ? 'Cerrar Caja' : 'Fechar Caixa'}
                 </button>
               )}
             </>
@@ -153,10 +155,10 @@ export const CashRegisterView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsOpenRegisterOpen(true)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Unlock className="w-4 h-4" />
-              Abrir Novo Caixa
+              {language === 'es' ? 'Abrir Nueva Caja' : 'Abrir Novo Caixa'}
             </button>
           )}
         </div>
@@ -165,7 +167,7 @@ export const CashRegisterView: React.FC = () => {
       {/* 3 Physical Cash Drawer Balances */}
       <div className="space-y-2">
         <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
-          Dinheiro Físico Atual na Gaveta (Por Moeda)
+          {language === 'es' ? 'Dinero Físico Actual en Gaveta (Por Moneda)' : 'Dinheiro Físico Atual na Gaveta (Por Moeda)'}
         </label>
         
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -173,7 +175,7 @@ export const CashRegisterView: React.FC = () => {
           {/* BRL Cash */}
           <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium">Real Brasileiro (BRL)</span>
+              <span className="text-xs text-neutral-400 font-medium">Real Brasileño (BRL)</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
                 R$
               </span>
@@ -182,14 +184,14 @@ export const CashRegisterView: React.FC = () => {
               {formatCurrency(drawerBalances.brl, 'BRL')}
             </div>
             <p className="text-[11px] text-neutral-500 font-mono-nums">
-              Fundo inicial: {formatCurrency(currentSession.initialFloat.brl, 'BRL')}
+              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.brl, 'BRL')}
             </p>
           </div>
 
           {/* PYG Cash */}
           <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium">Guaraní Paraguaio (PYG)</span>
+              <span className="text-xs text-neutral-400 font-medium">Guaraní Paraguayo (PYG)</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
                 ₲
               </span>
@@ -198,7 +200,7 @@ export const CashRegisterView: React.FC = () => {
               {formatCurrency(drawerBalances.pyg, 'PYG')}
             </div>
             <p className="text-[11px] text-neutral-500 font-mono-nums">
-              Fundo inicial: {formatCurrency(currentSession.initialFloat.pyg, 'PYG')}
+              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.pyg, 'PYG')}
             </p>
           </div>
 
@@ -214,7 +216,7 @@ export const CashRegisterView: React.FC = () => {
               {formatCurrency(drawerBalances.usd, 'USD')}
             </div>
             <p className="text-[11px] text-neutral-500 font-mono-nums">
-              Fundo inicial: {formatCurrency(currentSession.initialFloat.usd, 'USD')}
+              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.usd, 'USD')}
             </p>
           </div>
 
@@ -224,19 +226,19 @@ export const CashRegisterView: React.FC = () => {
       {/* Other Payment Methods (Electronic / Digital) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Pix Instantâneo:</span>
+          <span className="text-xs text-neutral-400">Pix / QR:</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
             {formatCurrency(drawerBalances.totalPix, 'BRL')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Cartão de Débito:</span>
+          <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Débito:' : 'Cartão de Débito:'}</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
             {formatCurrency(drawerBalances.totalDebito, 'BRL')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Cartão de Crédito:</span>
+          <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Crédito:' : 'Cartão de Crédito:'}</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
             {formatCurrency(drawerBalances.totalCredito, 'BRL')}
           </span>
@@ -251,20 +253,22 @@ export const CashRegisterView: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
               <ArrowDownRight className="w-4 h-4 text-amber-400" />
-              Movimentações do Caixa Atual ({currentSession.transactions.length})
+              {language === 'es' ? 'Movimientos de la Caja Actual' : 'Movimentações do Caixa Atual'} ({currentSession.transactions.length})
             </h3>
-            <span className="text-xs text-neutral-500">Sangrias & Suprimentos</span>
+            <span className="text-xs text-neutral-500">
+              {language === 'es' ? 'Retiros & Ingresos' : 'Sangrias & Suprimentos'}
+            </span>
           </div>
 
           <div className="space-y-2">
             {currentSession.transactions.length === 0 ? (
               <p className="text-xs text-neutral-500 py-6 text-center">
-                Nenhuma sangria ou suprimento registrado neste turno.
+                {language === 'es' ? 'Ningún retiro o ingreso registrado en este turno.' : 'Nenhuma sangria ou suprimento registrado neste turno.'}
               </p>
             ) : (
               currentSession.transactions.map(t => {
                 const isSup = t.type === 'suprimento';
-                const timeStr = new Date(t.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const timeStr = new Date(t.timestamp).toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                 return (
                   <div
@@ -276,12 +280,12 @@ export const CashRegisterView: React.FC = () => {
                         <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
                           isSup ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
                         }`}>
-                          {t.type}
+                          {isSup ? (language === 'es' ? 'Ingreso' : 'Suprimento') : (language === 'es' ? 'Retiro' : 'Sangria')}
                         </span>
                         <span className="font-semibold text-neutral-200">{t.reason}</span>
                       </div>
                       <div className="text-[11px] text-neutral-500 mt-1">
-                        Por: {t.employeeName} · {timeStr}
+                        {language === 'es' ? 'Por:' : 'Por:'} {t.employeeName} · {timeStr}
                       </div>
                     </div>
                     
@@ -304,20 +308,21 @@ export const CashRegisterView: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
               <FileText className="w-4 h-4 text-emerald-400" />
-              Histórico de Caixas Fechados ({sessionHistory.length})
+              {language === 'es' ? 'Historial de Cajas Cerradas' : 'Histórico de Caixas Fechados'} ({sessionHistory.length})
             </h3>
-            <span className="text-xs text-neutral-500">Auditoria</span>
+            <span className="text-xs text-neutral-500">{language === 'es' ? 'Auditoría' : 'Auditoria'}</span>
           </div>
 
           <div className="space-y-2.5">
             {sessionHistory.length === 0 ? (
               <p className="text-xs text-neutral-500 py-6 text-center">
-                Ainda não há caixas fechados no histórico recente.
+                {language === 'es' ? 'Aún no hay cajas cerradas en el historial reciente.' : 'Ainda não há caixas fechados no histórico recente.'}
               </p>
             ) : (
               sessionHistory.map(s => {
-                const closedDate = s.closedAt ? new Date(s.closedAt).toLocaleDateString('pt-BR') : '—';
-                const closedTime = s.closedAt ? new Date(s.closedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                const locale = language === 'es' ? 'es-PY' : 'pt-BR';
+                const closedDate = s.closedAt ? new Date(s.closedAt).toLocaleDateString(locale) : '—';
+                const closedTime = s.closedAt ? new Date(s.closedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '—';
 
                 return (
                   <div
@@ -325,27 +330,27 @@ export const CashRegisterView: React.FC = () => {
                     className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-neutral-200">Caixa #{s.sessionNumber}</span>
+                      <span className="font-bold text-neutral-200">{language === 'es' ? 'Caja' : 'Caixa'} #{s.sessionNumber}</span>
                       <span className="text-neutral-500 text-[11px] font-mono-nums">
-                        {closedDate} às {closedTime}
+                        {closedDate} {language === 'es' ? 'a las' : 'às'} {closedTime}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-neutral-850">
                       <div>
-                        <span className="text-[10px] text-neutral-500 block">Contado R$</span>
+                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado R$' : 'Contado R$'}</span>
                         <span className="font-mono-nums font-semibold text-neutral-200">
                           {formatCurrency(s.countedOnClose?.brl || 0, 'BRL')}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-neutral-500 block">Contado ₲</span>
+                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado ₲' : 'Contado ₲'}</span>
                         <span className="font-mono-nums font-semibold text-amber-400">
                           {formatCurrency(s.countedOnClose?.pyg || 0, 'PYG')}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-neutral-500 block">Contado $</span>
+                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado $' : 'Contado $'}</span>
                         <span className="font-mono-nums font-semibold text-emerald-400">
                           {formatCurrency(s.countedOnClose?.usd || 0, 'USD')}
                         </span>

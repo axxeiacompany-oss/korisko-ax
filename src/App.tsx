@@ -26,7 +26,7 @@ import { UserProfileModal } from './components/modals/UserProfileModal';
 import { Lock, ShieldAlert } from 'lucide-react';
 
 function MainAppShell() {
-  const { isFeatureAllowed, currentUser } = useBakery();
+  const { isFeatureAllowed, currentUser, t, language } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     // Check if user previously logged in this session
     const saved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
@@ -100,16 +100,21 @@ function MainAppShell() {
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
                 <ShieldAlert className="w-6 h-6" />
               </div>
-              <h2 className="text-base font-bold text-white">Módulo Restrito</h2>
+              <h2 className="text-base font-bold text-white">
+                {language === 'es' ? 'Módulo Restringido' : 'Módulo Restrito'}
+              </h2>
               <p className="text-xs text-neutral-400">
-                O seu perfil de afiliado/colaborador ({currentUser.name}) não possui liberação para este módulo. Solicite ao Administrador Geral (Ax) a liberação desta função.
+                {language === 'es' 
+                  ? `Su perfil de afiliado/colaborador (${currentUser.name}) no tiene autorización para acceder a este módulo. Solicite al Administrador General (Ax) la habilitación de esta función.`
+                  : `O seu perfil de afiliado/colaborador (${currentUser.name}) não possui liberação para este módulo. Solicite ao Administrador Geral (Ax) a liberação desta função.`
+                }
               </p>
               <button
                 type="button"
                 onClick={() => setActiveTab('dashboard')}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
               >
-                Voltar ao Dashboard
+                {language === 'es' ? 'Volver al Dashboard' : 'Voltar ao Dashboard'}
               </button>
             </div>
           ) : (
@@ -139,14 +144,14 @@ function MainAppShell() {
       >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="font-medium text-neutral-300">
-            Korisko — Sistema Integrado de Gestão de Padaria, Confeitaria & Salão
+            {t.appName} — {t.systemDescription}
           </p>
           <div className="flex items-center gap-3 text-[11px] font-mono-nums">
             <span>🇧🇷 BRL</span>
             <span>🇵🇾 PYG</span>
             <span>🇺🇸 USD</span>
             <span className="text-neutral-600">|</span>
-            <span className="text-emerald-400">● Backup Automático Ativo</span>
+            <span className="text-emerald-400">● {language === 'es' ? 'Backup Automático Activo' : 'Backup Automático Ativo'}</span>
           </div>
         </div>
       </footer>
