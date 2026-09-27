@@ -6,7 +6,6 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  ShieldCheck, 
   Sparkles, 
   CheckCircle2, 
   AlertCircle,
@@ -75,7 +74,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   return (
     <div className="relative min-h-screen w-full bg-[#080B11] text-neutral-100 flex flex-col justify-between overflow-x-hidden selection:bg-indigo-500/30 selection:text-indigo-200">
       
-      {/* Ambient background glows matching UTMify / SaaS aesthetic */}
+      {/* Ambient background glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         {/* Subtle radial tech gradient top-left */}
         <div className="absolute -top-[25%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-indigo-600/15 via-violet-600/10 to-transparent blur-3xl opacity-70" />
@@ -102,11 +101,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             </div>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
+            <span className="font-bold text-base tracking-tight text-white">
               Korisko
-              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                SaaS ERP
-              </span>
             </span>
             <span className="text-[11px] text-neutral-400">Padaria, Confeitaria & Salão</span>
           </div>
@@ -114,11 +110,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
         <div className="flex items-center gap-3 text-xs text-neutral-400">
           <LanguageSwitcher />
-
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-mono-nums text-neutral-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {language === 'es' ? 'Servidores Seguros (v2.4)' : 'Servidores Seguros (v2.4)'}
-          </span>
         </div>
       </header>
 
@@ -245,18 +236,12 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
             </form>
 
-            {/* Security notice */}
-            <div className="mt-6 pt-4 border-t border-[#1A2234] flex items-center justify-center gap-2 text-[11px] text-neutral-400">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{language === 'es' ? 'Acceso seguro con cifrado y persistencia en Supabase' : 'Acesso seguro com criptografia e persistência no Supabase'}</span>
-            </div>
-
           </div>
 
           {/* Bottom helper */}
           <div className="text-center text-xs text-neutral-500 space-y-1">
             <p>
-              {language === 'es' ? 'Sistema Administrativo Korisko ERP' : 'Sistema Administrativo Korisko ERP'}
+              {language === 'es' ? 'Sistema Administrativo Korisko' : 'Sistema Administrativo Korisko'}
             </p>
           </div>
 

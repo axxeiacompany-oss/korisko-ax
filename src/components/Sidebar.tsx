@@ -26,7 +26,8 @@ import {
   ExternalLink,
   Lock,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { AppFeature } from '../types';
@@ -39,6 +40,8 @@ interface Props {
   onLogout: () => void;
   onOpenSwitchUser: () => void;
   onOpenProfile?: () => void;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<Props> = ({
@@ -49,6 +52,8 @@ export const Sidebar: React.FC<Props> = ({
   onLogout,
   onOpenSwitchUser,
   onOpenProfile,
+  isOpenMobile,
+  onCloseMobile,
 }) => {
   const { 
     currentUser, 
@@ -171,24 +176,33 @@ export const Sidebar: React.FC<Props> = ({
   ];
 
   return (
-    <aside 
-      className={`fixed top-0 bottom-0 left-0 z-40 bg-[#090D15] border-r border-[#1B2335] flex flex-col justify-between transition-all duration-300 select-none ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
-    >
-      
-      {/* Top Header / Workspace Selector in UTMify Style */}
-      <div className="p-4 border-b border-[#182030] flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Logo Mark */}
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-amber-500 p-[1.5px] shadow-md shadow-indigo-500/20 shrink-0">
-            <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-amber-300 text-sm">
-              K
-            </div>
-          </div>
+    <>
+      {/* Mobile Drawer Backdrop Overlay */}
+      {isOpenMobile && (
+        <div 
+          onClick={onCloseMobile}
+          className="fixed inset-0 z-40 bg-black/75 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+          aria-hidden="true"
+        />
+      )}
 
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1">
+      <aside 
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#090D15] border-r border-[#1B2335] flex flex-col justify-between transition-transform lg:transition-all duration-300 select-none shadow-2xl lg:shadow-none ${
+          isOpenMobile ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${isCollapsed ? 'lg:w-20' : 'w-72 sm:w-64'}`}
+      >
+        
+        {/* Top Header / Workspace Selector in UTMify Style */}
+        <div className="p-4 border-b border-[#182030] flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Logo Mark */}
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-amber-500 p-[1.5px] shadow-md shadow-indigo-500/20 shrink-0">
+              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-amber-300 text-sm">
+                K
+              </div>
+            </div>
+
+            <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : 'block'}`}>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-sm text-white tracking-tight truncate">
                   Korisko
@@ -199,98 +213,115 @@ export const Sidebar: React.FC<Props> = ({
                 Padaria & Confeitaria
               </p>
             </div>
-          )}
+          </div>
+
+          {/* Close button for Mobile */}
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            className="lg:hidden p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors cursor-pointer"
+            title="Fechar menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Collapse toggle button for Desktop */}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="hidden lg:flex p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors"
+            title={isCollapsed ? 'Expandir Menu' : 'Recolher Menu'}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Collapse toggle button */}
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors"
-          title={isCollapsed ? 'Expandir Menu' : 'Recolher Menu'}
-        >
-          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
+        {/* Navigation Links Area */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          {navSections.map((section, idx) => {
+            const visibleItems = section.items.filter(item => isFeatureAllowed(item.id as AppFeature));
+            if (visibleItems.length === 0) return null;
 
-      {/* Navigation Links Area */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        {navSections.map((section, idx) => {
-          const visibleItems = section.items.filter(item => isFeatureAllowed(item.id as AppFeature));
-          if (visibleItems.length === 0) return null;
-
-          return (
-            <div key={idx} className="space-y-1">
-              {!isCollapsed && (
-                <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
+            return (
+              <div key={idx} className="space-y-1">
+                <span className={`px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1 ${
+                  isCollapsed ? 'lg:hidden' : 'block'
+                }`}>
                   {section.group}
                 </span>
-              )}
-              
-              <div className="space-y-0.5">
-                {visibleItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onSelectTab(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all group relative ${
-                        isActive
-                          ? 'bg-gradient-to-r from-indigo-600/20 to-violet-600/10 text-white font-semibold border border-indigo-500/30 shadow-sm'
-                          : 'text-neutral-400 hover:text-white hover:bg-[#121826]'
-                      } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
-                      title={isCollapsed ? item.label : undefined}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Icon className={`w-4 h-4 shrink-0 transition-colors ${
-                          isActive ? 'text-indigo-400' : 'text-neutral-400 group-hover:text-neutral-200'
-                        }`} />
-                        {!isCollapsed && (
-                          <span className="truncate">{item.label}</span>
+                
+                <div className="space-y-0.5">
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectTab(item.id);
+                          onCloseMobile?.();
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group relative cursor-pointer ${
+                          isActive
+                            ? 'bg-gradient-to-r from-indigo-600/25 to-violet-600/15 text-white font-semibold border border-indigo-500/40 shadow-sm'
+                            : 'text-neutral-400 hover:text-white hover:bg-[#121826]'
+                        } ${isCollapsed ? 'lg:justify-center justify-between' : 'justify-between'}`}
+                        title={isCollapsed ? item.label : undefined}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className={`w-4 h-4 shrink-0 transition-colors ${
+                            isActive ? 'text-indigo-400' : 'text-neutral-400 group-hover:text-neutral-200'
+                          }`} />
+                          <span className={`truncate ${isCollapsed ? 'lg:hidden' : 'inline'}`}>
+                            {item.label}
+                          </span>
+                        </div>
+
+                        {item.badge && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono-nums font-medium ${
+                            isCollapsed ? 'lg:hidden' : 'inline'
+                          } ${item.badgeColor || 'bg-neutral-800 text-neutral-400'}`}>
+                            {item.badge}
+                          </span>
                         )}
-                      </div>
 
-                      {!isCollapsed && item.badge && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono-nums font-medium ${item.badgeColor || 'bg-neutral-800 text-neutral-400'}`}>
-                          {item.badge}
-                        </span>
-                      )}
-
-                      {/* Active vertical pill indicator */}
-                      {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-indigo-500" />
-                      )}
-                    </button>
-                  );
-                })}
+                        {/* Active vertical pill indicator */}
+                        {isActive && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-indigo-500" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Bottom Profile / Quick Action Card */}
-      <div className="p-3 border-t border-[#182030] bg-[#0A0E18] space-y-2">
-        
-        {/* User Card with Online Indicator and Profile Trigger */}
-        <div 
-          onClick={onOpenProfile || onOpenSwitchUser}
-          className={`p-2.5 rounded-xl bg-[#0F1422] border border-[#1E273A] hover:border-indigo-500/50 cursor-pointer transition-all flex items-center gap-2.5 group ${
-            isCollapsed ? 'justify-center' : ''
-          }`}
-          title={`${t.myProfile} & ${t.myPassword}`}
-        >
-          <div className="relative">
-            <div className={`w-8 h-8 rounded-lg ${currentUser.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-md`}>
-              {currentUser.name.charAt(0)}
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A0E18] animate-pulse" />
-          </div>
+        {/* Bottom Profile / Quick Action Card */}
+        <div className="p-3 border-t border-[#182030] bg-[#0A0E18] space-y-2">
           
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1">
+          {/* User Card with Online Indicator and Profile Trigger */}
+          <div 
+            onClick={() => {
+              if (onOpenProfile) onOpenProfile();
+              else onOpenSwitchUser();
+              onCloseMobile?.();
+            }}
+            className={`p-2.5 rounded-xl bg-[#0F1422] border border-[#1E273A] hover:border-indigo-500/50 cursor-pointer transition-all flex items-center gap-2.5 group ${
+              isCollapsed ? 'lg:justify-center' : ''
+            }`}
+            title={`${t.myProfile} & ${t.myPassword}`}
+          >
+            <div className="relative">
+              <div className={`w-8 h-8 rounded-lg ${currentUser.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-md`}>
+                {currentUser.name.charAt(0)}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0A0E18] animate-pulse" />
+            </div>
+            
+            <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : 'block'}`}>
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
                   {currentUser.name}
@@ -302,50 +333,61 @@ export const Sidebar: React.FC<Props> = ({
                 <span className="text-indigo-400 group-hover:underline text-[9px] font-semibold">{t.myPassword}</span>
               </p>
             </div>
+          </div>
+
+          {/* Action Row: Alternar Usuário & Bloquear Tela */}
+          {employees.length > 1 ? (
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenSwitchUser();
+                  onCloseMobile?.();
+                }}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors border border-transparent hover:border-[#1E273A] cursor-pointer ${
+                  isCollapsed ? 'lg:col-span-2' : ''
+                }`}
+                title={language === 'es' ? 'Cambiar Operador' : 'Alternar Operador'}
+              >
+                <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className={isCollapsed ? 'lg:hidden' : 'inline'}>{t.switchOperator}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onLogout();
+                  onCloseMobile?.();
+                }}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20 cursor-pointer ${
+                  isCollapsed ? 'lg:col-span-2' : ''
+                }`}
+                title={language === 'es' ? 'Bloquear Pantalla / Volver al Login' : 'Bloquear Tela / Voltar para Login'}
+              >
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span className={isCollapsed ? 'lg:hidden' : 'inline'}>{t.logout}</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onLogout();
+                onCloseMobile?.();
+              }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white bg-[#0F1422] hover:bg-rose-950/30 border border-[#1E273A] hover:border-rose-500/30 transition-all cursor-pointer"
+              title={language === 'es' ? 'Bloquear Pantalla / Salir' : 'Bloquear Sessão / Sair'}
+            >
+              <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span className={isCollapsed ? 'lg:hidden' : 'inline'}>
+                {language === 'es' ? 'Cerrar Sesión Segura' : 'Sair / Bloquear Sessão'}
+              </span>
+            </button>
           )}
+
         </div>
 
-        {/* Action Row: Alternar Usuário & Bloquear Tela */}
-        {employees.length > 1 ? (
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={onOpenSwitchUser}
-              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors border border-transparent hover:border-[#1E273A] ${
-                isCollapsed ? 'col-span-2' : ''
-              }`}
-              title={language === 'es' ? 'Cambiar Operador' : 'Alternar Operador'}
-            >
-              <UserCheck className="w-3.5 h-3.5 shrink-0" />
-              {!isCollapsed && <span>{t.switchOperator}</span>}
-            </button>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20 ${
-                isCollapsed ? 'col-span-2' : ''
-              }`}
-              title={language === 'es' ? 'Bloquear Pantalla / Volver al Login' : 'Bloquear Tela / Voltar para Login'}
-            >
-              <Lock className="w-3.5 h-3.5 shrink-0" />
-              {!isCollapsed && <span>{t.logout}</span>}
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white bg-[#0F1422] hover:bg-rose-950/30 border border-[#1E273A] hover:border-rose-500/30 transition-all cursor-pointer"
-            title={language === 'es' ? 'Bloquear Pantalla / Salir' : 'Bloquear Sessão / Sair'}
-          >
-            <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            {!isCollapsed && <span>{language === 'es' ? 'Cerrar Sesión Segura' : 'Sair / Bloquear Sessão'}</span>}
-          </button>
-        )}
-
-      </div>
-
-    </aside>
+      </aside>
+    </>
   );
 };

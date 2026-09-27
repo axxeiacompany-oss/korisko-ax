@@ -17,7 +17,8 @@ import {
   Command, 
   X, 
   Zap, 
-  ShieldCheck 
+  ShieldCheck,
+  Menu
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
@@ -32,6 +33,7 @@ interface Props {
   onLogout: () => void;
   isSidebarCollapsed: boolean;
   onOpenProfile?: () => void;
+  onOpenMobileMenu?: () => void;
 }
 
 export const TopNav: React.FC<Props> = ({
@@ -40,6 +42,7 @@ export const TopNav: React.FC<Props> = ({
   onLogout,
   isSidebarCollapsed,
   onOpenProfile,
+  onOpenMobileMenu,
 }) => {
   const { 
     currentUser, 
@@ -80,7 +83,7 @@ export const TopNav: React.FC<Props> = ({
     afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
   };
 
-  const currentTabInfo = tabTitles[activeTab] || { title: 'Korisko ERP', subtitle: 'Gestão Inteligente' };
+  const currentTabInfo = tabTitles[activeTab] || { title: 'Korisko', subtitle: 'Gestão Inteligente' };
 
   // Search Results
   const searchResults = React.useMemo(() => {
@@ -307,7 +310,7 @@ export const TopNav: React.FC<Props> = ({
 
             <div className="p-2.5 border-t border-[#1A2234] bg-[#0A0D15] flex items-center justify-between text-[11px] text-neutral-500">
               <span>{language === 'es' ? 'Presione' : 'Pressione'} <kbd className="px-1 rounded bg-[#161E30] text-neutral-300">ESC</kbd> {language === 'es' ? 'para cerrar' : 'para fechar'}</span>
-              <span>Korisko ERP</span>
+              <span>Korisko</span>
             </div>
 
           </div>
