@@ -28,9 +28,9 @@ import { Lock, ShieldAlert } from 'lucide-react';
 function MainAppShell() {
   const { isFeatureAllowed, currentUser, t, language } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    // Check if user previously logged in this session
+    // Require strict authentication on any new device or new tab
     const saved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
-    return saved !== 'false'; // default to true for instant preview, but persists logout
+    return saved === 'true';
   });
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -40,6 +40,7 @@ function MainAppShell() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    sessionStorage.removeItem('KORISKO_AUTH_SESSION');
     sessionStorage.setItem('KORISKO_AUTH_SESSION', 'false');
   };
 

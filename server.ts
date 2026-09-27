@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -15,6 +16,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Increase payload limit for database state and image backups
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Supabase Connection Setup
+const SUPABASE_DEFAULT_URL = 'https://ofukieepxjawzqtlrgqy.supabase.co';
+const SUPABASE_DEFAULT_KEY = 'sb_publishable_sJLr9rPnGL-rVkNcQPcL0w_Q8KC7_el';
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_DEFAULT_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_DEFAULT_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+let isSupabaseConnected = false;
+let isSupabaseTablesReady = false;
 
 // Database connection setup (PostgreSQL - Native to Railway)
 const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_PUBLIC_URL;
@@ -38,8 +49,25 @@ function ensureLocalDir() {
 }
 
 async function initDatabase() {
+  // 1. Initialize Supabase
+  try {
+    const { data, error } = await supabase.from('korisko_system_state').select('id').limit(1);
+    if (!error) {
+      isSupabaseConnected = true;
+      isSupabaseTablesReady = true;
+      console.log('[Korisko DB] Successfully connected to Supabase with tables ready!');
+    } else {
+      isSupabaseConnected = true;
+      isSupabaseTablesReady = false;
+      console.log('[Korisko DB] Supabase authenticated! Table korisko_system_state needs setup in Supabase SQL editor.');
+    }
+  } catch (err) {
+    console.warn('[Korisko DB] Supabase connectivity check warning:', err);
+  }
+
+  // 2. Initialize PostgreSQL if URL provided
   if (!dbUrl) {
-    console.log('[Korisko DB] No DATABASE_URL provided. Operating in high-speed local storage mode.');
+    console.log('[Korisko DB] Operating in high-speed cloud/local storage mode.');
     return;
   }
 
@@ -92,8 +120,13 @@ app.get('/api/health', async (_req, res) => {
 
   res.json({
     status: 'ok',
-    mode: isDbConnected ? 'railway_postgres' : 'local_storage',
-    databaseConnected: isDbConnected,
+    mode: isSupabaseTablesReady ? 'supabase' : (isDbConnected ? 'railway_postgres' : 'local_storage'),
+    databaseConnected: isDbConnected || isSupabaseTablesReady,
+    supabase: {
+      connected: isSupabaseConnected,
+      tablesReady: isSupabaseTablesReady,
+      url: supabaseUrl,
+    },
     hasDatabaseUrl: Boolean(dbUrl),
     railwayDetected: Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL),
     port: PORT,
@@ -106,6 +139,28 @@ app.get('/api/state', async (_req, res) => {
   if (dbInitPromise) await dbInitPromise;
 
   try {
+    // 1. Try Supabase
+    if (isSupabaseTablesReady) {
+      try {
+        const { data, error } = await supabase
+          .from('korisko_system_state')
+          .select('data, updated_at')
+          .eq('id', 'active_state')
+          .maybeSingle();
+
+        if (!error && data && data.data) {
+          return res.json({
+            source: 'supabase',
+            updatedAt: data.updated_at,
+            data: data.data,
+          });
+        }
+      } catch (err) {
+        console.warn('Supabase state read warning:', err);
+      }
+    }
+
+    // 2. Try PostgreSQL
     if (isDbConnected && pool) {
       const result = await pool.query(
         'SELECT data, updated_at FROM korisko_system_state WHERE id = $1',
@@ -121,7 +176,7 @@ app.get('/api/state', async (_req, res) => {
       }
     }
 
-    // Fallback: Check local filesystem
+    // 3. Fallback: Check local filesystem
     if (fs.existsSync(LOCAL_STATE_FILE)) {
       try {
         const raw = fs.readFileSync(LOCAL_STATE_FILE, 'utf-8');
@@ -159,6 +214,25 @@ app.post('/api/state', async (req, res) => {
   let savedTo = 'none';
 
   try {
+    // 1. Save to Supabase
+    try {
+      const { error: supaErr } = await supabase
+        .from('korisko_system_state')
+        .upsert({
+          id: 'active_state',
+          data,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+
+      if (!supaErr) {
+        savedTo = 'supabase';
+        isSupabaseTablesReady = true;
+      }
+    } catch (err) {
+      console.warn('Supabase state save warning:', err);
+    }
+
+    // 2. Save to PostgreSQL
     if (isDbConnected && pool) {
       await pool.query(
         `INSERT INTO korisko_system_state (id, data, updated_at) 
@@ -166,10 +240,10 @@ app.post('/api/state', async (req, res) => {
          ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
         ['active_state', JSON.stringify(data)]
       );
-      savedTo = 'railway_postgres';
+      if (savedTo === 'none') savedTo = 'railway_postgres';
     }
 
-    // Always mirror to local file as immediate redundant backup
+    // 3. Always mirror to local file as immediate redundant backup
     try {
       ensureLocalDir();
       fs.writeFileSync(LOCAL_STATE_FILE, JSON.stringify(data, null, 2), 'utf-8');
@@ -194,6 +268,23 @@ app.get('/api/backups', async (_req, res) => {
   if (dbInitPromise) await dbInitPromise;
 
   try {
+    // 1. Try Supabase
+    try {
+      const { data: supaBackups, error } = await supabase
+        .from('korisko_backup_points')
+        .select('data')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (!error && supaBackups && supaBackups.length > 0) {
+        return res.json({
+          source: 'supabase',
+          backups: supaBackups.map((r: any) => r.data),
+        });
+      }
+    } catch {}
+
+    // 2. Try PostgreSQL
     if (isDbConnected && pool) {
       const result = await pool.query(
         'SELECT data FROM korisko_backup_points ORDER BY created_at DESC LIMIT 30'
@@ -206,7 +297,7 @@ app.get('/api/backups', async (_req, res) => {
       }
     }
 
-    // Fallback: local file
+    // 3. Fallback: local file
     if (fs.existsSync(LOCAL_BACKUPS_FILE)) {
       const raw = fs.readFileSync(LOCAL_BACKUPS_FILE, 'utf-8');
       const backups = JSON.parse(raw);
@@ -233,6 +324,18 @@ app.post('/api/backups', async (req, res) => {
   }
 
   try {
+    // 1. Supabase
+    try {
+      await supabase
+        .from('korisko_backup_points')
+        .upsert({
+          id: point.id,
+          data: point,
+          created_at: point.timestamp || new Date().toISOString(),
+        }, { onConflict: 'id' });
+    } catch {}
+
+    // 2. PostgreSQL
     if (isDbConnected && pool) {
       await pool.query(
         `INSERT INTO korisko_backup_points (id, data, created_at) 
@@ -242,7 +345,7 @@ app.post('/api/backups', async (req, res) => {
       );
     }
 
-    // Mirror to local file
+    // 3. Mirror to local file
     try {
       ensureLocalDir();
       let list = [];

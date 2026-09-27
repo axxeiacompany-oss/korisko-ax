@@ -52,6 +52,7 @@ export const Sidebar: React.FC<Props> = ({
 }) => {
   const { 
     currentUser, 
+    employees,
     currentSession, 
     openComandas, 
     fichasTecnicas, 
@@ -305,31 +306,43 @@ export const Sidebar: React.FC<Props> = ({
         </div>
 
         {/* Action Row: Alternar Usuário & Bloquear Tela */}
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={onOpenSwitchUser}
-            className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors border border-transparent hover:border-[#1E273A] ${
-              isCollapsed ? 'col-span-2' : ''
-            }`}
-            title={language === 'es' ? 'Cambiar Operador' : 'Alternar Operador'}
-          >
-            <UserCheck className="w-3.5 h-3.5 shrink-0" />
-            {!isCollapsed && <span>{t.switchOperator}</span>}
-          </button>
+        {employees.length > 1 ? (
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenSwitchUser}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-white hover:bg-[#141B2B] transition-colors border border-transparent hover:border-[#1E273A] ${
+                isCollapsed ? 'col-span-2' : ''
+              }`}
+              title={language === 'es' ? 'Cambiar Operador' : 'Alternar Operador'}
+            >
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+              {!isCollapsed && <span>{t.switchOperator}</span>}
+            </button>
 
+            <button
+              type="button"
+              onClick={onLogout}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20 ${
+                isCollapsed ? 'col-span-2' : ''
+              }`}
+              title={language === 'es' ? 'Bloquear Pantalla / Volver al Login' : 'Bloquear Tela / Voltar para Login'}
+            >
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              {!isCollapsed && <span>{t.logout}</span>}
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
             onClick={onLogout}
-            className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20 ${
-              isCollapsed ? 'col-span-2' : ''
-            }`}
-            title={language === 'es' ? 'Bloquear Pantalla / Volver al Login' : 'Bloquear Tela / Voltar para Login'}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white bg-[#0F1422] hover:bg-rose-950/30 border border-[#1E273A] hover:border-rose-500/30 transition-all cursor-pointer"
+            title={language === 'es' ? 'Bloquear Pantalla / Salir' : 'Bloquear Sessão / Sair'}
           >
-            <Lock className="w-3.5 h-3.5 shrink-0" />
-            {!isCollapsed && <span>{t.logout}</span>}
+            <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            {!isCollapsed && <span>{language === 'es' ? 'Cerrar Sesión Segura' : 'Sair / Bloquear Sessão'}</span>}
           </button>
-        </div>
+        )}
 
       </div>
 

@@ -144,7 +144,16 @@ interface BakeryContextType {
     mode: string;
     railwayDetected: boolean;
     checking: boolean;
+    supabase?: {
+      reachable: boolean;
+      authenticated: boolean;
+      tablesExist: boolean;
+      url: string;
+      keyPrefix: string;
+      error?: string | null;
+    };
   };
+  refreshDbStatus: () => Promise<void>;
 }
 
 const BakeryContext = createContext<BakeryContextType | null>(null);
@@ -189,6 +198,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mode: string;
     railwayDetected: boolean;
     checking: boolean;
+    supabase?: {
+      reachable: boolean;
+      authenticated: boolean;
+      tablesExist: boolean;
+      url: string;
+      keyPrefix: string;
+      error?: string | null;
+    };
   }>({
     connected: false,
     mode: 'local_storage',
@@ -196,7 +213,28 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     checking: true,
   });
 
-  // On mount: fetch database health and hydrate from server/Railway database
+  const refreshDbStatus = useCallback(async () => {
+    setDbStatus(prev => ({ ...prev, checking: true }));
+    try {
+      const health = await StorageService.checkDatabaseHealth();
+      setDbStatus({
+        connected: health.connected,
+        mode: health.mode,
+        railwayDetected: health.railwayDetected,
+        checking: false,
+        supabase: health.supabase,
+      });
+
+      const serverData = await StorageService.fetchServerState();
+      if (serverData) {
+        setData(serverData);
+      }
+    } catch {
+      setDbStatus(prev => ({ ...prev, checking: false }));
+    }
+  }, []);
+
+  // On mount: fetch database health and hydrate from server/Supabase database
   useEffect(() => {
     let isMounted = true;
     async function initSync() {
@@ -208,6 +246,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             mode: health.mode,
             railwayDetected: health.railwayDetected,
             checking: false,
+            supabase: health.supabase,
           });
         }
 
@@ -1284,6 +1323,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     restoreFromPoint,
     resetToSampleData,
     dbStatus,
+    refreshDbStatus,
   }), [
     currentUser,
     data.employees,
@@ -1345,6 +1385,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     restoreFromPoint,
     resetToSampleData,
     dbStatus,
+    refreshDbStatus,
     language,
     setLanguage,
     t,

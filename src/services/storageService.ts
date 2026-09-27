@@ -15,6 +15,14 @@ import {
   CustomerAccountEntry
 } from '../types';
 import { DEFAULT_EXCHANGE_RATES } from '../utils/currency';
+import { 
+  saveStateToSupabase, 
+  fetchStateFromSupabase, 
+  saveBackupPointToSupabase, 
+  fetchBackupPointsFromSupabase,
+  checkSupabaseHealth,
+  SupabaseHealthResult
+} from './supabaseClient';
 
 const DB_KEY = 'KORISKO_STATE_V1';
 const LEGACY_DB_KEY = 'PANETTIERE_STATE_V1';
@@ -44,44 +52,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
       'backup', 
       'afiliados'
     ],
-  },
-  {
-    id: 'emp-1',
-    name: 'Roberto Silveira',
-    role: 'admin',
-    pin: '1234',
-    avatarColor: 'bg-amber-600',
-    email: 'roberto@korisko.com.br',
-    password: '1234',
-  },
-  {
-    id: 'emp-2',
-    name: 'Luciana Mendes',
-    role: 'gerente',
-    pin: '5678',
-    avatarColor: 'bg-emerald-600',
-    email: 'luciana@korisko.com.br',
-    password: '5678',
-  },
-  {
-    id: 'emp-3',
-    name: 'Carlos Eduardo',
-    role: 'caixa',
-    pin: '1111',
-    avatarColor: 'bg-blue-600',
-    email: 'carlos.caixa@korisko.com.br',
-    password: '1111',
-    allowedFeatures: ['dashboard', 'pdv', 'venda_direta', 'crm'],
-  },
-  {
-    id: 'emp-4',
-    name: 'Seu Zé Padeiro',
-    role: 'padeiro',
-    pin: '2222',
-    avatarColor: 'bg-orange-600',
-    email: 'ze.padeiro@korisko.com.br',
-    password: '2222',
-    allowedFeatures: ['dashboard', 'fichas_tecnicas', 'estoque'],
   },
 ];
 
@@ -1248,6 +1218,12 @@ export class StorageService {
           if (!parsed.employees || parsed.employees.length === 0) {
             parsed.employees = INITIAL_EMPLOYEES;
           } else {
+            // Remove old demo profiles (Roberto Silveira, Luciana Mendes, Carlos Eduardo, Seu Zé Padeiro)
+            parsed.employees = parsed.employees.filter((e: any) => !['emp-1', 'emp-2', 'emp-3', 'emp-4'].includes(e.id));
+            if (parsed.employees.length === 0) {
+              parsed.employees = INITIAL_EMPLOYEES;
+            }
+
             // Ensure Ax admin is always present and updated
             const hasAx = parsed.employees.some((e: any) => e.email === 'axxeiacompany@gmail.com');
             if (!hasAx) {
@@ -1311,13 +1287,21 @@ export class StorageService {
   }
 
   /**
-   * Queue debounced persistence to server database (PostgreSQL on Railway)
+   * Queue debounced persistence to Supabase and server database
    */
   static queueServerSync(data: SystemBackupData): void {
     if (saveTimer) {
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(async () => {
+      // 1. Direct Supabase real-time cloud sync
+      try {
+        saveStateToSupabase(data);
+      } catch (err) {
+        console.warn('Supabase background sync exception:', err);
+      }
+
+      // 2. Server API sync (PostgreSQL on Railway or server fallback)
       try {
         await fetch('/api/state', {
           method: 'POST',
@@ -1331,9 +1315,21 @@ export class StorageService {
   }
 
   /**
-   * Fetch current state from server / Railway database
+   * Fetch current state from Supabase or server database
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
+    // 1. Try Supabase first
+    try {
+      const supabaseData = await fetchStateFromSupabase();
+      if (supabaseData && supabaseData.products && supabaseData.sales) {
+        StorageService.saveState(supabaseData, false);
+        return supabaseData;
+      }
+    } catch (err) {
+      console.warn('Could not fetch state from Supabase:', err);
+    }
+
+    // 2. Fallback to /api/state
     try {
       const res = await fetch('/api/state');
       if (!res.ok) return null;
@@ -1349,21 +1345,51 @@ export class StorageService {
   }
 
   /**
-   * Check connection status to Railway database or local server storage
+   * Check connection status to Supabase, Railway database, or local server storage
    */
-  static async checkDatabaseHealth(): Promise<{ connected: boolean; mode: string; railwayDetected: boolean }> {
+  static async checkDatabaseHealth(): Promise<{ 
+    connected: boolean; 
+    mode: string; 
+    railwayDetected: boolean;
+    supabase: SupabaseHealthResult;
+  }> {
+    // Check Supabase health
+    let supabaseHealth: SupabaseHealthResult;
+    try {
+      supabaseHealth = await checkSupabaseHealth();
+    } catch (err: any) {
+      supabaseHealth = {
+        reachable: false,
+        authenticated: false,
+        tablesExist: false,
+        url: 'https://ofukieepxjawzqtlrgqy.supabase.co',
+        keyPrefix: 'sb_publishable_...',
+        error: err.message,
+      };
+    }
+
+    // Check server / PostgreSQL health
     try {
       const res = await fetch('/api/health');
-      if (!res.ok) return { connected: false, mode: 'local_storage', railwayDetected: false };
-      const json = await res.json();
-      return {
-        connected: Boolean(json.databaseConnected),
-        mode: json.mode || 'local_storage',
-        railwayDetected: Boolean(json.railwayDetected),
-      };
+      if (res.ok) {
+        const json = await res.json();
+        return {
+          connected: Boolean(json.databaseConnected || supabaseHealth.tablesExist),
+          mode: supabaseHealth.tablesExist ? 'supabase' : (json.mode || 'local_storage'),
+          railwayDetected: Boolean(json.railwayDetected),
+          supabase: supabaseHealth,
+        };
+      }
     } catch {
-      return { connected: false, mode: 'local_storage', railwayDetected: false };
+      // ignore
     }
+
+    return { 
+      connected: supabaseHealth.tablesExist, 
+      mode: supabaseHealth.tablesExist ? 'supabase' : 'local_storage', 
+      railwayDetected: false,
+      supabase: supabaseHealth,
+    };
   }
 
   /**
@@ -1427,7 +1453,12 @@ export class StorageService {
     const updated = [newPoint, ...currentPoints].slice(0, 20); // keep last 20
     localStorage.setItem(BACKUPS_KEY, JSON.stringify(updated));
 
-    // Send backup point to server
+    // 1. Direct Supabase backup point sync
+    try {
+      saveBackupPointToSupabase(newPoint);
+    } catch {}
+
+    // 2. Send backup point to server
     fetch('/api/backups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

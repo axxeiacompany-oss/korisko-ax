@@ -25,13 +25,12 @@ interface Props {
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const { employees, switchUser, currentUser, t, language } = useBakery();
 
-  const [email, setEmail] = useState('axxeiacompany@gmail.com');
-  const [password, setPassword] = useState('9APG_47z-EgF4yz');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedQuickRole, setSelectedQuickRole] = useState<string>('emp-admin-ax');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +49,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         const isMaster = password.trim() === '9APG_47z-EgF4yz' && emp.email === 'axxeiacompany@gmail.com';
 
         if (!matchesPin && !matchesPwd && !isMaster) {
-          setErrorMsg('Senha ou PIN incorreto para este usuário.');
+          setErrorMsg(language === 'es' ? 'Contraseña o PIN incorrecto.' : 'Senha ou PIN incorreto para este usuário.');
           setIsLoading(false);
           return;
         }
@@ -59,32 +58,18 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         setIsLoading(false);
         onLoginSuccess();
       } else {
-        // Fallback: match by PIN alone or password alone
-        const empByPin = employees.find(e => e.pin === password.trim() || e.password === password.trim());
+        // Fallback: match by PIN alone or password alone if admin master password used
+        const empByPin = employees.find(e => (e.pin === password.trim() || e.password === password.trim()) && (!e.email || e.email.toLowerCase() === email.trim().toLowerCase()));
         if (empByPin) {
           switchUser(empByPin.id, empByPin.pin);
           setIsLoading(false);
           onLoginSuccess();
         } else {
-          setErrorMsg('Credenciais não encontradas. Verifique o Gmail ou senha.');
+          setErrorMsg(language === 'es' ? 'Credenciales no encontradas. Verifique su email y contraseña.' : 'Credenciais não encontradas. Verifique seu e-mail e senha.');
           setIsLoading(false);
         }
       }
     }, 400);
-  };
-
-  const handleQuickLogin = (emp: Employee) => {
-    setSelectedQuickRole(emp.id);
-    setEmail(emp.email || `${emp.name.toLowerCase().replace(/\s+/g, '')}@korisko.com.br`);
-    setPassword(emp.pin);
-    setErrorMsg(null);
-    setIsLoading(true);
-
-    setTimeout(() => {
-      switchUser(emp.id, emp.pin);
-      setIsLoading(false);
-      onLoginSuccess();
-    }, 300);
   };
 
   return (
@@ -130,17 +115,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         <div className="flex items-center gap-3 text-xs text-neutral-400">
           <LanguageSwitcher />
 
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono-nums text-neutral-400">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-mono-nums text-neutral-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {language === 'es' ? 'Servidores Online (v2.4)' : 'Servidores Online (v2.4)'}
+            {language === 'es' ? 'Servidores Seguros (v2.4)' : 'Servidores Seguros (v2.4)'}
           </span>
-          <a 
-            href="#demo"
-            onClick={(e) => { e.preventDefault(); onLoginSuccess(); }}
-            className="px-3.5 py-1.5 rounded-lg border border-[#1E2638] bg-[#0E131F] hover:bg-[#151D30] text-neutral-300 hover:text-white text-xs font-medium transition-colors"
-          >
-            {language === 'es' ? 'Acceso Directo' : 'Acessar Direto'}
-          </a>
         </div>
       </header>
 
@@ -267,61 +245,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
             </form>
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#1C2436]" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase font-semibold tracking-wider">
-                <span className="bg-[#0D121D] px-2.5 text-neutral-500">
-                  {t.loginQuickRoles}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Access Roles (1-Click Login) */}
-            <div className="space-y-1.5">
-              <div className="grid grid-cols-2 gap-2">
-                {employees.map((emp) => {
-                  const isSelected = selectedQuickRole === emp.id;
-                  const roleLabel = emp.role === 'admin' 
-                    ? t.roleAdmin 
-                    : emp.role === 'gerente' 
-                    ? t.roleManager 
-                    : emp.role === 'caixa' 
-                    ? t.roleCashier 
-                    : emp.role === 'padeiro' 
-                    ? t.roleBaker 
-                    : t.roleAffiliate;
-
-                  return (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      onClick={() => handleQuickLogin(emp)}
-                      className={`p-2 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
-                        isSelected 
-                          ? 'border-indigo-500/80 bg-indigo-500/10 text-white' 
-                          : 'border-[#1C2538] bg-[#090D15] hover:bg-[#121826] text-neutral-300'
-                      }`}
-                    >
-                      <div className={`w-7 h-7 rounded-lg ${emp.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
-                        {emp.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold truncate leading-tight">{emp.name}</p>
-                        <p className="text-[9px] text-neutral-500">{roleLabel}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Security notice */}
-            <div className="mt-6 pt-4 border-t border-[#1A2234] flex items-center justify-center gap-2 text-[11px] text-neutral-500">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{t.loginSecurityNotice}</span>
+            <div className="mt-6 pt-4 border-t border-[#1A2234] flex items-center justify-center gap-2 text-[11px] text-neutral-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{language === 'es' ? 'Acceso seguro con cifrado y persistencia en Supabase' : 'Acesso seguro com criptografia e persistência no Supabase'}</span>
             </div>
 
           </div>
@@ -329,19 +256,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           {/* Bottom helper */}
           <div className="text-center text-xs text-neutral-500 space-y-1">
             <p>
-              {language === 'es' ? '¿Aún no tiene cuenta en Korisko?' : 'Ainda não tem conta no Korisko?'}{' '}
-              <a
-                href="#solicitar"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert(language === 'es' 
-                    ? 'El sistema Korisko está configurado con perfiles operativos listos para usar: Administrador Ax, Gerente, Caja y Panadero.' 
-                    : 'O sistema Korisko está configurado com 4 perfis operacionais prontos para uso: Administrador, Gerente, Caixa e Padeiro.');
-                }}
-                className="text-indigo-400 hover:text-indigo-300 font-medium"
-              >
-                {language === 'es' ? 'Solicitar Acceso' : 'Solicitar Acesso'}
-              </a>
+              {language === 'es' ? 'Sistema Administrativo Korisko ERP' : 'Sistema Administrativo Korisko ERP'}
             </p>
           </div>
 
