@@ -277,7 +277,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     all: 'Todos',
 
     // Login View
-    loginTitle: 'Acceso Seguro al Sistema',
+    loginTitle: 'Acceso al Sistema Korisko',
     loginSubtitle: 'Ingrese sus credenciales de operador o administrador para continuar',
     loginEmailLabel: 'Correo Electrónico / Gmail',
     loginPasswordLabel: 'Contraseña o PIN Numérico',
@@ -288,16 +288,16 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginErrorInvalid: 'Contraseña o PIN incorrecto para este usuario.',
     loginErrorEmpty: 'Por favor ingrese sus credenciales completas.',
     loginLoggingIn: 'Verificando credenciales...',
-    loginSecurityNotice: 'Conexión cifrada y segura · Korisko Cloud',
+    loginSecurityNotice: 'Korisko Gestión & PDV',
 
     // Database / Cloud Sync
-    dbConnected: 'Base de Datos Railway Conectada (PostgreSQL)',
-    dbRailway: 'Railway BD',
-    dbLocalFallback: 'Almacenamiento Local Activo',
+    dbConnected: 'Base de Datos Conectada y Operacional',
+    dbRailway: 'Banco BD',
+    dbLocalFallback: 'Almacenamiento Nativo Activo',
     dbSyncing: 'Sincronizando...',
     dbLastBackup: 'Último backup',
     dbTestConnection: 'Verificar Conexión BD',
-    dbTitle: 'Integración Railway PostgreSQL',
+    dbTitle: 'Base de Datos Korisko',
 
     // Roles
     roleAdmin: 'Administrador Ax',
@@ -470,7 +470,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     all: 'Todos',
 
     // Login View
-    loginTitle: 'Acesso Seguro ao Sistema',
+    loginTitle: 'Acesso ao Sistema Korisko',
     loginSubtitle: 'Entre com as credenciais do seu operador ou administrador para continuar',
     loginEmailLabel: 'E-mail / Gmail Cadastrado',
     loginPasswordLabel: 'Senha Individual ou PIN Numérico',
@@ -481,16 +481,16 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginErrorInvalid: 'Senha ou PIN incorreto para este usuário.',
     loginErrorEmpty: 'Por favor preencha suas credenciais completas.',
     loginLoggingIn: 'Verificando credenciais...',
-    loginSecurityNotice: 'Conexão segura e criptografada · Korisko Cloud',
+    loginSecurityNotice: 'Korisko Gestão & PDV',
 
     // Database / Cloud Sync
-    dbConnected: 'Banco de Dados Railway Conectado (PostgreSQL)',
-    dbRailway: 'Railway BD',
-    dbLocalFallback: 'Armazenamento Local Ativo',
+    dbConnected: 'Banco de Dados Conectado e Operacional',
+    dbRailway: 'Banco BD',
+    dbLocalFallback: 'Armazenamento Nativo Operacional',
     dbSyncing: 'Sincronizando...',
     dbLastBackup: 'Último backup',
     dbTestConnection: 'Testar Conexão BD',
-    dbTitle: 'Integração Railway PostgreSQL',
+    dbTitle: 'Banco de Dados Korisko',
 
     // Roles
     roleAdmin: 'Administrador Ax',

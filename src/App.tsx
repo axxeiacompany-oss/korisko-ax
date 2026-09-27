@@ -21,6 +21,7 @@ import { FichaTecnicaView } from './components/views/FichaTecnicaView';
 import { CustomersView } from './components/views/CustomersView';
 import { DirectSaleView } from './components/views/DirectSaleView';
 import { AfiliadosView } from './components/views/AfiliadosView';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { SwitchEmployeeModal } from './components/modals/SwitchEmployeeModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
 import { Lock, ShieldAlert } from 'lucide-react';
@@ -35,6 +36,7 @@ function MainAppShell() {
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
 
@@ -72,26 +74,35 @@ function MainAppShell() {
       {/* UTMify-Style Left Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setIsMobileMenuOpen(false);
+        }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         onLogout={handleLogout}
         onOpenSwitchUser={() => setIsSwitchUserOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Top Header */}
       <TopNav
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setIsMobileMenuOpen(false);
+        }}
         onLogout={handleLogout}
         isSidebarCollapsed={isSidebarCollapsed}
         onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
       />
 
       {/* Main Content Area with adaptive left padding based on sidebar */}
       <main 
-        className={`flex-1 w-full mx-auto p-4 sm:p-6 lg:p-8 transition-all duration-300 ${
+        className={`flex-1 w-full mx-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-all duration-300 ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >
@@ -136,6 +147,16 @@ function MainAppShell() {
           )}
         </div>
       </main>
+
+      {/* Mobile Sticky Quick Navigation Bar (PDV, 1-Clique, Dashboard, Afiliados, Menu) */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setIsMobileMenuOpen(false);
+        }}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+      />
 
       {/* Footer */}
       <footer 

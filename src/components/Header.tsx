@@ -131,7 +131,7 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
             onClick={() => onSelectTab('backup')}
             title={
               dbStatus.connected
-                ? 'Banco de Dados Railway Conectado (PostgreSQL)'
+                ? 'Banco de Dados Conectado e Operacional'
                 : lastBackupTime
                 ? `Último backup: ${new Date(lastBackupTime).toLocaleTimeString('pt-BR')}`
                 : 'Sincronização em nuvem'
@@ -149,7 +149,7 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
               {isCloudSyncing
                 ? 'Sincronizando...'
                 : dbStatus.connected
-                ? 'Railway BD'
+                ? 'Banco OK'
                 : 'Nuvem OK'}
             </span>
           </button>

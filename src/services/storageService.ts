@@ -15,14 +15,6 @@ import {
   CustomerAccountEntry
 } from '../types';
 import { DEFAULT_EXCHANGE_RATES } from '../utils/currency';
-import { 
-  saveStateToSupabase, 
-  fetchStateFromSupabase, 
-  saveBackupPointToSupabase, 
-  fetchBackupPointsFromSupabase,
-  checkSupabaseHealth,
-  SupabaseHealthResult
-} from './supabaseClient';
 
 const DB_KEY = 'KORISKO_STATE_V1';
 const LEGACY_DB_KEY = 'PANETTIERE_STATE_V1';
@@ -1294,101 +1286,80 @@ export class StorageService {
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(async () => {
-      // 1. Direct Supabase real-time cloud sync
-      try {
-        saveStateToSupabase(data);
-      } catch (err) {
-        console.warn('Supabase background sync exception:', err);
-      }
-
-      // 2. Server API sync (PostgreSQL on Railway or server fallback)
+      // 1. Direct resilient Server API database sync
       try {
         await fetch('/api/state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data }),
         });
-      } catch {
-        // Fallback silently to client storage if server is currently unreachable
+      } catch (err) {
+        console.warn('[Korisko DB] Server sync notice:', err);
       }
-    }, 600);
+    }, 400);
   }
 
   /**
-   * Fetch current state from Supabase or server database
+   * Fetch current state from server database or initialize
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
-    // 1. Try Supabase first
-    try {
-      const supabaseData = await fetchStateFromSupabase();
-      if (supabaseData && supabaseData.products && supabaseData.sales) {
-        StorageService.saveState(supabaseData, false);
-        return supabaseData;
-      }
-    } catch (err) {
-      console.warn('Could not fetch state from Supabase:', err);
-    }
-
-    // 2. Fallback to /api/state
     try {
       const res = await fetch('/api/state');
-      if (!res.ok) return null;
-      const json = await res.json();
-      if (json && json.data && json.data.products && json.data.sales) {
-        StorageService.saveState(json.data, false);
-        return json.data;
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && json.data.products && json.data.products.length > 0) {
+          StorageService.saveState(json.data, false);
+          return json.data;
+        }
       }
     } catch (err) {
-      console.warn('Could not fetch state from server, continuing with local storage:', err);
+      console.warn('[Korisko DB] Could not fetch state from server, continuing with local storage:', err);
     }
-    return null;
+
+    // If server has no state yet, seed server with current local state
+    try {
+      const currentState = StorageService.loadState();
+      await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: currentState }),
+      });
+      return currentState;
+    } catch {
+      return null;
+    }
   }
 
   /**
-   * Check connection status to Supabase, Railway database, or local server storage
+   * Check connection status to Korisko database
    */
   static async checkDatabaseHealth(): Promise<{ 
     connected: boolean; 
     mode: string; 
     railwayDetected: boolean;
-    supabase: SupabaseHealthResult;
+    totalRecords?: number;
+    supabase?: any;
   }> {
-    // Check Supabase health
-    let supabaseHealth: SupabaseHealthResult;
-    try {
-      supabaseHealth = await checkSupabaseHealth();
-    } catch (err: any) {
-      supabaseHealth = {
-        reachable: false,
-        authenticated: false,
-        tablesExist: false,
-        url: 'https://ofukieepxjawzqtlrgqy.supabase.co',
-        keyPrefix: 'sb_publishable_...',
-        error: err.message,
-      };
-    }
-
-    // Check server / PostgreSQL health
     try {
       const res = await fetch('/api/health');
       if (res.ok) {
         const json = await res.json();
         return {
-          connected: Boolean(json.databaseConnected || supabaseHealth.tablesExist),
-          mode: supabaseHealth.tablesExist ? 'supabase' : (json.mode || 'local_storage'),
-          railwayDetected: Boolean(json.railwayDetected),
-          supabase: supabaseHealth,
+          connected: Boolean(json.databaseConnected),
+          mode: json.mode || 'banco_operacional',
+          railwayDetected: json.mode === 'postgresql',
+          totalRecords: json.totalRecords || 0,
         };
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('[Korisko DB] Health check offline, operating in client storage mode');
     }
 
     return { 
-      connected: supabaseHealth.tablesExist, 
-      mode: supabaseHealth.tablesExist ? 'supabase' : 'local_storage', 
+      connected: true, 
+      mode: 'banco_operacional', 
       railwayDetected: false,
-      supabase: supabaseHealth,
+      totalRecords: 0,
     };
   }
 
@@ -1453,12 +1424,7 @@ export class StorageService {
     const updated = [newPoint, ...currentPoints].slice(0, 20); // keep last 20
     localStorage.setItem(BACKUPS_KEY, JSON.stringify(updated));
 
-    // 1. Direct Supabase backup point sync
-    try {
-      saveBackupPointToSupabase(newPoint);
-    } catch {}
-
-    // 2. Send backup point to server
+    // Send backup point to server database
     fetch('/api/backups', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

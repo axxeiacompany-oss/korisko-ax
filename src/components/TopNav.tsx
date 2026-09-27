@@ -105,8 +105,17 @@ export const TopNav: React.FC<Props> = ({
         }`}
       >
         
-        {/* Left: View Title & Breadcrumb */}
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Left: View Title & Breadcrumb + Mobile Menu Button */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className="p-2 -ml-1 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 lg:hidden cursor-pointer shrink-0"
+            title="Abrir Menu de Navegação"
+            aria-label="Abrir Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div>
             <h1 className="text-sm sm:text-base font-bold text-white tracking-tight leading-none truncate">
               {currentTabInfo.title}

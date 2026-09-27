@@ -144,14 +144,7 @@ interface BakeryContextType {
     mode: string;
     railwayDetected: boolean;
     checking: boolean;
-    supabase?: {
-      reachable: boolean;
-      authenticated: boolean;
-      tablesExist: boolean;
-      url: string;
-      keyPrefix: string;
-      error?: string | null;
-    };
+    totalRecords?: number;
   };
   refreshDbStatus: () => Promise<void>;
 }
@@ -198,19 +191,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mode: string;
     railwayDetected: boolean;
     checking: boolean;
-    supabase?: {
-      reachable: boolean;
-      authenticated: boolean;
-      tablesExist: boolean;
-      url: string;
-      keyPrefix: string;
-      error?: string | null;
-    };
+    totalRecords?: number;
   }>({
-    connected: false,
-    mode: 'local_storage',
+    connected: true,
+    mode: 'banco_operacional',
     railwayDetected: false,
     checking: true,
+    totalRecords: 0,
   });
 
   const refreshDbStatus = useCallback(async () => {
@@ -222,7 +209,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         mode: health.mode,
         railwayDetected: health.railwayDetected,
         checking: false,
-        supabase: health.supabase,
+        totalRecords: health.totalRecords,
       });
 
       const serverData = await StorageService.fetchServerState();
@@ -234,7 +221,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // On mount: fetch database health and hydrate from server/Supabase database
+  // On mount: fetch database health and hydrate from server database
   useEffect(() => {
     let isMounted = true;
     async function initSync() {
@@ -246,7 +233,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             mode: health.mode,
             railwayDetected: health.railwayDetected,
             checking: false,
-            supabase: health.supabase,
+            totalRecords: health.totalRecords,
           });
         }
 

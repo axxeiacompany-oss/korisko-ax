@@ -42,6 +42,9 @@ export const PdvView: React.FC = () => {
   const [activeComandaNumber, setActiveComandaNumber] = useState<string | null>(null);
   const [activeCustomerName, setActiveCustomerName] = useState<string>('');
 
+  // Mobile Catalog vs Cart view toggle
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
+
   // Weight entry modal state (for items sold by kg)
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [customWeightInput, setCustomWeightInput] = useState('0.500');
@@ -169,10 +172,45 @@ export const PdvView: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[640px]">
+    <div className="space-y-4">
       
-      {/* Left Column: Catalog & Quick Selection (8 cols) */}
-      <div className="lg:col-span-8 flex flex-col h-full space-y-4">
+      {/* Mobile Catalog vs Cart Selector Tabs */}
+      <div className="lg:hidden flex items-center p-1 bg-neutral-900 border border-neutral-800 rounded-xl">
+        <button
+          type="button"
+          onClick={() => setMobileTab('catalog')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+            mobileTab === 'catalog'
+              ? 'bg-amber-500 text-neutral-950 shadow-md'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          {language === 'es' ? 'Catálogo de Productos' : 'Catálogo de Produtos'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            mobileTab === 'cart'
+              ? 'bg-amber-500 text-neutral-950 shadow-md'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <span>{language === 'es' ? 'Carrito' : 'Carrinho'}</span>
+          {cart.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-neutral-950 text-amber-400 text-[10px] font-mono font-bold">
+              {cart.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[500px] lg:h-[calc(100vh-140px)]">
+        
+        {/* Left Column: Catalog & Quick Selection (8 cols) */}
+        <div className={`lg:col-span-8 flex flex-col h-full space-y-4 ${
+          mobileTab === 'catalog' ? 'block' : 'hidden lg:flex'
+        }`}>
         
         {/* Top Controls: Search & Category pills & Bakery Quick Actions */}
         <div className="space-y-3">
@@ -321,7 +359,9 @@ export const PdvView: React.FC = () => {
       </div>
 
       {/* Right Column: Active Order Cart & Fast Multi-Currency Checkout (4 cols) */}
-      <div className="lg:col-span-4 flex flex-col h-full bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
+      <div className={`lg:col-span-4 flex flex-col h-full bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden ${
+        mobileTab === 'cart' ? 'block' : 'hidden lg:flex'
+      }`}>
         
         {/* Cart Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-800 bg-neutral-950/60">
@@ -478,6 +518,28 @@ export const PdvView: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Mobile Floating Cart Summary Button */}
+      {cart.length > 0 && mobileTab === 'catalog' && (
+        <div className="lg:hidden fixed bottom-16 left-3 right-3 z-30 animate-in slide-in-from-bottom-2">
+          <button
+            type="button"
+            onClick={() => setMobileTab('cart')}
+            className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-neutral-950 font-bold text-xs shadow-2xl flex items-center justify-between active:scale-98 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              <span>{cart.length} {cart.length === 1 ? 'item' : (language === 'es' ? 'ítems' : 'itens')}</span>
+            </div>
+            <div className="flex items-center gap-1 font-mono-nums font-black text-sm">
+              <span>{formatCurrency(cartTotalBrl, 'BRL')}</span>
+              <span>➔</span>
+            </div>
+          </button>
+        </div>
+      )}
+
+    </div>
 
       {/* Quick Weight Modal for products sold by kg (e.g. pão francês, queijo, presunto) */}
       {weightProduct && (
