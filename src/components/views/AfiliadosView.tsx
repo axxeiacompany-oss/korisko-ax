@@ -145,8 +145,13 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     updateEmployeePermissions
   } = useBakery();
 
-  // Strict check: Only the Admin Ax can access this management panel
-  const isAx = currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com';
+  // Flexible check: Admin Ax, users with admin role or manager role can manage affiliates
+  const isAx = 
+    currentUser.id === 'emp-admin-ax' || 
+    currentUser.role === 'admin' ||
+    currentUser.role === 'gerente' ||
+    currentUser.email?.toLowerCase().includes('axxeia') ||
+    currentUser.name?.toLowerCase() === 'ax';
 
   // Form State for creating a new affiliate
   const [isCreating, setIsCreating] = useState(false);
@@ -183,9 +188,9 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
           <ShieldAlert className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-black text-white">Painel Exclusivo do Administrador Ax</h2>
+          <h2 className="text-xl font-black text-white">Painel Exclusivo de Gestão de Afiliados</h2>
           <p className="text-xs text-neutral-400 leading-relaxed">
-            Somente o Administrador Geral <b>Ax</b> (<span className="text-indigo-400 font-mono">axxeiacompany@gmail.com</span>) possui autorização para criar, excluir e liberar funções de afiliados.
+            Somente o Administrador (<span className="text-indigo-400 font-mono">axxeiacompany@gmail.com</span>) possui autorização para criar, excluir e liberar funções de afiliados.
           </p>
           <p className="text-xs text-neutral-500">
             Você está conectado como: <b className="text-neutral-300">{currentUser.name}</b> ({currentUser.email || 'Usuário Local'}).
@@ -224,22 +229,26 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
   const handleCreateAffiliate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      alert('Por favor, preencha o nome, Gmail e senha.');
+    if (!name.trim() || !password.trim()) {
+      alert('Por favor, informe pelo menos o nome e a senha do afiliado.');
       return;
     }
 
+    const cleanName = name.trim();
+    const cleanPassword = password.trim();
+    const cleanEmail = email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
+
     const created = addEmployee({
-      name: name.trim(),
-      email: email.trim(),
-      pin: password.trim().slice(0, 6) || '1234',
-      password: password.trim(),
+      name: cleanName,
+      email: cleanEmail,
+      pin: cleanPassword.slice(0, 6) || '1234',
+      password: cleanPassword,
       role,
       avatarColor: 'bg-indigo-600',
       allowedFeatures: selectedFeatures,
     });
 
-    setSuccessMessage(`Afiliado "${created.name}" adicionado com sucesso com ${selectedFeatures.length} funções liberadas!`);
+    setSuccessMessage(`Afiliado "${created.name}" salvo e sincronizado com sucesso!`);
     setIsCreating(false);
     setName('');
     setEmail('');
@@ -373,16 +382,15 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
               <div>
                 <label className="text-xs font-medium text-neutral-300 block mb-1.5">
-                  Gmail de Acesso *
+                  Gmail ou Usuário
                 </label>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="email"
-                    required
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="afiliado@gmail.com"
+                    placeholder="afiliado@gmail.com ou usuario"
                     className="w-full pl-9 pr-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 font-sans"
                   />
                 </div>

@@ -352,18 +352,32 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString(),
       avatarColor: empData.avatarColor || 'bg-indigo-600',
     };
-    setData(prev => ({
-      ...prev,
-      employees: [...prev.employees, newEmp]
-    }));
+    setData(prev => {
+      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
+      const updatedEmployees = [...currentList.filter(e => e.id !== newEmp.id), newEmp];
+      const updated = {
+        ...prev,
+        timestamp: new Date().toISOString(),
+        employees: updatedEmployees,
+      };
+      StorageService.saveState(updated, true);
+      return updated;
+    });
     return newEmp;
   }, []);
 
   const updateEmployee = useCallback((emp: Employee) => {
-    setData(prev => ({
-      ...prev,
-      employees: prev.employees.map(e => e.id === emp.id ? emp : e)
-    }));
+    setData(prev => {
+      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
+      const updatedEmployees = currentList.map(e => e.id === emp.id ? emp : e);
+      const updated = {
+        ...prev,
+        timestamp: new Date().toISOString(),
+        employees: updatedEmployees,
+      };
+      StorageService.saveState(updated, true);
+      return updated;
+    });
     if (currentUser.id === emp.id) {
       setCurrentUser(emp);
     }
@@ -374,17 +388,31 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       alert('Não é possível remover o administrador principal (Ax).');
       return;
     }
-    setData(prev => ({
-      ...prev,
-      employees: prev.employees.filter(e => e.id !== id)
-    }));
+    setData(prev => {
+      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
+      const updatedEmployees = currentList.filter(e => e.id !== id);
+      const updated = {
+        ...prev,
+        timestamp: new Date().toISOString(),
+        employees: updatedEmployees,
+      };
+      StorageService.saveState(updated, true);
+      return updated;
+    });
   }, []);
 
   const updateEmployeePermissions = useCallback((id: string, allowedFeatures: AppFeature[]) => {
-    setData(prev => ({
-      ...prev,
-      employees: prev.employees.map(e => e.id === id ? { ...e, allowedFeatures } : e)
-    }));
+    setData(prev => {
+      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
+      const updatedEmployees = currentList.map(e => e.id === id ? { ...e, allowedFeatures } : e);
+      const updated = {
+        ...prev,
+        timestamp: new Date().toISOString(),
+        employees: updatedEmployees,
+      };
+      StorageService.saveState(updated, true);
+      return updated;
+    });
     if (currentUser.id === id) {
       setCurrentUser(prev => ({ ...prev, allowedFeatures }));
     }
