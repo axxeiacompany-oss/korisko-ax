@@ -44,6 +44,9 @@ function MainAppShell() {
     setIsAuthenticated(false);
     sessionStorage.removeItem('KORISKO_AUTH_SESSION');
     sessionStorage.setItem('KORISKO_AUTH_SESSION', 'false');
+    try {
+      localStorage.removeItem('KORISKO_CURRENT_USER_ID');
+    } catch {}
   };
 
   const handleLoginSuccess = () => {

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '../../types';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { StorageService } from '../../services/storageService';
 
 interface Props {
   onLoginSuccess: () => void;
@@ -31,44 +32,110 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      // Find employee by email or PIN or password
-      const emp = employees.find(
-        e => (e.email && e.email.toLowerCase() === email.trim().toLowerCase())
-      );
+    const inputIdentifier = email.trim().toLowerCase();
+    const inputPassword = password.trim();
 
-      if (emp) {
-        const matchesPin = emp.pin && password.trim() === emp.pin;
-        const matchesPwd = emp.password && password.trim() === emp.password;
-        const isMaster = password.trim() === '9APG_47z-EgF4yz' && emp.email === 'axxeiacompany@gmail.com';
+    if (!inputIdentifier || !inputPassword) {
+      setErrorMsg(
+        language === 'es'
+          ? 'Por favor ingrese su usuario y contraseña.'
+          : 'Por favor preencha seu usuário/e-mail e senha.'
+      );
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Initial list from React memory
+      let currentList = Array.isArray(employees) && employees.length > 0 ? employees : [];
+
+      // Helper function to match an affiliate/employee flexibly
+      const findMatchingEmployee = (list: Employee[]) => {
+        return list.find(emp => {
+          const empEmail = (emp.email || '').toLowerCase().trim();
+          const empName = (emp.name || '').toLowerCase().trim();
+          const empUsername = empEmail.includes('@') ? empEmail.split('@')[0] : empEmail;
+          const inputUserPart = inputIdentifier.includes('@') ? inputIdentifier.split('@')[0] : inputIdentifier;
+
+          // Flexible match: full email, full name, username before @, exact ID, or user prefix
+          return (
+            empEmail === inputIdentifier ||
+            empName === inputIdentifier ||
+            empUsername === inputIdentifier ||
+            empUsername === inputUserPart ||
+            empName === inputUserPart ||
+            emp.id === inputIdentifier
+          );
+        });
+      };
+
+      let matchedEmp = findMatchingEmployee(currentList);
+
+      // 2. Real-time Cloud Fetch: If not found in current device memory (e.g. mobile opening for first time),
+      // fetch immediately from Supabase/Server!
+      if (!matchedEmp) {
+        try {
+          const freshState = await StorageService.fetchServerState();
+          if (freshState && Array.isArray(freshState.employees)) {
+            currentList = freshState.employees;
+            matchedEmp = findMatchingEmployee(currentList);
+          }
+        } catch (fetchErr) {
+          console.warn('[Login] Real-time fetch warning:', fetchErr);
+        }
+      }
+
+      if (matchedEmp) {
+        const matchesPin = Boolean(matchedEmp.pin && inputPassword === matchedEmp.pin.trim());
+        const matchesPwd = Boolean(matchedEmp.password && inputPassword === matchedEmp.password.trim());
+        const isMaster = inputPassword === '9APG_47z-EgF4yz' && (matchedEmp.email === 'axxeiacompany@gmail.com' || matchedEmp.role === 'admin');
 
         if (!matchesPin && !matchesPwd && !isMaster) {
-          setErrorMsg(language === 'es' ? 'Contraseña o PIN incorrecto.' : 'Senha ou PIN incorreto para este usuário.');
+          setErrorMsg(
+            language === 'es' 
+              ? `Contraseña o PIN incorrecto para "${matchedEmp.name}". Verifique la clave que el Administrador (Ax) le asignó.` 
+              : `Senha ou PIN incorreto para "${matchedEmp.name}". Verifique a senha cadastrada pelo Administrador (Ax).`
+          );
           setIsLoading(false);
           return;
         }
 
-        switchUser(emp.id, emp.pin);
+        switchUser(matchedEmp.id, matchedEmp.pin);
         setIsLoading(false);
         onLoginSuccess();
-      } else {
-        // Fallback: match by PIN alone or password alone if admin master password used
-        const empByPin = employees.find(e => (e.pin === password.trim() || e.password === password.trim()) && (!e.email || e.email.toLowerCase() === email.trim().toLowerCase()));
-        if (empByPin) {
-          switchUser(empByPin.id, empByPin.pin);
-          setIsLoading(false);
-          onLoginSuccess();
-        } else {
-          setErrorMsg(language === 'es' ? 'Credenciales no encontradas. Verifique su email y contraseña.' : 'Credenciais não encontradas. Verifique seu e-mail e senha.');
-          setIsLoading(false);
-        }
+        return;
       }
-    }, 400);
+
+      // Fallback: match by PIN alone or password alone if unique
+      const empByPin = currentList.find(e => 
+        (e.pin === inputPassword || e.password === inputPassword) && 
+        (!e.email || e.email.toLowerCase() === inputIdentifier || e.name.toLowerCase() === inputIdentifier)
+      );
+
+      if (empByPin) {
+        switchUser(empByPin.id, empByPin.pin);
+        setIsLoading(false);
+        onLoginSuccess();
+        return;
+      }
+
+      // User not found in database
+      const availableNames = currentList.map(e => e.name).join(', ');
+      setErrorMsg(
+        language === 'es' 
+          ? `Usuario "${email.trim()}" no encontrado. Ingrese su nombre o email cadastrado. (Perfiles activos: ${availableNames})` 
+          : `Usuário ou e-mail "${email.trim()}" não encontrado. Digite seu nome ou e-mail cadastrado. (Perfis ativos: ${availableNames})`
+      );
+      setIsLoading(false);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao realizar login.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -144,21 +211,24 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* Email Input */}
+              {/* Email / Username / Name Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-neutral-300 block">
-                  {t.loginEmailLabel}
+                  {language === 'es' ? 'Usuario, Nombre o Correo' : 'Usuário, Nome do Afiliado ou E-mail'}
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
-                    type="email"
+                    type="text"
                     required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu.email@korisko.com.br"
+                    placeholder={language === 'es' ? 'Ej: claudia o correo@gmail.com' : 'Ex: claudia ou seu-email@gmail.com'}
                     className="w-full pl-10 pr-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition-all font-sans"
                   />
                 </div>

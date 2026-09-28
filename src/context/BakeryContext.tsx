@@ -180,6 +180,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
   const [currentUser, setCurrentUser] = useState<Employee>(() => {
+    try {
+      const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
+      if (savedUserId && Array.isArray(data.employees)) {
+        const found = data.employees.find(e => e.id === savedUserId);
+        if (found) return found;
+      }
+    } catch {}
     return data.employees[0] || INITIAL_EMPLOYEES[0];
   });
   const [backupPoints, setBackupPoints] = useState<BackupPoint[]>(() => StorageService.loadBackupPoints());
@@ -241,6 +248,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const serverData = await StorageService.fetchServerState();
         if (serverData && isMounted) {
           setData(serverData);
+          try {
+            const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
+            if (savedUserId && Array.isArray(serverData.employees)) {
+              const found = serverData.employees.find(e => e.id === savedUserId);
+              if (found) {
+                setCurrentUser(found);
+              }
+            }
+          } catch {}
         }
       } catch {
         if (isMounted) {
@@ -333,6 +349,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return false;
     }
     setCurrentUser(target);
+    try {
+      localStorage.setItem('KORISKO_CURRENT_USER_ID', target.id);
+    } catch {}
     return true;
   }, [data.employees]);
 
