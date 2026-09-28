@@ -4,8 +4,46 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 dotenv.config();
+
+const SUPABASE_DEFAULT_URL = 'https://lmbpvdpmrdfxfqednwxd.supabase.co';
+const SUPABASE_DEFAULT_KEY = 'sb_publishable_l0-nPS9D5LQAC_AvzAyYWA_MXIFG0lm';
+
+function normalizeSupabaseUrl(url: string): string {
+  if (!url) return SUPABASE_DEFAULT_URL;
+  return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+}
+
+const supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_DEFAULT_URL);
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_DEFAULT_KEY;
+
+let supabaseServer: SupabaseClient | null = null;
+try {
+  supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
+} catch (err) {
+  console.warn('[Korisko Server] Supabase client init notice:', err);
+}
+
+function safeSupabaseUpsert(table: string, payload: any, onConflict: string) {
+  if (!supabaseServer) return;
+  try {
+    supabaseServer
+      .from(table)
+      .upsert(payload, { onConflict })
+      .then(
+        ({ error }) => {
+          if (error && error.code !== 'PGRST205') {
+            console.warn(`[Korisko Server] Supabase mirror notice (${table}):`, error.message);
+          }
+        },
+        err => {
+          console.warn(`[Korisko Server] Supabase mirror exception (${table}):`, err);
+        }
+      );
+  } catch {}
+}
 
 const { Pool } = pg;
 const app = express();
@@ -124,7 +162,9 @@ app.get('/api/health', async (_req, res) => {
   res.json({
     status: 'ok',
     databaseConnected: true,
-    mode: isPgConnected ? 'postgresql' : 'banco_operacional',
+    mode: isPgConnected ? 'postgresql' : (supabaseServer ? 'supabase_cloud' : 'banco_operacional'),
+    supabaseConnected: Boolean(supabaseServer),
+    supabaseUrl,
     totalRecords: productsCount + salesCount + customersCount,
     records: {
       products: productsCount,
@@ -160,7 +200,28 @@ app.get('/api/state', async (_req, res) => {
       }
     }
 
-    // 2. Read from persistent local file
+    // 2. Try Supabase Cloud
+    if (supabaseServer) {
+      try {
+        const { data: supaRow, error } = await supabaseServer
+          .from('korisko_system_state')
+          .select('data, updated_at')
+          .eq('id', 'active_state')
+          .maybeSingle();
+        if (!error && supaRow && supaRow.data && supaRow.data.products?.length > 0) {
+          safeWriteJsonFile(LOCAL_STATE_FILE, supaRow.data);
+          return res.json({
+            source: 'supabase_cloud',
+            updatedAt: supaRow.updated_at,
+            data: supaRow.data,
+          });
+        }
+      } catch (err) {
+        console.warn('[Korisko DB] Read Supabase fallback to local:', err);
+      }
+    }
+
+    // 3. Read from persistent local file
     let localData = safeReadJsonFile(LOCAL_STATE_FILE);
     if (!localData || !localData.products || localData.products.length === 0) {
       const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
@@ -213,6 +274,13 @@ app.post('/api/state', async (req, res) => {
         ['active_state', JSON.stringify(data)]
       ).catch(err => console.warn('[Korisko DB] PG state mirror warning:', err));
     }
+
+    // 3. Supabase Cloud mirror
+    safeSupabaseUpsert('korisko_system_state', {
+      id: 'active_state',
+      data,
+      updated_at: new Date().toISOString(),
+    }, 'id');
 
     return res.json({
       success: true,
@@ -279,6 +347,12 @@ app.post('/api/backups', async (req, res) => {
         [point.id, JSON.stringify(point)]
       ).catch(() => {});
     }
+
+    safeSupabaseUpsert('korisko_backup_points', {
+      id: point.id,
+      data: point,
+      created_at: point.timestamp || new Date().toISOString(),
+    }, 'id');
 
     return res.json({ success: true, id: point.id });
   } catch (err: any) {

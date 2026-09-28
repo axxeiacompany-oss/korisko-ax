@@ -1,11 +1,20 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Default configuration with the user-provided Supabase project credentials
-export const DEFAULT_SUPABASE_URL = 'https://ofukieepxjawzqtlrgqy.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_sJLr9rPnGL-rVkNcQPcL0w_Q8KC7_el';
+export const DEFAULT_SUPABASE_URL = 'https://lmbpvdpmrdfxfqednwxd.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_l0-nPS9D5LQAC_AvzAyYWA_MXIFG0lm';
 
-const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
-const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
+/**
+ * Normalizes Supabase URL, removing any /rest/v1 or trailing slashes
+ */
+export function normalizeSupabaseUrl(url: string): string {
+  if (!url) return DEFAULT_SUPABASE_URL;
+  return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+}
+
+const rawEnvUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
+export const supabaseUrl = normalizeSupabaseUrl(rawEnvUrl);
+export const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
 
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -193,5 +202,72 @@ export async function fetchBackupPointsFromSupabase(): Promise<any[]> {
     return data.map((row: any) => row.data);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Execute an immediate test write and read against Supabase to verify connectivity and latency
+ */
+export async function testSupabaseReadWrite(): Promise<{
+  success: boolean;
+  latencyMs: number;
+  message: string;
+  error?: string;
+}> {
+  const t0 = performance.now();
+  try {
+    const testId = `ping-test-${Date.now()}`;
+    const pingData = { test: true, timestamp: new Date().toISOString() };
+
+    // 1. Test Write
+    const { error: writeError } = await supabase
+      .from('korisko_backup_points')
+      .upsert({
+        id: testId,
+        data: pingData,
+        created_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    if (writeError) {
+      return {
+        success: false,
+        latencyMs: Math.round(performance.now() - t0),
+        message: 'Falha na gravação no Supabase: ' + writeError.message,
+        error: writeError.message,
+      };
+    }
+
+    // 2. Test Read
+    const { data: readData, error: readError } = await supabase
+      .from('korisko_backup_points')
+      .select('id, data')
+      .eq('id', testId)
+      .maybeSingle();
+
+    if (readError || !readData) {
+      return {
+        success: false,
+        latencyMs: Math.round(performance.now() - t0),
+        message: 'Falha na leitura no Supabase: ' + (readError?.message || 'Registro não encontrado'),
+        error: readError?.message,
+      };
+    }
+
+    // 3. Cleanup test ping
+    await supabase.from('korisko_backup_points').delete().eq('id', testId);
+
+    const latencyMs = Math.round(performance.now() - t0);
+    return {
+      success: true,
+      latencyMs,
+      message: `Comunicação com Supabase 100% verificada! Gravação, leitura e confirmação em ${latencyMs}ms.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      latencyMs: Math.round(performance.now() - t0),
+      message: err.message || 'Erro ao conectar ao Supabase',
+      error: err.message,
+    };
   }
 }

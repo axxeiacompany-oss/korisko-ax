@@ -25,6 +25,7 @@ import {
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES } from '../services/storageService';
+import { SupabaseHealthResult } from '../services/supabaseClient';
 import { toBrl } from '../utils/currency';
 import { fetchLiveExchangeRates } from '../services/exchangeRateService';
 
@@ -145,6 +146,7 @@ interface BakeryContextType {
     railwayDetected: boolean;
     checking: boolean;
     totalRecords?: number;
+    supabase?: SupabaseHealthResult | null;
   };
   refreshDbStatus: () => Promise<void>;
 }
@@ -192,12 +194,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     railwayDetected: boolean;
     checking: boolean;
     totalRecords?: number;
+    supabase?: SupabaseHealthResult | null;
   }>({
     connected: true,
     mode: 'banco_operacional',
     railwayDetected: false,
     checking: true,
     totalRecords: 0,
+    supabase: null,
   });
 
   const refreshDbStatus = useCallback(async () => {
@@ -210,6 +214,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         railwayDetected: health.railwayDetected,
         checking: false,
         totalRecords: health.totalRecords,
+        supabase: health.supabase || null,
       });
 
       const serverData = await StorageService.fetchServerState();
@@ -234,6 +239,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             railwayDetected: health.railwayDetected,
             checking: false,
             totalRecords: health.totalRecords,
+            supabase: health.supabase || null,
           });
         }
 
@@ -249,8 +255,24 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     initSync();
-    return () => { isMounted = false; };
-  }, []);
+
+    // Auto-refresh when tab gains focus (e.g. returning from Supabase dashboard)
+    const handleFocus = () => {
+      refreshDbStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Periodic check every 15s
+    const interval = setInterval(() => {
+      refreshDbStatus();
+    }, 15000);
+
+    return () => { 
+      isMounted = false; 
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [refreshDbStatus]);
 
   // Sync state to local storage whenever data changes
   useEffect(() => {

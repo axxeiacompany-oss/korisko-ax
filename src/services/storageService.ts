@@ -15,6 +15,12 @@ import {
   CustomerAccountEntry
 } from '../types';
 import { DEFAULT_EXCHANGE_RATES } from '../utils/currency';
+import { 
+  saveStateToSupabase, 
+  saveBackupPointToSupabase, 
+  checkSupabaseHealth, 
+  fetchStateFromSupabase 
+} from './supabaseClient';
 
 const DB_KEY = 'KORISKO_STATE_V1';
 const LEGACY_DB_KEY = 'PANETTIERE_STATE_V1';
@@ -1296,11 +1302,18 @@ export class StorageService {
       } catch (err) {
         console.warn('[Korisko DB] Server sync notice:', err);
       }
+
+      // 2. Direct Supabase Cloud sync
+      try {
+        await saveStateToSupabase(data);
+      } catch (err) {
+        console.warn('[Supabase Sync Notice]:', err);
+      }
     }, 400);
   }
 
   /**
-   * Fetch current state from server database or initialize
+   * Fetch current state from server database, Supabase cloud or initialize
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
     try {
@@ -1313,7 +1326,18 @@ export class StorageService {
         }
       }
     } catch (err) {
-      console.warn('[Korisko DB] Could not fetch state from server, continuing with local storage:', err);
+      console.warn('[Korisko DB] Could not fetch state from server, checking Supabase/local storage:', err);
+    }
+
+    // Try fetching from Supabase cloud directly
+    try {
+      const supabaseData = await fetchStateFromSupabase();
+      if (supabaseData && supabaseData.products && supabaseData.products.length > 0) {
+        StorageService.saveState(supabaseData, false);
+        return supabaseData;
+      }
+    } catch (err) {
+      console.warn('[Korisko DB] Supabase state fetch notice:', err);
     }
 
     // If server has no state yet, seed server with current local state
@@ -1331,7 +1355,7 @@ export class StorageService {
   }
 
   /**
-   * Check connection status to Korisko database
+   * Check connection status to Korisko database and Supabase
    */
   static async checkDatabaseHealth(): Promise<{ 
     connected: boolean; 
@@ -1340,6 +1364,13 @@ export class StorageService {
     totalRecords?: number;
     supabase?: any;
   }> {
+    let supabaseHealth: any = null;
+    try {
+      supabaseHealth = await checkSupabaseHealth();
+    } catch (err) {
+      console.warn('[Korisko DB] Supabase health check exception:', err);
+    }
+
     try {
       const res = await fetch('/api/health');
       if (res.ok) {
@@ -1349,6 +1380,7 @@ export class StorageService {
           mode: json.mode || 'banco_operacional',
           railwayDetected: json.mode === 'postgresql',
           totalRecords: json.totalRecords || 0,
+          supabase: supabaseHealth,
         };
       }
     } catch (err) {
@@ -1360,6 +1392,7 @@ export class StorageService {
       mode: 'banco_operacional', 
       railwayDetected: false,
       totalRecords: 0,
+      supabase: supabaseHealth,
     };
   }
 
@@ -1430,6 +1463,11 @@ export class StorageService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ point: newPoint }),
     }).catch(() => {});
+
+    // Send backup point to Supabase cloud
+    saveBackupPointToSupabase(newPoint).catch((err) => {
+      console.warn('[Supabase Backup Point Notice]:', err);
+    });
 
     return newPoint;
   }
