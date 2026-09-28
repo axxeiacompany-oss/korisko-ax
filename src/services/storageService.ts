@@ -1321,6 +1321,20 @@ export class StorageService {
       if (res.ok) {
         const json = await res.json();
         if (json && json.data && json.data.products && json.data.products.length > 0) {
+          // Merge local employees to prevent wiping newly created affiliates
+          try {
+            const local = StorageService.loadState();
+            const localEmployees = local?.employees || [];
+            const serverEmployees = json.data.employees || [];
+            const mergedEmployees = [...serverEmployees];
+            for (const le of localEmployees) {
+              if (!mergedEmployees.some(se => se.id === le.id)) {
+                mergedEmployees.push(le);
+              }
+            }
+            json.data.employees = mergedEmployees;
+          } catch {}
+
           StorageService.saveState(json.data, false);
           return json.data;
         }
@@ -1333,6 +1347,20 @@ export class StorageService {
     try {
       const supabaseData = await fetchStateFromSupabase();
       if (supabaseData && supabaseData.products && supabaseData.products.length > 0) {
+        // Merge local employees
+        try {
+          const local = StorageService.loadState();
+          const localEmployees = local?.employees || [];
+          const supaEmployees = supabaseData.employees || [];
+          const mergedEmployees = [...supaEmployees];
+          for (const le of localEmployees) {
+            if (!mergedEmployees.some(se => se.id === le.id)) {
+              mergedEmployees.push(le);
+            }
+          }
+          supabaseData.employees = mergedEmployees;
+        } catch {}
+
         StorageService.saveState(supabaseData, false);
         return supabaseData;
       }

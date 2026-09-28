@@ -216,11 +216,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         totalRecords: health.totalRecords,
         supabase: health.supabase || null,
       });
-
-      const serverData = await StorageService.fetchServerState();
-      if (serverData) {
-        setData(serverData);
-      }
     } catch {
       setDbStatus(prev => ({ ...prev, checking: false }));
     }
