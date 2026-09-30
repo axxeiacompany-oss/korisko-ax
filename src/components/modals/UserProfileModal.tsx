@@ -232,9 +232,12 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   Editar minhas credenciais
                 </div>
                 <div>
-                  <label className="text-[11px] text-neutral-400 block mb-1">Nome de Exibição</label>
+                  <label htmlFor="user-profile-name" className="text-[11px] text-neutral-400 block mb-1">Nome de Exibição</label>
                   <input
+                    id="user-profile-name"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     className="w-full px-3 py-2 bg-[#0A0E18] border border-[#1F273A] rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
@@ -242,9 +245,12 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[11px] text-neutral-400 block mb-1">Nova Senha</label>
+                    <label htmlFor="user-profile-new-password" className="text-[11px] text-neutral-400 block mb-1">Nova Senha</label>
                     <input
+                      id="user-profile-new-password"
+                      name="new-password"
                       type="text"
+                      autoComplete="new-password"
                       value={editPassword}
                       onChange={(e) => setEditPassword(e.target.value)}
                       placeholder="Nova senha"
@@ -252,9 +258,12 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-neutral-400 block mb-1">Novo PIN (4-6 dígitos)</label>
+                    <label htmlFor="user-profile-new-pin" className="text-[11px] text-neutral-400 block mb-1">Novo PIN (4-6 dígitos)</label>
                     <input
+                      id="user-profile-new-pin"
+                      name="new-pin"
                       type="text"
+                      autoComplete="off"
                       maxLength={6}
                       value={editPin}
                       onChange={(e) => setEditPin(e.target.value)}

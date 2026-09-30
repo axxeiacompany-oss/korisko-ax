@@ -332,12 +332,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isMounted) return;
 
         setData(prev => {
-          // Merge products
-          const products = dbProducts.length > 0 ? dbProducts : prev.products;
+          // Merge products (if dbProducts table has rows use them, else if dbExtra exists use dbExtra.products, else prev)
+          const products = dbProducts.length > 0 ? dbProducts : (dbExtra ? (dbExtra.products ?? []) : prev.products);
           // Merge customers
-          const customers = dbCustomers.length > 0 ? dbCustomers : prev.customers;
+          const customers = dbCustomers.length > 0 ? dbCustomers : (dbExtra ? (dbExtra.customers ?? []) : prev.customers);
           // Merge sales
-          const sales = dbSales.length > 0 ? dbSales : prev.sales;
+          const sales = dbSales.length > 0 ? dbSales : (dbExtra ? (dbExtra.sales ?? []) : prev.sales);
           // Merge employees: ensure Admin Ax always preserved
           let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
@@ -364,7 +364,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Extra system state
             openComandas: dbExtra?.openComandas ?? prev.openComandas ?? [],
             fornadas: dbExtra?.fornadas ?? prev.fornadas ?? [],
-            fichasTecnicas: dbExtra?.fichasTecnicas && dbExtra.fichasTecnicas.length > 0 ? dbExtra.fichasTecnicas : (prev.fichasTecnicas || INITIAL_FICHAS_TECNICAS),
+            fichasTecnicas: dbExtra ? (dbExtra.fichasTecnicas ?? []) : (prev.fichasTecnicas ?? []),
             goals: dbExtra?.goals && dbExtra.goals.length > 0 ? dbExtra.goals : (prev.goals || INITIAL_GOALS),
             exchangeRates: dbExtra?.exchangeRates ?? prev.exchangeRates ?? DEFAULT_EXCHANGE_RATES,
             stockMovements: dbExtra?.stockMovements ?? prev.stockMovements ?? [],
@@ -1671,11 +1671,25 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       await upsertUsuario(adminAx);
 
-      setData(prev => ({
-        ...prev,
+      // Clean Supabase tables
+      try {
+        await supabase.from('produtos').delete().neq('id', 'none');
+        await supabase.from('vendas').delete().neq('id', 'none');
+        await supabase.from('clientes').delete().neq('id', 'none');
+        await supabase.from('caixa_sessoes').delete().neq('id', 'none');
+      } catch {}
+
+      const cleanState: SystemBackupData = {
+        ...data,
+        products: [],
+        fichasTecnicas: [],
+        stockMovements: [],
         sales: [],
         openComandas: [],
         fornadas: [],
+        customers: [],
+        customerEntries: [],
+        employees: [adminAx],
         currentSession: {
           id: `sess-${Date.now()}`,
           sessionNumber: 1,
@@ -1683,11 +1697,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           openedAt: new Date().toISOString(),
           closedAt: new Date().toISOString(),
           openedBy: 'Ax',
+          closedBy: 'Ax',
           initialFloat: { brl: 0, pyg: 0, usd: 0 },
           transactions: [],
         },
         sessionHistory: [],
-      }));
+      };
+
+      await saveSystemStateDoc(cleanState);
+      setData(cleanState);
+
+      // Sync backend local storage
+      try {
+        await fetch('/api/factory-zero', { method: 'POST' });
+      } catch {}
     } catch (err: any) {
       setDbError(`Erro ao resetar padrão de fábrica: ${err.message}`);
     }

@@ -1205,14 +1205,14 @@ export class StorageService {
   static loadState(): SystemBackupData {
     try {
       // Auto-purge old mock data to deliver zeroed factory state
-      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V3') !== 'true') {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V4') !== 'true') {
         localStorage.removeItem(DB_KEY);
         localStorage.removeItem('KORISKO_STATE_V1');
         localStorage.removeItem('PANETTIERE_STATE_V1');
         localStorage.removeItem(BACKUPS_KEY);
         localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
         localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
-        localStorage.setItem('KORISKO_ZERO_CLEANSED_V3', 'true');
+        localStorage.setItem('KORISKO_ZERO_CLEANSED_V4', 'true');
       }
 
       const serialized = typeof localStorage !== 'undefined' ? localStorage.getItem(DB_KEY) : null;
@@ -1221,7 +1221,7 @@ export class StorageService {
         if (parsed && Array.isArray(parsed.products)) {
           if (!parsed.openComandas) parsed.openComandas = [];
           if (!parsed.fornadas) parsed.fornadas = [];
-          if (!parsed.fichasTecnicas || parsed.fichasTecnicas.length === 0) parsed.fichasTecnicas = INITIAL_FICHAS_TECNICAS;
+          if (!parsed.fichasTecnicas) parsed.fichasTecnicas = [];
           if (!parsed.customers) parsed.customers = [];
           if (!parsed.customerEntries) parsed.customerEntries = [];
           if (!parsed.employees || parsed.employees.length === 0) {
@@ -1270,7 +1270,7 @@ export class StorageService {
     return {
       version: '2.0.0',
       timestamp: new Date().toISOString(),
-      products: INITIAL_PRODUCTS.map(p => ({ ...p, stock: 0 })),
+      products: [], // ZERADO - pronto para adicionar do zero
       stockMovements: [],
       sales: [], // ZERADO
       currentSession: {
@@ -1294,7 +1294,7 @@ export class StorageService {
       employees: INITIAL_EMPLOYEES, // Admin Ax PERMANECE SEMPRE
       openComandas: [], // ZERADO
       fornadas: [], // ZERADO
-      fichasTecnicas: INITIAL_FICHAS_TECNICAS,
+      fichasTecnicas: [], // ZERADO - pronto para adicionar do zero
       customers: [], // ZERADO
       customerEntries: [], // ZERADO
     };

@@ -212,7 +212,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               
               {/* Email / Username / Name Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-300 block">
+                <label htmlFor="login-username" className="text-xs font-medium text-neutral-300 block">
                   {language === 'es' ? 'Usuario o Correo Electrónico' : 'E-mail ou Usuário'}
                 </label>
                 <div className="relative group">
@@ -220,8 +220,11 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
+                    id="login-username"
+                    name="username"
                     type="text"
                     required
+                    autoComplete="username email"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -236,7 +239,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               {/* Password Input */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-neutral-300">
+                  <label htmlFor="login-password" className="text-xs font-medium text-neutral-300">
                     {t.loginPasswordLabel}
                   </label>
                   <a
@@ -244,7 +247,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     onClick={(e) => {
                       e.preventDefault();
                       alert(language === 'es' 
-                        ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) en el panel de gestión.' 
+                        ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) en el panel de gestão.' 
                         : 'Para recuperar a senha de acesso, solicite ao Administrador (Ax) no painel de gestão.');
                     }}
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -257,8 +260,11 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
+                    id="login-password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -276,8 +282,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
               {/* Remember me */}
               <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-400 hover:text-neutral-300">
+                <label htmlFor="login-remember-me" className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-400 hover:text-neutral-300">
                   <input
+                    id="login-remember-me"
+                    name="remember"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}

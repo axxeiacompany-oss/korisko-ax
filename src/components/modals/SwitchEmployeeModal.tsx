@@ -155,7 +155,7 @@ export const SwitchEmployeeModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <form onSubmit={handleConfirmSwitch} className="space-y-4 pt-2 border-t border-neutral-800">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
+                <label htmlFor="switch-employee-password" className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
                   <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                   Senha de Acesso
                 </label>
@@ -164,7 +164,10 @@ export const SwitchEmployeeModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </span>
               </div>
               <input
+                id="switch-employee-password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 value={pinInput}
                 onChange={(e) => {
                   setPinInput(e.target.value);

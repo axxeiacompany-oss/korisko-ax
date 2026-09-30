@@ -466,7 +466,7 @@ app.post('/api/factory-zero', async (_req, res) => {
       version: '2.0.0',
       timestamp: new Date().toISOString(),
       employees: [adminUser],
-      products: defaultSeed?.products || [],
+      products: [],
       stockMovements: [],
       sales: [],
       currentSession: {
@@ -484,6 +484,7 @@ app.post('/api/factory-zero', async (_req, res) => {
       sessionHistory: [],
       openComandas: [],
       fornadas: [],
+      fichasTecnicas: [],
       customers: [],
       customerEntries: [],
     };
@@ -492,7 +493,7 @@ app.post('/api/factory-zero', async (_req, res) => {
     safeWriteJsonFile(LOCAL_BACKUPS_FILE, []);
 
     if (isPgConnected && pool) {
-      pool.query(`TRUNCATE TABLE vendas; TRUNCATE TABLE caixa_sessoes; TRUNCATE TABLE clientes;`).catch(() => {});
+      pool.query(`TRUNCATE TABLE produtos; TRUNCATE TABLE vendas; TRUNCATE TABLE caixa_sessoes; TRUNCATE TABLE clientes;`).catch(() => {});
       pool.query(
         `INSERT INTO korisko_system_state (id, data, updated_at) 
          VALUES ('active_state', $1, NOW()) 
@@ -502,6 +503,7 @@ app.post('/api/factory-zero', async (_req, res) => {
     }
 
     if (supabaseServer) {
+      supabaseServer.from('produtos').delete().neq('id', 'none').then(() => {}, () => {});
       supabaseServer.from('vendas').delete().neq('id', 'none').then(() => {}, () => {});
       supabaseServer.from('caixa_sessoes').delete().neq('id', 'none').then(() => {}, () => {});
       supabaseServer.from('clientes').delete().neq('id', 'none').then(() => {}, () => {});
