@@ -210,7 +210,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     navGroupMain: 'Principal',
     navGroupProduction: 'Producción & Stock',
     navGroupFinancial: 'Gestión Financiera',
-    navGroupAdmin: 'Administración & Afiliados',
+    navGroupAdmin: 'Administración & Equipo',
 
     // Tabs
     tabDashboard: 'Dashboard',
@@ -224,7 +224,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     tabGoals: 'Metas del Mes',
     tabCurrency: 'Multi-Monedas & Cambio',
     tabBackup: 'Nube & Backup',
-    tabAffiliates: 'Afiliados & Roles',
+    tabAffiliates: 'Equipo & Roles',
 
     // Tab Subtitles
     subDashboard: 'Visión general consolidada en tiempo real del negocio',
@@ -238,7 +238,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     subGoals: 'Seguimiento del objetivo financiero del mes',
     subCurrency: 'Cotizaciones en tiempo real (Real, Guaraní, Dólar)',
     subBackup: 'Base de datos en la nube (PostgreSQL Railway) y copias locales',
-    subAffiliates: 'Panel del Administrador General para permisos de usuarios',
+    subAffiliates: 'Gestión de colaboradores, credenciales y control de permisos',
 
     // TopNav & Common Actions
     searchPlaceholder: 'Buscar por panes, bebidas, clientes, comandas...',
@@ -280,12 +280,12 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginTitle: 'Acceso al Sistema Korisko',
     loginSubtitle: 'Ingrese sus credenciales de operador o administrador para continuar',
     loginEmailLabel: 'Correo Electrónico / Gmail',
-    loginPasswordLabel: 'Contraseña o PIN Numérico',
+    loginPasswordLabel: 'Contraseña de Acceso',
     loginButton: 'Ingresar al Sistema',
     loginRememberMe: 'Recordar credenciales en este equipo',
     loginQuickRoles: 'Acceso Rápido por Perfil',
     loginMasterKeyHint: 'Clave Maestra Ax disponible para soporte',
-    loginErrorInvalid: 'Contraseña o PIN incorrecto para este usuario.',
+    loginErrorInvalid: 'Usuario o contraseña incorrectos.',
     loginErrorEmpty: 'Por favor ingrese sus credenciales completas.',
     loginLoggingIn: 'Verificando credenciales...',
     loginSecurityNotice: 'Korisko Gestión & PDV',
@@ -304,7 +304,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     roleManager: 'Gerente General',
     roleCashier: 'Operador de Caja',
     roleBaker: 'Panadero / Maestro',
-    roleAffiliate: 'Afiliado / Vendedor',
+    roleAffiliate: 'Colaborador / Operador',
 
     // PDV & Sales
     pdvCart: 'Comanda / Carrito',
@@ -403,7 +403,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     navGroupMain: 'Principal',
     navGroupProduction: 'Produção & Estoque',
     navGroupFinancial: 'Gestão Financeira',
-    navGroupAdmin: 'Administração & Afiliados',
+    navGroupAdmin: 'Administração & Equipe',
 
     // Tabs
     tabDashboard: 'Dashboard',
@@ -417,7 +417,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     tabGoals: 'Metas do Mês',
     tabCurrency: 'Multi-Moedas & Câmbio',
     tabBackup: 'Backup & Nuvem',
-    tabAffiliates: 'Afiliados & Funções',
+    tabAffiliates: 'Equipe & Permissões',
 
     // Tab Subtitles
     subDashboard: 'Visão consolidada em tempo real da padaria',
@@ -431,7 +431,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     subGoals: 'Acompanhamento do objetivo financeiro do mês',
     subCurrency: 'Flutuação cambial em tempo real (Real, Guaraní, Dólar)',
     subBackup: 'Pontos de restauração e cópia local',
-    subAffiliates: 'Painel do Administrador Geral Ax para liberação de funções',
+    subAffiliates: 'Gestão de colaboradores, controle de senhas e liberação de funções',
 
     // TopNav & Common Actions
     searchPlaceholder: 'Buscar produto, cliente ou comanda...',
@@ -473,12 +473,12 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginTitle: 'Acesso ao Sistema Korisko',
     loginSubtitle: 'Entre com as credenciais do seu operador ou administrador para continuar',
     loginEmailLabel: 'E-mail / Gmail Cadastrado',
-    loginPasswordLabel: 'Senha Individual ou PIN Numérico',
+    loginPasswordLabel: 'Senha de Acesso',
     loginButton: 'Entrar no Sistema',
     loginRememberMe: 'Lembrar credenciais neste navegador',
     loginQuickRoles: 'Acesso Rápido por Perfil',
     loginMasterKeyHint: 'Senha Mestra Ax disponível para suporte',
-    loginErrorInvalid: 'Senha ou PIN incorreto para este usuário.',
+    loginErrorInvalid: 'E-mail, usuário ou senha incorretos.',
     loginErrorEmpty: 'Por favor preencha suas credenciais completas.',
     loginLoggingIn: 'Verificando credenciais...',
     loginSecurityNotice: 'Korisko Gestão & PDV',
@@ -497,7 +497,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     roleManager: 'Gerente Geral',
     roleCashier: 'Operador de Caixa',
     roleBaker: 'Padeiro / Mestre',
-    roleAffiliate: 'Afiliado / Vendedor',
+    roleAffiliate: 'Colaborador / Operador',
 
     // PDV & Sales
     pdvCart: 'Comanda / Carrinho',

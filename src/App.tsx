@@ -120,8 +120,8 @@ function MainAppShell() {
               </h2>
               <p className="text-xs text-neutral-400">
                 {language === 'es' 
-                  ? `Su perfil de afiliado/colaborador (${currentUser.name}) no tiene autorización para acceder a este módulo. Solicite al Administrador General (Ax) la habilitación de esta función.`
-                  : `O seu perfil de afiliado/colaborador (${currentUser.name}) não possui liberação para este módulo. Solicite ao Administrador Geral (Ax) a liberação desta função.`
+                  ? `Su perfil de usuario (${currentUser.name}) no tiene autorización para acceder a este módulo. Solicite al Administrador General (Ax) la habilitación de esta función.`
+                  : `O seu perfil de usuário (${currentUser.name}) não possui liberação para este módulo. Solicite ao Administrador Geral (Ax) a liberação desta função.`
                 }
               </p>
               <button

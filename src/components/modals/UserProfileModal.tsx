@@ -43,7 +43,7 @@ const FEATURE_INFO: Record<AppFeature, { label: string; icon: any; color: string
   metas: { label: 'Metas do Mês', icon: Target, color: 'text-purple-400 bg-purple-500/10' },
   cambio: { label: 'Cotação & Multi-Moedas', icon: Coins, color: 'text-teal-400 bg-teal-500/10' },
   backup: { label: 'Backup & Nuvem', icon: Cloud, color: 'text-blue-400 bg-blue-500/10' },
-  afiliados: { label: 'Gestão de Afiliados (Admin)', icon: ShieldCheck, color: 'text-indigo-400 bg-indigo-500/10' },
+  afiliados: { label: 'Gestão de Equipe & Permissões (Admin)', icon: ShieldCheck, color: 'text-indigo-400 bg-indigo-500/10' },
 };
 
 export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
@@ -165,19 +165,19 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {/* Individual Credentials Card (Visible when online in your own profile) */}
+          {/* Access Credentials Card */}
           <div className="p-4 rounded-2xl bg-[#090D15] border border-[#1E283D] space-y-3.5">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Minhas Credenciais Individuais</span>
+                <span>Minhas Credenciais de Acesso</span>
               </h3>
               <span className="text-[10px] text-neutral-400">
                 Apenas você tem acesso a esta visualização
               </span>
             </div>
 
-            {/* Individual Password */}
+            {/* Password */}
             <div className="p-3 rounded-xl bg-[#0E1422] border border-[#1B2436] flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
@@ -197,7 +197,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            {/* Individual PIN */}
+            {/* PIN */}
             <div className="p-3 rounded-xl bg-[#0E1422] border border-[#1B2436] flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
@@ -224,7 +224,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 onClick={() => setIsEditing(true)}
                 className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer pt-1 block"
               >
-                Alterar minha senha ou PIN pessoal
+                Alterar minha senha de acesso
               </button>
             ) : (
               <form onSubmit={handleSaveProfile} className="pt-2 border-t border-[#1C2538] space-y-3">

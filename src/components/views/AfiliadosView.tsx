@@ -310,10 +310,10 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               <span className="text-xs text-neutral-400 font-mono">axxeiacompany@gmail.com</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Gestão de Afiliados & Liberação de Funções
+              Gestão de Equipe & Permissões
             </h1>
             <p className="text-xs text-neutral-400 max-w-2xl">
-              Somente você (<b className="text-white">Ax</b>) tem acesso a este painel para adicionar e excluir afiliados, definir suas senhas e liberar de forma individual quais funções cada afiliado poderá utilizar.
+              Somente você (<b className="text-white">Ax</b>) tem acesso a este painel para cadastrar colaboradores, definir credenciais e conceder individualmente as permissões de acesso aos módulos do sistema.
             </p>
           </div>
 
@@ -324,7 +324,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Adicionar Afiliado</span>
+              <span>Novo Colaborador</span>
             </button>
           </div>
         </div>
@@ -347,8 +347,8 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                 <UserPlus className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Criar Novo Afiliado pelo Gmail e Senha</h3>
-                <p className="text-[11px] text-neutral-400">Insira o Gmail de acesso, crie a senha personalizada e marque as funções liberadas.</p>
+                <h3 className="text-sm font-bold text-white">Cadastrar Novo Colaborador / Usuário</h3>
+                <p className="text-[11px] text-neutral-400">Informe os dados cadastrais, defina a senha e selecione os módulos autorizados.</p>
               </div>
             </div>
             <button
@@ -367,7 +367,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               
               <div>
                 <label className="text-xs font-medium text-neutral-300 block mb-1.5">
-                  Nome do Afiliado *
+                  Nome Completo *
                 </label>
                 <input
                   type="text"
@@ -375,14 +375,14 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: João Afiliado ou Maria Mendes"
+                  placeholder="Ex: Carlos Silva ou Maria Mendes"
                   className="w-full px-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 font-sans"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-neutral-300 block mb-1.5">
-                  Gmail ou Usuário
+                  E-mail ou Usuário
                 </label>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -390,7 +390,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="afiliado@gmail.com ou usuario"
+                    placeholder="usuario@empresa.com ou nome.usuario"
                     className="w-full pl-9 pr-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 font-sans"
                   />
                 </div>
@@ -398,7 +398,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
               <div>
                 <label className="text-xs font-medium text-neutral-300 block mb-1.5">
-                  Senha que Você Criou para Ele *
+                  Senha de Acesso *
                 </label>
                 <div className="relative">
                   <KeyRound className="w-3.5 h-3.5 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -449,10 +449,10 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <label className="text-xs font-bold text-white block">
-                    Funções Liberadas para Este Afiliado ({selectedFeatures.length} selecionadas)
+                    Módulos Liberados para Este Colaborador ({selectedFeatures.length} selecionados)
                   </label>
                   <p className="text-[11px] text-neutral-400">
-                    O afiliado só conseguirá acessar os módulos que você marcar:
+                    O colaborador terá acesso apenas aos módulos marcados abaixo:
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -524,7 +524,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>Salvar Afiliado & Liberar Acesso</span>
+                <span>Salvar Colaborador & Conceder Acesso</span>
               </button>
             </div>
 
@@ -532,12 +532,12 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Lista de Afiliados Cadastrados */}
+      {/* Lista de Colaboradores e Usuários */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Users className="w-4 h-4 text-indigo-400" />
-            <span>Afiliados & Membros Ativos ({employees.length})</span>
+            <span>Equipe & Usuários Ativos ({employees.length})</span>
           </h2>
           <span className="text-xs text-neutral-400">
             Controle exclusivo do Administrador Ax
@@ -595,7 +595,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                       type="button"
                       onClick={() => copyCredentials(emp)}
                       className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-[#161E30] transition-colors cursor-pointer"
-                      title="Copiar dados de acesso (Gmail e Senha)"
+                      title="Copiar dados de acesso (E-mail e Senha)"
                     >
                       {copiedId === emp.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -605,7 +605,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                       type="button"
                       onClick={() => handleOpenEdit(emp)}
                       className="p-2 rounded-lg text-neutral-400 hover:text-indigo-400 hover:bg-[#161E30] transition-colors cursor-pointer"
-                      title="Editar dados, senha e funções liberadas"
+                      title="Editar dados, credenciais e permissões"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -615,12 +615,12 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          if (confirm(`Deseja realmente excluir o afiliado ${emp.name} (${emp.email})?`)) {
+                          if (confirm(`Deseja realmente excluir o colaborador ${emp.name} (${emp.email})?`)) {
                             deleteEmployee(emp.id);
                           }
                         }}
                         className="p-2 rounded-lg text-neutral-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                        title="Excluir afiliado"
+                        title="Excluir colaborador"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -632,7 +632,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                 <div className="mt-4 p-3 rounded-xl bg-[#090D15] border border-[#1A2234] flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <Lock className="w-3.5 h-3.5 text-neutral-500" />
-                    <span className="text-neutral-400">Senha do Afiliado:</span>
+                    <span className="text-neutral-400">Senha de Acesso:</span>
                     <span className="font-mono text-white font-semibold">
                       {isThisPasswordVisible ? (emp.password || emp.pin) : '••••••••••••'}
                     </span>
@@ -641,7 +641,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                     type="button"
                     onClick={() => handleToggleRevealPassword(emp.id)}
                     className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1.5 px-2 py-1 rounded bg-[#131A29] border border-[#1E283D] transition-colors cursor-pointer"
-                    title={isThisPasswordVisible ? 'Ocultar esta senha' : 'Ver somente a senha deste afiliado'}
+                    title={isThisPasswordVisible ? 'Ocultar esta senha' : 'Ver senha do usuário'}
                   >
                     {isThisPasswordVisible ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
                     <span>{isThisPasswordVisible ? 'Ocultar' : 'Ver Senha'}</span>
@@ -701,10 +701,10 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Shield className="w-4 h-4 text-indigo-400" />
-                  <span>Editar Afiliado: {editingEmployee.name}</span>
+                  <span>Editar Colaborador: {editingEmployee.name}</span>
                 </h3>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  Atualize o nome, Gmail, senha e gerencie quais funções estão liberadas.
+                  Atualize o nome, e-mail, credenciais e permissões de acesso aos módulos.
                 </p>
               </div>
               <button

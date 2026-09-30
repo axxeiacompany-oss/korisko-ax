@@ -98,38 +98,37 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         if (!matchesPin && !matchesPwd && !isMaster) {
           setErrorMsg(
             language === 'es' 
-              ? `Contraseña o PIN incorrecto para "${matchedEmp.name}". Verifique la clave que el Administrador (Ax) le asignó.` 
-              : `Senha ou PIN incorreto para "${matchedEmp.name}". Verifique a senha cadastrada pelo Administrador (Ax).`
+              ? `Contraseña incorrecta para "${matchedEmp.name}". Verifique su clave de acceso.` 
+              : `Senha incorreta para "${matchedEmp.name}". Verifique a sua senha de acesso.`
           );
           setIsLoading(false);
           return;
         }
 
-        switchUser(matchedEmp.id, matchedEmp.pin);
+        switchUser(matchedEmp.id);
         setIsLoading(false);
         onLoginSuccess();
         return;
       }
 
-      // Fallback: match by PIN alone or password alone if unique
-      const empByPin = currentList.find(e => 
-        (e.pin === inputPassword || e.password === inputPassword) && 
+      // Fallback: match by password or PIN if unique
+      const empByCred = currentList.find(e => 
+        (e.password === inputPassword || e.pin === inputPassword) && 
         (!e.email || e.email.toLowerCase() === inputIdentifier || e.name.toLowerCase() === inputIdentifier)
       );
 
-      if (empByPin) {
-        switchUser(empByPin.id, empByPin.pin);
+      if (empByCred) {
+        switchUser(empByCred.id);
         setIsLoading(false);
         onLoginSuccess();
         return;
       }
 
-      // User not found in database
-      const availableNames = currentList.map(e => e.name).join(', ');
+      // User not found in database - Professional message without leaking internal database records
       setErrorMsg(
         language === 'es' 
-          ? `Usuario "${email.trim()}" no encontrado. Ingrese su nombre o email cadastrado. (Perfiles activos: ${availableNames})` 
-          : `Usuário ou e-mail "${email.trim()}" não encontrado. Digite seu nome ou e-mail cadastrado. (Perfis ativos: ${availableNames})`
+          ? `Usuario o correo "${email.trim()}" no encontrado. Verifique sus credenciales.` 
+          : `Usuário ou e-mail "${email.trim()}" não encontrado. Verifique seus dados de acesso.`
       );
       setIsLoading(false);
     } catch (err: any) {
@@ -214,7 +213,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               {/* Email / Username / Name Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-neutral-300 block">
-                  {language === 'es' ? 'Usuario, Nombre o Correo' : 'Usuário, Nome do Afiliado ou E-mail'}
+                  {language === 'es' ? 'Usuario o Correo Electrónico' : 'E-mail ou Usuário'}
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">
@@ -228,7 +227,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     spellCheck={false}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={language === 'es' ? 'Ej: claudia o correo@gmail.com' : 'Ex: claudia ou seu-email@gmail.com'}
+                    placeholder={language === 'es' ? 'Ej: usuario o correo@empresa.com' : 'Ex: usuario ou seu-email@empresa.com'}
                     className="w-full pl-10 pr-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition-all font-sans"
                   />
                 </div>
@@ -245,8 +244,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     onClick={(e) => {
                       e.preventDefault();
                       alert(language === 'es' 
-                        ? 'Para recuperar su PIN o contraseña, comuníquese con el Administrador (Ax) en el panel de gestión.' 
-                        : 'Para recuperar o PIN ou senha, solicite ao Administrador (Ax) no painel de gestão.');
+                        ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) en el panel de gestión.' 
+                        : 'Para recuperar a senha de acesso, solicite ao Administrador (Ax) no painel de gestão.');
                     }}
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
                   >

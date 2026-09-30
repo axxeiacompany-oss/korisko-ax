@@ -374,6 +374,19 @@ app.post('/api/reset', async (_req, res) => {
 });
 
 // ==========================================
+// VS CODE PROJECT EXPORT (.ZIP)
+// ==========================================
+app.get(['/api/download-zip', '/download', '/download-project'], (_req, res) => {
+  const zipPath = path.resolve(process.cwd(), 'public', 'korisko-pdv-projeto.zip');
+  if (fs.existsSync(zipPath)) {
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="korisko-pdv-projeto.zip"');
+    return res.sendFile(zipPath);
+  }
+  return res.status(404).json({ error: 'Arquivo zip do projeto ainda não gerado.' });
+});
+
+// ==========================================
 // STATIC ASSETS & VITE INTEGRATION
 // ==========================================
 async function start() {

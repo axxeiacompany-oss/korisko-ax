@@ -151,7 +151,7 @@ export const MobileBottomNav: React.FC<Props> = ({
               <ShieldCheck className="w-4 h-4" />
             </div>
             <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full">
-              {language === 'es' ? 'Afiliados' : 'Afiliados'}
+              {language === 'es' ? 'Equipo' : 'Equipe'}
             </span>
           </button>
         ) : isFeatureAllowed('crm') ? (

@@ -61,7 +61,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'paes',
     priceBrl: 18.90, // por kg
     costPriceBrl: 6.50,
-    stock: 42.5,
+    stock: 0,
     minStock: 15.0,
     unit: 'kg',
     expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
@@ -74,7 +74,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'salgados',
     priceBrl: 54.00, // por kg
     costPriceBrl: 22.00,
-    stock: 18.0,
+    stock: 0,
     minStock: 8.0,
     unit: 'kg',
     active: true,
@@ -86,7 +86,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'paes',
     priceBrl: 14.50,
     costPriceBrl: 4.80,
-    stock: 24,
+    stock: 0,
     minStock: 10,
     unit: 'un',
     active: true,
@@ -98,7 +98,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'confeitaria',
     priceBrl: 8.50,
     costPriceBrl: 3.20,
-    stock: 19,
+    stock: 0,
     minStock: 12,
     unit: 'un',
     expirationDate: new Date(Date.now() + 172800000).toISOString().split('T')[0],
@@ -111,7 +111,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'confeitaria',
     priceBrl: 36.00,
     costPriceBrl: 12.50,
-    stock: 7,
+    stock: 0,
     minStock: 4,
     unit: 'un',
     active: true,
@@ -123,7 +123,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'salgados',
     priceBrl: 6.00,
     costPriceBrl: 2.10,
-    stock: 35,
+    stock: 0,
     minStock: 15,
     unit: 'un',
     active: true,
@@ -135,7 +135,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'paes',
     priceBrl: 12.00,
     costPriceBrl: 4.50,
-    stock: 16,
+    stock: 0,
     minStock: 10,
     unit: 'un',
     active: true,
@@ -147,7 +147,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'salgados',
     priceBrl: 9.50,
     costPriceBrl: 3.80,
-    stock: 28,
+    stock: 0,
     minStock: 12,
     unit: 'un',
     active: true,
@@ -159,7 +159,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'bebidas',
     priceBrl: 7.00,
     costPriceBrl: 1.80,
-    stock: 150,
+    stock: 0,
     minStock: 30,
     unit: 'un',
     active: true,
@@ -171,7 +171,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'bebidas',
     priceBrl: 11.50,
     costPriceBrl: 3.50,
-    stock: 90,
+    stock: 0,
     minStock: 25,
     unit: 'un',
     active: true,
@@ -183,7 +183,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'bebidas',
     priceBrl: 10.00,
     costPriceBrl: 3.20,
-    stock: 22,
+    stock: 0,
     minStock: 10,
     unit: 'un',
     active: true,
@@ -195,7 +195,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'frios',
     priceBrl: 58.00,
     costPriceBrl: 34.00,
-    stock: 8.5,
+    stock: 0,
     minStock: 5.0,
     unit: 'kg',
     expirationDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
@@ -208,7 +208,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'frios',
     priceBrl: 46.00,
     costPriceBrl: 26.00,
-    stock: 6.2,
+    stock: 0,
     minStock: 4.0,
     unit: 'kg',
     expirationDate: new Date(Date.now() + 86400000 * 6).toISOString().split('T')[0],
@@ -221,7 +221,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 115.00,
     costPriceBrl: 95.00,
-    stock: 14,
+    stock: 0,
     minStock: 6,
     unit: 'pct',
     isIngredient: true,
@@ -234,7 +234,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 12.00,
     costPriceBrl: 8.50,
-    stock: 18,
+    stock: 0,
     minStock: 8,
     unit: 'un',
     isIngredient: true,
@@ -248,7 +248,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 42.00,
     costPriceBrl: 31.50,
-    stock: 16.0,
+    stock: 0,
     minStock: 5.0,
     unit: 'kg',
     isIngredient: true,
@@ -261,7 +261,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 14.00,
     costPriceBrl: 8.90,
-    stock: 45.0,
+    stock: 0,
     minStock: 15.0,
     unit: 'kg',
     isIngredient: true,
@@ -274,7 +274,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 48.00,
     costPriceBrl: 34.00,
-    stock: 22.0,
+    stock: 0,
     minStock: 8.0,
     unit: 'kg',
     isIngredient: true,
@@ -287,7 +287,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 6.50,
     costPriceBrl: 4.20,
-    stock: 60.0,
+    stock: 0,
     minStock: 20.0,
     unit: 'kg',
     isIngredient: true,
@@ -300,7 +300,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 1.20,
     costPriceBrl: 0.70,
-    stock: 240,
+    stock: 0,
     minStock: 60,
     unit: 'un',
     isIngredient: true,
@@ -313,7 +313,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 6.80,
     costPriceBrl: 4.60,
-    stock: 48.0,
+    stock: 0,
     minStock: 15.0,
     unit: 'l',
     isIngredient: true,
@@ -326,7 +326,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 3.50,
     costPriceBrl: 2.10,
-    stock: 30.0,
+    stock: 0,
     minStock: 10.0,
     unit: 'kg',
     isIngredient: true,
@@ -339,7 +339,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 7.90,
     costPriceBrl: 4.50,
-    stock: 15.0,
+    stock: 0,
     minStock: 5.0,
     unit: 'kg',
     isIngredient: true,
@@ -352,7 +352,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 46.00,
     costPriceBrl: 32.00,
-    stock: 12.0,
+    stock: 0,
     minStock: 4.0,
     unit: 'kg',
     isIngredient: true,
@@ -365,7 +365,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: 'ingredientes',
     priceBrl: 9.50,
     costPriceBrl: 6.80,
-    stock: 25.0,
+    stock: 0,
     minStock: 8.0,
     unit: 'l',
     isIngredient: true,
@@ -373,227 +373,23 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
-// Seed realistic multi-currency sales history
+// Realistic multi-currency sales history (Starts zeroed for real production)
 function generateInitialSales(): Sale[] {
-  const sales: Sale[] = [];
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
-  // Create sales across the last 15 days
-  const baseRates = DEFAULT_EXCHANGE_RATES;
-  
-  const sampleTransactions = [
-    {
-      dayOffset: 0,
-      hour: 7,
-      minute: 24,
-      items: [
-        { prodIndex: 0, qty: 0.8 }, // Pao frances
-        { prodIndex: 8, qty: 2 },   // Cafe expresso
-      ],
-      paymentCur: 'BRL',
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 0,
-      hour: 8,
-      minute: 15,
-      items: [
-        { prodIndex: 1, qty: 0.4 }, // Pao de queijo
-        { prodIndex: 9, qty: 1 },   // Cappuccino
-        { prodIndex: 5, qty: 3 },   // Chipa
-      ],
-      paymentCur: 'PYG', // Paid in Guaranis!
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 0,
-      hour: 9,
-      minute: 40,
-      items: [
-        { prodIndex: 6, qty: 2 }, // Croissant
-        { prodIndex: 10, qty: 1 }, // Suco laranja
-      ],
-      paymentCur: 'USD', // Paid in US Dollars!
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 0,
-      hour: 11,
-      minute: 10,
-      items: [
-        { prodIndex: 4, qty: 1 }, // Bolo cenoura
-        { prodIndex: 7, qty: 2 }, // Coxinha
-      ],
-      paymentCur: 'BRL',
-      method: 'pix' as const,
-    },
-    {
-      dayOffset: 1,
-      hour: 7,
-      minute: 50,
-      items: [
-        { prodIndex: 0, qty: 1.2 },
-        { prodIndex: 11, qty: 0.3 },
-        { prodIndex: 12, qty: 0.3 },
-      ],
-      paymentCur: 'BRL',
-      method: 'cartao_debito' as const,
-    },
-    {
-      dayOffset: 1,
-      hour: 15,
-      minute: 20,
-      items: [
-        { prodIndex: 3, qty: 4 }, // Sonhos
-        { prodIndex: 8, qty: 2 }, // Cafe
-      ],
-      paymentCur: 'PYG',
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 2,
-      hour: 8,
-      minute: 30,
-      items: [
-        { prodIndex: 2, qty: 2 }, // Baguete
-        { prodIndex: 5, qty: 4 }, // Chipa
-      ],
-      paymentCur: 'USD',
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 3,
-      hour: 16,
-      minute: 45,
-      items: [
-        { prodIndex: 0, qty: 1.5 },
-        { prodIndex: 4, qty: 1 },
-      ],
-      paymentCur: 'BRL',
-      method: 'pix' as const,
-    },
-    {
-      dayOffset: 4,
-      hour: 10,
-      minute: 12,
-      items: [
-        { prodIndex: 7, qty: 4 },
-        { prodIndex: 10, qty: 2 },
-      ],
-      paymentCur: 'PYG',
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 5,
-      hour: 8,
-      minute: 5,
-      items: [
-        { prodIndex: 0, qty: 2.0 },
-        { prodIndex: 1, qty: 0.5 },
-      ],
-      paymentCur: 'BRL',
-      method: 'dinheiro' as const,
-    },
-    {
-      dayOffset: 6,
-      hour: 17,
-      minute: 30,
-      items: [
-        { prodIndex: 6, qty: 3 },
-        { prodIndex: 9, qty: 2 },
-      ],
-      paymentCur: 'USD',
-      method: 'cartao_credito' as const,
-    },
-  ];
-
-  sampleTransactions.forEach((tx, idx) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - tx.dayOffset);
-    d.setHours(tx.hour, tx.minute, 0, 0);
-
-    const items = tx.items.map(it => {
-      const prod = INITIAL_PRODUCTS[it.prodIndex];
-      const subtotal = Math.round(prod.priceBrl * it.qty * 100) / 100;
-      return {
-        product: prod,
-        quantity: it.qty,
-        unitPriceBrl: prod.priceBrl,
-        subtotalBrl: subtotal,
-      };
-    });
-
-    const totalBrl = items.reduce((sum, item) => sum + item.subtotalBrl, 0);
-    
-    // Calculate currency payment
-    let amountReceived = totalBrl;
-    let exchangeRateUsed = 1;
-    if (tx.paymentCur === 'PYG') {
-      exchangeRateUsed = 1 / baseRates.BRL_TO_PYG;
-      amountReceived = Math.round(totalBrl * baseRates.BRL_TO_PYG);
-    } else if (tx.paymentCur === 'USD') {
-      exchangeRateUsed = baseRates.USD_TO_BRL;
-      amountReceived = Math.round((totalBrl / baseRates.USD_TO_BRL) * 100) / 100;
-    }
-
-    sales.push({
-      id: `sale-hist-${idx + 1}`,
-      saleNumber: 1000 + idx + 1,
-      timestamp: d.toISOString(),
-      employeeId: idx % 2 === 0 ? 'emp-3' : 'emp-2',
-      employeeName: idx % 2 === 0 ? 'Carlos Eduardo' : 'Luciana Mendes',
-      items,
-      totalBrl: Math.round(totalBrl * 100) / 100,
-      payments: [
-        {
-          id: `pay-${idx + 1}`,
-          currency: tx.paymentCur as any,
-          amountReceived,
-          exchangeRateUsed,
-          equivalentBrl: totalBrl,
-          method: tx.method,
-        },
-      ],
-      status: 'completed',
-      registerSessionId: 'session-curr-1',
-    });
-  });
-
-  return sales;
+  return [];
 }
 
 export const INITIAL_CASH_SESSION: CashRegisterSession = {
-  id: 'session-curr-1',
-  sessionNumber: 142,
+  id: 'session-1',
+  sessionNumber: 1,
   status: 'aberto',
-  openedAt: new Date(new Date().setHours(6, 0, 0, 0)).toISOString(),
-  openedBy: 'Carlos Eduardo',
+  openedAt: new Date().toISOString(),
+  openedBy: 'Ax',
   initialFloat: {
-    brl: 350.00,   // R$ 350 em troco
-    pyg: 500000,   // ₲ 500.000 em troco
-    usd: 50.00,    // $ 50 em notas de troco
+    brl: 0,
+    pyg: 0,
+    usd: 0,
   },
-  transactions: [
-    {
-      id: 'tx-1',
-      type: 'suprimento',
-      amount: 100.00,
-      currency: 'BRL',
-      reason: 'Reforço de moedas e notas de R$ 5 para troco',
-      timestamp: new Date(new Date().setHours(8, 30, 0, 0)).toISOString(),
-      employeeName: 'Luciana Mendes',
-    },
-    {
-      id: 'tx-2',
-      type: 'sangria',
-      amount: 200.00,
-      currency: 'BRL',
-      reason: 'Sangria de segurança para cofre',
-      timestamp: new Date(new Date().setHours(13, 0, 0, 0)).toISOString(),
-      employeeName: 'Luciana Mendes',
-    }
-  ],
+  transactions: [],
 };
 
 export const INITIAL_GOALS: MonthlyGoal[] = [
@@ -613,117 +409,11 @@ export const INITIAL_GOALS: MonthlyGoal[] = [
   }
 ];
 
-export const INITIAL_STOCK_MOVEMENTS: StockMovement[] = [
-  {
-    id: 'mov-1',
-    productId: 'prod-1',
-    productName: 'Pão Francês Tradicional',
-    type: 'producao',
-    quantity: 50,
-    unit: 'kg',
-    reason: 'Fornada matinal das 06:00',
-    employeeName: 'Seu Zé Padeiro',
-    timestamp: new Date(new Date().setHours(6, 15, 0, 0)).toISOString(),
-    previousStock: 2.5,
-    newStock: 52.5,
-  },
-  {
-    id: 'mov-2',
-    productId: 'prod-14',
-    productName: 'Farinha de Trigo Especial Tipo 1',
-    type: 'saida_venda',
-    quantity: 2,
-    unit: 'pct',
-    reason: 'Consumo na masseira da produção matinal',
-    employeeName: 'Seu Zé Padeiro',
-    timestamp: new Date(new Date().setHours(5, 45, 0, 0)).toISOString(),
-    previousStock: 16,
-    newStock: 14,
-  },
-  {
-    id: 'mov-3',
-    productId: 'prod-4',
-    productName: 'Sonho Recheado de Doce de Leite',
-    type: 'entrada',
-    quantity: 25,
-    unit: 'un',
-    reason: 'Produção fresca confeitaria',
-    employeeName: 'Luciana Mendes',
-    timestamp: new Date(new Date().setHours(7, 30, 0, 0)).toISOString(),
-    previousStock: 0,
-    newStock: 25,
-  }
-];
+export const INITIAL_STOCK_MOVEMENTS: StockMovement[] = [];
 
-export const INITIAL_COMANDAS: Comanda[] = [
-  {
-    id: 'cmd-01',
-    number: '05',
-    customerName: 'Dra. Vanessa',
-    openedAt: new Date(Date.now() - 25 * 60000).toISOString(),
-    openedBy: 'Carlos Eduardo',
-    notes: 'Mesa 3 / Janela',
-    items: [
-      {
-        product: INITIAL_PRODUCTS[5],
-        quantity: 2,
-        unitPriceBrl: 6.50,
-        subtotalBrl: 13.00,
-      },
-      {
-        product: INITIAL_PRODUCTS[2],
-        quantity: 4,
-        unitPriceBrl: 4.50,
-        subtotalBrl: 18.00,
-      },
-    ],
-  },
-  {
-    id: 'cmd-02',
-    number: '12',
-    customerName: 'Seu Marcos (Balcão)',
-    openedAt: new Date(Date.now() - 10 * 60000).toISOString(),
-    openedBy: 'Luciana Mendes',
-    notes: 'Aguardando pão doce',
-    items: [
-      {
-        product: INITIAL_PRODUCTS[3],
-        quantity: 1,
-        unitPriceBrl: 8.90,
-        subtotalBrl: 8.90,
-      },
-      {
-        product: INITIAL_PRODUCTS[7],
-        quantity: 1,
-        unitPriceBrl: 9.00,
-        subtotalBrl: 9.00,
-      },
-    ],
-  },
-];
+export const INITIAL_COMANDAS: Comanda[] = [];
 
-export const INITIAL_FORNADAS: FornadaLog[] = [
-  {
-    id: 'forn-1',
-    productId: 'prod-1',
-    productName: 'Pão Francês Tradicional',
-    quantity: 120,
-    unit: 'un',
-    timestamp: new Date(Date.now() - 35 * 60000).toISOString(),
-    bakerName: 'Seu Zé Padeiro',
-    batchNumber: 'F-0801',
-  },
-  {
-    id: 'forn-2',
-    productId: 'prod-3',
-    productName: 'Pão de Queijo Mineiro',
-    quantity: 60,
-    unit: 'un',
-    timestamp: new Date(Date.now() - 75 * 60000).toISOString(),
-    bakerName: 'Seu Zé Padeiro',
-    batchNumber: 'F-0802',
-  },
-];
+export const INITIAL_FORNADAS: FornadaLog[] = [];
 
 export const INITIAL_FICHAS_TECNICAS: FichaTecnica[] = [
   {
@@ -1074,12 +764,12 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     address: 'Av. Brasil, 420 - Centro',
     category: 'mensalista',
     creditLimitBrl: 600.00,
-    outstandingBalanceBrl: 145.50,
-    loyaltyPoints: 480,
+    outstandingBalanceBrl: 0,
+    loyaltyPoints: 0,
     birthday: '15/04',
     notes: 'Paga todo dia 10. Sempre leva 6 pães franceses pela manhã.',
-    totalSpentBrl: 1840.00,
-    purchaseCount: 38,
+    totalSpentBrl: 0,
+    purchaseCount: 0,
     lastPurchaseDate: new Date(Date.now() - 24 * 3600000).toISOString(),
     createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
   },
@@ -1093,11 +783,11 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     category: 'confeitaria',
     creditLimitBrl: 300.00,
     outstandingBalanceBrl: 0,
-    loyaltyPoints: 1250,
+    loyaltyPoints: 0,
     birthday: '28/09',
     notes: 'Encomenda bolos e tortas com frequência. Aniversariante do mês!',
-    totalSpentBrl: 2450.00,
-    purchaseCount: 22,
+    totalSpentBrl: 0,
+    purchaseCount: 0,
     lastPurchaseDate: new Date(Date.now() - 48 * 3600000).toISOString(),
     createdAt: new Date(Date.now() - 120 * 86400000).toISOString(),
   },
@@ -1110,12 +800,12 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     address: 'Rua Jorge Sanwais, 1200 - Sl 402',
     category: 'empresa',
     creditLimitBrl: 1500.00,
-    outstandingBalanceBrl: 420.00,
-    loyaltyPoints: 2100,
+    outstandingBalanceBrl: 0,
+    loyaltyPoints: 0,
     birthday: '10/11',
     notes: 'Coffee break diário às 08h30. Fatura fechada no último dia do mês.',
-    totalSpentBrl: 5600.00,
-    purchaseCount: 54,
+    totalSpentBrl: 0,
+    purchaseCount: 0,
     lastPurchaseDate: new Date(Date.now() - 12 * 3600000).toISOString(),
     createdAt: new Date(Date.now() - 180 * 86400000).toISOString(),
   },
@@ -1128,12 +818,12 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     address: 'Rua Almirante Barroso, 310',
     category: 'mensalista',
     creditLimitBrl: 800.00,
-    outstandingBalanceBrl: 85.00,
-    loyaltyPoints: 720,
+    outstandingBalanceBrl: 0,
+    loyaltyPoints: 0,
     birthday: '03/05',
     notes: 'Compra salgados fritos e pão de queijo no atacado toda terça e sexta.',
-    totalSpentBrl: 3200.00,
-    purchaseCount: 31,
+    totalSpentBrl: 0,
+    purchaseCount: 0,
     lastPurchaseDate: new Date(Date.now() - 72 * 3600000).toISOString(),
     createdAt: new Date(Date.now() - 150 * 86400000).toISOString(),
   },
@@ -1147,54 +837,17 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     category: 'varejo',
     creditLimitBrl: 200.00,
     outstandingBalanceBrl: 0,
-    loyaltyPoints: 940,
+    loyaltyPoints: 0,
     birthday: '24/09',
     notes: 'Cliente fiel do café espresso e croissant. Aniversariante esta semana!',
-    totalSpentBrl: 1120.00,
-    purchaseCount: 65,
+    totalSpentBrl: 0,
+    purchaseCount: 0,
     lastPurchaseDate: new Date(Date.now() - 6 * 3600000).toISOString(),
     createdAt: new Date(Date.now() - 200 * 86400000).toISOString(),
   },
 ];
 
-export const INITIAL_CUSTOMER_ENTRIES: CustomerAccountEntry[] = [
-  {
-    id: 'entry-1',
-    customerId: 'cust-1',
-    date: new Date(Date.now() - 4 * 86400000).toISOString(),
-    type: 'debito_compra',
-    amountBrl: 65.50,
-    description: 'Compra no balcão - Comanda #14',
-    recordedBy: 'Carlos Eduardo',
-  },
-  {
-    id: 'entry-2',
-    customerId: 'cust-1',
-    date: new Date(Date.now() - 2 * 86400000).toISOString(),
-    type: 'debito_compra',
-    amountBrl: 80.00,
-    description: 'Encomenda 2kg pão de queijo',
-    recordedBy: 'Luciana Mendes',
-  },
-  {
-    id: 'entry-3',
-    customerId: 'cust-3',
-    date: new Date(Date.now() - 5 * 86400000).toISOString(),
-    type: 'debito_compra',
-    amountBrl: 220.00,
-    description: 'Coffee break corporativo - Salgados e cafés',
-    recordedBy: 'Carlos Eduardo',
-  },
-  {
-    id: 'entry-4',
-    customerId: 'cust-3',
-    date: new Date(Date.now() - 1 * 86400000).toISOString(),
-    type: 'debito_compra',
-    amountBrl: 200.00,
-    description: 'Lanches e sucos da semana',
-    recordedBy: 'Carlos Eduardo',
-  },
-];
+export const INITIAL_CUSTOMER_ENTRIES: CustomerAccountEntry[] = [];
 
 let saveTimer: any = null;
 

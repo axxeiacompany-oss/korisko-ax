@@ -15,695 +15,16 @@
       "targetDailyAverageBrl": 2666
     }
   ],
-  "sales": [
-    {
-      "id": "sale-hist-1",
-      "items": [
-        {
-          "product": {
-            "id": "prod-1",
-            "code": "PAO-001",
-            "name": "Pão Francês Tradicional",
-            "unit": "kg",
-            "stock": 42.5,
-            "active": true,
-            "category": "paes",
-            "minStock": 15,
-            "priceBrl": 18.9,
-            "costPriceBrl": 6.5,
-            "expirationDate": "2026-09-26"
-          },
-          "quantity": 0.8,
-          "subtotalBrl": 15.12,
-          "unitPriceBrl": 18.9
-        },
-        {
-          "product": {
-            "id": "prod-9",
-            "code": "BEB-001",
-            "name": "Café Expresso Especial Italiano",
-            "unit": "un",
-            "stock": 150,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 30,
-            "priceBrl": 7,
-            "costPriceBrl": 1.8
-          },
-          "quantity": 2,
-          "subtotalBrl": 14,
-          "unitPriceBrl": 7
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-1",
-          "method": "dinheiro",
-          "currency": "BRL",
-          "equivalentBrl": 29.119999999999997,
-          "amountReceived": 29.119999999999997,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 29.12,
-      "timestamp": "2026-09-24T10:24:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1001,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-2",
-      "items": [
-        {
-          "product": {
-            "id": "prod-2",
-            "code": "PAO-002",
-            "name": "Pão de Queijo Mineiro",
-            "unit": "kg",
-            "stock": 18,
-            "active": true,
-            "category": "salgados",
-            "minStock": 8,
-            "priceBrl": 54,
-            "costPriceBrl": 22
-          },
-          "quantity": 0.4,
-          "subtotalBrl": 21.6,
-          "unitPriceBrl": 54
-        },
-        {
-          "product": {
-            "id": "prod-10",
-            "code": "BEB-002",
-            "name": "Cappuccino Cremoso com Canela",
-            "unit": "un",
-            "stock": 90,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 25,
-            "priceBrl": 11.5,
-            "costPriceBrl": 3.5
-          },
-          "quantity": 1,
-          "subtotalBrl": 11.5,
-          "unitPriceBrl": 11.5
-        },
-        {
-          "product": {
-            "id": "prod-6",
-            "code": "SALG-001",
-            "name": "Chipa Tradicional Paraguaia",
-            "unit": "un",
-            "stock": 35,
-            "active": true,
-            "category": "salgados",
-            "minStock": 15,
-            "priceBrl": 6,
-            "costPriceBrl": 2.1
-          },
-          "quantity": 3,
-          "subtotalBrl": 18,
-          "unitPriceBrl": 6
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-2",
-          "method": "dinheiro",
-          "currency": "PYG",
-          "equivalentBrl": 51.1,
-          "amountReceived": 70518,
-          "exchangeRateUsed": 0.0007246376811594203
-        }
-      ],
-      "totalBrl": 51.1,
-      "timestamp": "2026-09-24T11:15:00.000Z",
-      "employeeId": "emp-2",
-      "saleNumber": 1002,
-      "employeeName": "Luciana Mendes",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-3",
-      "items": [
-        {
-          "product": {
-            "id": "prod-7",
-            "code": "SALG-002",
-            "name": "Croissant de Manteiga Folhado",
-            "unit": "un",
-            "stock": 16,
-            "active": true,
-            "category": "paes",
-            "minStock": 10,
-            "priceBrl": 12,
-            "costPriceBrl": 4.5
-          },
-          "quantity": 2,
-          "subtotalBrl": 24,
-          "unitPriceBrl": 12
-        },
-        {
-          "product": {
-            "id": "prod-11",
-            "code": "BEB-003",
-            "name": "Suco Natural de Laranja 500ml",
-            "unit": "un",
-            "stock": 22,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 10,
-            "priceBrl": 10,
-            "costPriceBrl": 3.2
-          },
-          "quantity": 1,
-          "subtotalBrl": 10,
-          "unitPriceBrl": 10
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-3",
-          "method": "dinheiro",
-          "currency": "USD",
-          "equivalentBrl": 34,
-          "amountReceived": 6.02,
-          "exchangeRateUsed": 5.65
-        }
-      ],
-      "totalBrl": 34,
-      "timestamp": "2026-09-24T12:40:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1003,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-4",
-      "items": [
-        {
-          "product": {
-            "id": "prod-5",
-            "code": "CONF-002",
-            "name": "Bolo Caseiro de Cenoura com Chocolate",
-            "unit": "un",
-            "stock": 7,
-            "active": true,
-            "category": "confeitaria",
-            "minStock": 4,
-            "priceBrl": 36,
-            "costPriceBrl": 12.5
-          },
-          "quantity": 1,
-          "subtotalBrl": 36,
-          "unitPriceBrl": 36
-        },
-        {
-          "product": {
-            "id": "prod-8",
-            "code": "SALG-003",
-            "name": "Coxinha Gourmet de Frango com Catupiry",
-            "unit": "un",
-            "stock": 28,
-            "active": true,
-            "category": "salgados",
-            "minStock": 12,
-            "priceBrl": 9.5,
-            "costPriceBrl": 3.8
-          },
-          "quantity": 2,
-          "subtotalBrl": 19,
-          "unitPriceBrl": 9.5
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-4",
-          "method": "pix",
-          "currency": "BRL",
-          "equivalentBrl": 55,
-          "amountReceived": 55,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 55,
-      "timestamp": "2026-09-24T14:10:00.000Z",
-      "employeeId": "emp-2",
-      "saleNumber": 1004,
-      "employeeName": "Luciana Mendes",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-5",
-      "items": [
-        {
-          "product": {
-            "id": "prod-1",
-            "code": "PAO-001",
-            "name": "Pão Francês Tradicional",
-            "unit": "kg",
-            "stock": 42.5,
-            "active": true,
-            "category": "paes",
-            "minStock": 15,
-            "priceBrl": 18.9,
-            "costPriceBrl": 6.5,
-            "expirationDate": "2026-09-26"
-          },
-          "quantity": 1.2,
-          "subtotalBrl": 22.68,
-          "unitPriceBrl": 18.9
-        },
-        {
-          "product": {
-            "id": "prod-12",
-            "code": "FRIO-001",
-            "name": "Queijo Mussarela Fatiado",
-            "unit": "kg",
-            "stock": 8.5,
-            "active": true,
-            "category": "frios",
-            "minStock": 5,
-            "priceBrl": 58,
-            "costPriceBrl": 34,
-            "expirationDate": "2026-09-30"
-          },
-          "quantity": 0.3,
-          "subtotalBrl": 17.4,
-          "unitPriceBrl": 58
-        },
-        {
-          "product": {
-            "id": "prod-13",
-            "code": "FRIO-002",
-            "name": "Presunto Cozido Especial Fatiado",
-            "unit": "kg",
-            "stock": 6.2,
-            "active": true,
-            "category": "frios",
-            "minStock": 4,
-            "priceBrl": 46,
-            "costPriceBrl": 26,
-            "expirationDate": "2026-10-01"
-          },
-          "quantity": 0.3,
-          "subtotalBrl": 13.8,
-          "unitPriceBrl": 46
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-5",
-          "method": "cartao_debito",
-          "currency": "BRL",
-          "equivalentBrl": 53.879999999999995,
-          "amountReceived": 53.879999999999995,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 53.88,
-      "timestamp": "2026-09-23T10:50:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1005,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-6",
-      "items": [
-        {
-          "product": {
-            "id": "prod-4",
-            "code": "CONF-001",
-            "name": "Sonho Recheado de Doce de Leite",
-            "unit": "un",
-            "stock": 19,
-            "active": true,
-            "category": "confeitaria",
-            "minStock": 12,
-            "priceBrl": 8.5,
-            "costPriceBrl": 3.2,
-            "expirationDate": "2026-09-27"
-          },
-          "quantity": 4,
-          "subtotalBrl": 34,
-          "unitPriceBrl": 8.5
-        },
-        {
-          "product": {
-            "id": "prod-9",
-            "code": "BEB-001",
-            "name": "Café Expresso Especial Italiano",
-            "unit": "un",
-            "stock": 150,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 30,
-            "priceBrl": 7,
-            "costPriceBrl": 1.8
-          },
-          "quantity": 2,
-          "subtotalBrl": 14,
-          "unitPriceBrl": 7
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-6",
-          "method": "dinheiro",
-          "currency": "PYG",
-          "equivalentBrl": 48,
-          "amountReceived": 66240,
-          "exchangeRateUsed": 0.0007246376811594203
-        }
-      ],
-      "totalBrl": 48,
-      "timestamp": "2026-09-23T18:20:00.000Z",
-      "employeeId": "emp-2",
-      "saleNumber": 1006,
-      "employeeName": "Luciana Mendes",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-7",
-      "items": [
-        {
-          "product": {
-            "id": "prod-3",
-            "code": "PAO-003",
-            "name": "Baguete Artesanal de Fermentação Natural",
-            "unit": "un",
-            "stock": 24,
-            "active": true,
-            "category": "paes",
-            "minStock": 10,
-            "priceBrl": 14.5,
-            "costPriceBrl": 4.8
-          },
-          "quantity": 2,
-          "subtotalBrl": 29,
-          "unitPriceBrl": 14.5
-        },
-        {
-          "product": {
-            "id": "prod-6",
-            "code": "SALG-001",
-            "name": "Chipa Tradicional Paraguaia",
-            "unit": "un",
-            "stock": 35,
-            "active": true,
-            "category": "salgados",
-            "minStock": 15,
-            "priceBrl": 6,
-            "costPriceBrl": 2.1
-          },
-          "quantity": 4,
-          "subtotalBrl": 24,
-          "unitPriceBrl": 6
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-7",
-          "method": "dinheiro",
-          "currency": "USD",
-          "equivalentBrl": 53,
-          "amountReceived": 9.38,
-          "exchangeRateUsed": 5.65
-        }
-      ],
-      "totalBrl": 53,
-      "timestamp": "2026-09-22T11:30:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1007,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-8",
-      "items": [
-        {
-          "product": {
-            "id": "prod-1",
-            "code": "PAO-001",
-            "name": "Pão Francês Tradicional",
-            "unit": "kg",
-            "stock": 42.5,
-            "active": true,
-            "category": "paes",
-            "minStock": 15,
-            "priceBrl": 18.9,
-            "costPriceBrl": 6.5,
-            "expirationDate": "2026-09-26"
-          },
-          "quantity": 1.5,
-          "subtotalBrl": 28.35,
-          "unitPriceBrl": 18.9
-        },
-        {
-          "product": {
-            "id": "prod-5",
-            "code": "CONF-002",
-            "name": "Bolo Caseiro de Cenoura com Chocolate",
-            "unit": "un",
-            "stock": 7,
-            "active": true,
-            "category": "confeitaria",
-            "minStock": 4,
-            "priceBrl": 36,
-            "costPriceBrl": 12.5
-          },
-          "quantity": 1,
-          "subtotalBrl": 36,
-          "unitPriceBrl": 36
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-8",
-          "method": "pix",
-          "currency": "BRL",
-          "equivalentBrl": 64.35,
-          "amountReceived": 64.35,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 64.35,
-      "timestamp": "2026-09-21T19:45:00.000Z",
-      "employeeId": "emp-2",
-      "saleNumber": 1008,
-      "employeeName": "Luciana Mendes",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-9",
-      "items": [
-        {
-          "product": {
-            "id": "prod-8",
-            "code": "SALG-003",
-            "name": "Coxinha Gourmet de Frango com Catupiry",
-            "unit": "un",
-            "stock": 28,
-            "active": true,
-            "category": "salgados",
-            "minStock": 12,
-            "priceBrl": 9.5,
-            "costPriceBrl": 3.8
-          },
-          "quantity": 4,
-          "subtotalBrl": 38,
-          "unitPriceBrl": 9.5
-        },
-        {
-          "product": {
-            "id": "prod-11",
-            "code": "BEB-003",
-            "name": "Suco Natural de Laranja 500ml",
-            "unit": "un",
-            "stock": 22,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 10,
-            "priceBrl": 10,
-            "costPriceBrl": 3.2
-          },
-          "quantity": 2,
-          "subtotalBrl": 20,
-          "unitPriceBrl": 10
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-9",
-          "method": "dinheiro",
-          "currency": "PYG",
-          "equivalentBrl": 58,
-          "amountReceived": 80040,
-          "exchangeRateUsed": 0.0007246376811594203
-        }
-      ],
-      "totalBrl": 58,
-      "timestamp": "2026-09-20T13:12:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1009,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-10",
-      "items": [
-        {
-          "product": {
-            "id": "prod-1",
-            "code": "PAO-001",
-            "name": "Pão Francês Tradicional",
-            "unit": "kg",
-            "stock": 42.5,
-            "active": true,
-            "category": "paes",
-            "minStock": 15,
-            "priceBrl": 18.9,
-            "costPriceBrl": 6.5,
-            "expirationDate": "2026-09-26"
-          },
-          "quantity": 2,
-          "subtotalBrl": 37.8,
-          "unitPriceBrl": 18.9
-        },
-        {
-          "product": {
-            "id": "prod-2",
-            "code": "PAO-002",
-            "name": "Pão de Queijo Mineiro",
-            "unit": "kg",
-            "stock": 18,
-            "active": true,
-            "category": "salgados",
-            "minStock": 8,
-            "priceBrl": 54,
-            "costPriceBrl": 22
-          },
-          "quantity": 0.5,
-          "subtotalBrl": 27,
-          "unitPriceBrl": 54
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-10",
-          "method": "dinheiro",
-          "currency": "BRL",
-          "equivalentBrl": 64.8,
-          "amountReceived": 64.8,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 64.8,
-      "timestamp": "2026-09-19T11:05:00.000Z",
-      "employeeId": "emp-2",
-      "saleNumber": 1010,
-      "employeeName": "Luciana Mendes",
-      "registerSessionId": "session-curr-1"
-    },
-    {
-      "id": "sale-hist-11",
-      "items": [
-        {
-          "product": {
-            "id": "prod-7",
-            "code": "SALG-002",
-            "name": "Croissant de Manteiga Folhado",
-            "unit": "un",
-            "stock": 16,
-            "active": true,
-            "category": "paes",
-            "minStock": 10,
-            "priceBrl": 12,
-            "costPriceBrl": 4.5
-          },
-          "quantity": 3,
-          "subtotalBrl": 36,
-          "unitPriceBrl": 12
-        },
-        {
-          "product": {
-            "id": "prod-10",
-            "code": "BEB-002",
-            "name": "Cappuccino Cremoso com Canela",
-            "unit": "un",
-            "stock": 90,
-            "active": true,
-            "category": "bebidas",
-            "minStock": 25,
-            "priceBrl": 11.5,
-            "costPriceBrl": 3.5
-          },
-          "quantity": 2,
-          "subtotalBrl": 23,
-          "unitPriceBrl": 11.5
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-11",
-          "method": "cartao_credito",
-          "currency": "USD",
-          "equivalentBrl": 59,
-          "amountReceived": 10.44,
-          "exchangeRateUsed": 5.65
-        }
-      ],
-      "totalBrl": 59,
-      "timestamp": "2026-09-18T20:30:00.000Z",
-      "employeeId": "emp-3",
-      "saleNumber": 1011,
-      "employeeName": "Carlos Eduardo",
-      "registerSessionId": "session-curr-1"
-    }
-  ],
+  "sales": [],
   "version": "1.2.0",
-  "fornadas": [
-    {
-      "id": "forn-1",
-      "unit": "un",
-      "quantity": 120,
-      "bakerName": "Seu Zé Padeiro",
-      "productId": "prod-1",
-      "timestamp": "2026-09-25T00:57:34.635Z",
-      "batchNumber": "F-0801",
-      "productName": "Pão Francês Tradicional"
-    },
-    {
-      "id": "forn-2",
-      "unit": "un",
-      "quantity": 60,
-      "bakerName": "Seu Zé Padeiro",
-      "productId": "prod-3",
-      "timestamp": "2026-09-25T00:17:34.635Z",
-      "batchNumber": "F-0802",
-      "productName": "Pão de Queijo Mineiro"
-    }
-  ],
+  "fornadas": [],
   "products": [
     {
       "id": "prod-1",
       "code": "PAO-001",
       "name": "Pão Francês Tradicional",
       "unit": "kg",
-      "stock": 42.5,
+      "stock": 0,
       "active": true,
       "category": "paes",
       "minStock": 15,
@@ -716,7 +37,7 @@
       "code": "PAO-002",
       "name": "Pão de Queijo Mineiro",
       "unit": "kg",
-      "stock": 18,
+      "stock": 0,
       "active": true,
       "category": "salgados",
       "minStock": 8,
@@ -728,7 +49,7 @@
       "code": "PAO-003",
       "name": "Baguete Artesanal de Fermentação Natural",
       "unit": "un",
-      "stock": 24,
+      "stock": 0,
       "active": true,
       "category": "paes",
       "minStock": 10,
@@ -740,7 +61,7 @@
       "code": "CONF-001",
       "name": "Sonho Recheado de Doce de Leite",
       "unit": "un",
-      "stock": 19,
+      "stock": 0,
       "active": true,
       "category": "confeitaria",
       "minStock": 12,
@@ -753,7 +74,7 @@
       "code": "CONF-002",
       "name": "Bolo Caseiro de Cenoura com Chocolate",
       "unit": "un",
-      "stock": 7,
+      "stock": 0,
       "active": true,
       "category": "confeitaria",
       "minStock": 4,
@@ -765,7 +86,7 @@
       "code": "SALG-001",
       "name": "Chipa Tradicional Paraguaia",
       "unit": "un",
-      "stock": 35,
+      "stock": 0,
       "active": true,
       "category": "salgados",
       "minStock": 15,
@@ -777,7 +98,7 @@
       "code": "SALG-002",
       "name": "Croissant de Manteiga Folhado",
       "unit": "un",
-      "stock": 16,
+      "stock": 0,
       "active": true,
       "category": "paes",
       "minStock": 10,
@@ -789,7 +110,7 @@
       "code": "SALG-003",
       "name": "Coxinha Gourmet de Frango com Catupiry",
       "unit": "un",
-      "stock": 28,
+      "stock": 0,
       "active": true,
       "category": "salgados",
       "minStock": 12,
@@ -801,7 +122,7 @@
       "code": "BEB-001",
       "name": "Café Expresso Especial Italiano",
       "unit": "un",
-      "stock": 150,
+      "stock": 0,
       "active": true,
       "category": "bebidas",
       "minStock": 30,
@@ -813,7 +134,7 @@
       "code": "BEB-002",
       "name": "Cappuccino Cremoso com Canela",
       "unit": "un",
-      "stock": 90,
+      "stock": 0,
       "active": true,
       "category": "bebidas",
       "minStock": 25,
@@ -825,7 +146,7 @@
       "code": "BEB-003",
       "name": "Suco Natural de Laranja 500ml",
       "unit": "un",
-      "stock": 22,
+      "stock": 0,
       "active": true,
       "category": "bebidas",
       "minStock": 10,
@@ -837,7 +158,7 @@
       "code": "FRIO-001",
       "name": "Queijo Mussarela Fatiado",
       "unit": "kg",
-      "stock": 8.5,
+      "stock": 0,
       "active": true,
       "category": "frios",
       "minStock": 5,
@@ -850,7 +171,7 @@
       "code": "FRIO-002",
       "name": "Presunto Cozido Especial Fatiado",
       "unit": "kg",
-      "stock": 6.2,
+      "stock": 0,
       "active": true,
       "category": "frios",
       "minStock": 4,
@@ -863,7 +184,7 @@
       "code": "INGR-001",
       "name": "Farinha de Trigo Especial Tipo 1 (Saco 25kg)",
       "unit": "pct",
-      "stock": 14,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 6,
@@ -876,7 +197,7 @@
       "code": "INGR-002",
       "name": "Fermento Biológico Fresco (Bloco 500g)",
       "unit": "un",
-      "stock": 18,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 8,
@@ -890,7 +211,7 @@
       "code": "INGR-003",
       "name": "Manteiga Extra sem Sal Artesanal (kg)",
       "unit": "kg",
-      "stock": 16,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 5,
@@ -903,7 +224,7 @@
       "code": "INGR-004",
       "name": "Polvilho Azedo Especial (kg)",
       "unit": "kg",
-      "stock": 45,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 15,
@@ -916,7 +237,7 @@
       "code": "INGR-005",
       "name": "Queijo Meia Cura Ralado Artesanal (kg)",
       "unit": "kg",
-      "stock": 22,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 8,
@@ -929,7 +250,7 @@
       "code": "INGR-006",
       "name": "Açúcar Cristal Especial (kg)",
       "unit": "kg",
-      "stock": 60,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 20,
@@ -942,7 +263,7 @@
       "code": "INGR-007",
       "name": "Ovos Brancos Selecionados (unidade)",
       "unit": "un",
-      "stock": 240,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 60,
@@ -955,7 +276,7 @@
       "code": "INGR-008",
       "name": "Leite Integral Pasteurizado (L)",
       "unit": "l",
-      "stock": 48,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 15,
@@ -968,7 +289,7 @@
       "code": "INGR-009",
       "name": "Sal Refinado Iodado (kg)",
       "unit": "kg",
-      "stock": 30,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 10,
@@ -981,7 +302,7 @@
       "code": "INGR-010",
       "name": "Cenoura In Natura Selecionada (kg)",
       "unit": "kg",
-      "stock": 15,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 5,
@@ -994,7 +315,7 @@
       "code": "INGR-011",
       "name": "Chocolate Nobre Meio Amargo (kg)",
       "unit": "kg",
-      "stock": 12,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 4,
@@ -1007,7 +328,7 @@
       "code": "INGR-012",
       "name": "Óleo de Girassol / Soja (L)",
       "unit": "l",
-      "stock": 25,
+      "stock": 0,
       "active": true,
       "category": "ingredientes",
       "minStock": 8,
@@ -1028,12 +349,12 @@
       "category": "mensalista",
       "createdAt": "2026-06-27T01:32:34.635Z",
       "documentCpf": "012.345.678-90",
-      "loyaltyPoints": 480,
-      "purchaseCount": 38,
-      "totalSpentBrl": 1840,
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
       "creditLimitBrl": 600,
       "lastPurchaseDate": "2026-09-24T01:32:34.635Z",
-      "outstandingBalanceBrl": 145.5
+      "outstandingBalanceBrl": 0
     },
     {
       "id": "cust-2",
@@ -1046,9 +367,9 @@
       "category": "confeitaria",
       "createdAt": "2026-05-28T01:32:34.635Z",
       "documentCpf": "321.654.987-11",
-      "loyaltyPoints": 1250,
-      "purchaseCount": 22,
-      "totalSpentBrl": 2450,
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
       "creditLimitBrl": 300,
       "lastPurchaseDate": "2026-09-23T01:32:34.635Z",
       "outstandingBalanceBrl": 0
@@ -1064,12 +385,12 @@
       "category": "empresa",
       "createdAt": "2026-03-29T01:32:34.635Z",
       "documentCpf": "14.882.910/0001-44",
-      "loyaltyPoints": 2100,
-      "purchaseCount": 54,
-      "totalSpentBrl": 5600,
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
       "creditLimitBrl": 1500,
       "lastPurchaseDate": "2026-09-24T13:32:34.635Z",
-      "outstandingBalanceBrl": 420
+      "outstandingBalanceBrl": 0
     },
     {
       "id": "cust-4",
@@ -1082,12 +403,12 @@
       "category": "mensalista",
       "createdAt": "2026-04-28T01:32:34.635Z",
       "documentCpf": "654.321.098-77",
-      "loyaltyPoints": 720,
-      "purchaseCount": 31,
-      "totalSpentBrl": 3200,
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
       "creditLimitBrl": 800,
       "lastPurchaseDate": "2026-09-22T01:32:34.635Z",
-      "outstandingBalanceBrl": 85
+      "outstandingBalanceBrl": 0
     },
     {
       "id": "cust-5",
@@ -1100,9 +421,9 @@
       "category": "varejo",
       "createdAt": "2026-03-09T01:32:34.635Z",
       "documentCpf": "890.123.456-33",
-      "loyaltyPoints": 940,
-      "purchaseCount": 65,
-      "totalSpentBrl": 1120,
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
       "creditLimitBrl": 200,
       "lastPurchaseDate": "2026-09-24T19:32:34.635Z",
       "outstandingBalanceBrl": 0
@@ -1149,135 +470,26 @@
       ]
     }
   ],
-  "timestamp": "2026-09-28T18:05:36.587Z",
-  "openComandas": [
-    {
-      "id": "cmd-01",
-      "items": [
-        {
-          "product": {
-            "id": "prod-6",
-            "code": "SALG-001",
-            "name": "Chipa Tradicional Paraguaia",
-            "unit": "un",
-            "stock": 35,
-            "active": true,
-            "category": "salgados",
-            "minStock": 15,
-            "priceBrl": 6,
-            "costPriceBrl": 2.1
-          },
-          "quantity": 2,
-          "subtotalBrl": 13,
-          "unitPriceBrl": 6.5
-        },
-        {
-          "product": {
-            "id": "prod-3",
-            "code": "PAO-003",
-            "name": "Baguete Artesanal de Fermentação Natural",
-            "unit": "un",
-            "stock": 24,
-            "active": true,
-            "category": "paes",
-            "minStock": 10,
-            "priceBrl": 14.5,
-            "costPriceBrl": 4.8
-          },
-          "quantity": 4,
-          "subtotalBrl": 18,
-          "unitPriceBrl": 4.5
-        }
-      ],
-      "notes": "Mesa 3 / Janela",
-      "number": "05",
-      "openedAt": "2026-09-25T01:07:34.635Z",
-      "openedBy": "Carlos Eduardo",
-      "customerName": "Dra. Vanessa"
-    },
-    {
-      "id": "cmd-02",
-      "items": [
-        {
-          "product": {
-            "id": "prod-4",
-            "code": "CONF-001",
-            "name": "Sonho Recheado de Doce de Leite",
-            "unit": "un",
-            "stock": 19,
-            "active": true,
-            "category": "confeitaria",
-            "minStock": 12,
-            "priceBrl": 8.5,
-            "costPriceBrl": 3.2,
-            "expirationDate": "2026-09-27"
-          },
-          "quantity": 1,
-          "subtotalBrl": 8.9,
-          "unitPriceBrl": 8.9
-        },
-        {
-          "product": {
-            "id": "prod-8",
-            "code": "SALG-003",
-            "name": "Coxinha Gourmet de Frango com Catupiry",
-            "unit": "un",
-            "stock": 28,
-            "active": true,
-            "category": "salgados",
-            "minStock": 12,
-            "priceBrl": 9.5,
-            "costPriceBrl": 3.8
-          },
-          "quantity": 1,
-          "subtotalBrl": 9,
-          "unitPriceBrl": 9
-        }
-      ],
-      "notes": "Aguardando pão doce",
-      "number": "12",
-      "openedAt": "2026-09-25T01:22:34.635Z",
-      "openedBy": "Luciana Mendes",
-      "customerName": "Seu Marcos (Balcão)"
-    }
-  ],
+  "timestamp": "2026-09-28T18:14:10.315Z",
+  "openComandas": [],
   "exchangeRates": {
-    "updatedAt": "2026-09-28T18:05:18.083Z",
+    "updatedAt": "2026-09-28T18:13:44.357Z",
     "BRL_TO_PYG": 1090,
     "USD_TO_BRL": 5.22,
     "USD_TO_PYG": 5689
   },
   "currentSession": {
-    "id": "session-curr-1",
+    "id": "session-1",
     "status": "aberto",
-    "openedAt": "2026-09-24T09:00:00.000Z",
-    "openedBy": "Carlos Eduardo",
+    "openedAt": "2026-09-28T18:14:10.315Z",
+    "openedBy": "Ax",
     "initialFloat": {
-      "brl": 350,
-      "pyg": 500000,
-      "usd": 50
+      "brl": 0,
+      "pyg": 0,
+      "usd": 0
     },
-    "transactions": [
-      {
-        "id": "tx-1",
-        "type": "suprimento",
-        "amount": 100,
-        "reason": "Reforço de moedas e notas de R$ 5 para troco",
-        "currency": "BRL",
-        "timestamp": "2026-09-24T11:30:00.000Z",
-        "employeeName": "Luciana Mendes"
-      },
-      {
-        "id": "tx-2",
-        "type": "sangria",
-        "amount": 200,
-        "reason": "Sangria de segurança para cofre",
-        "currency": "BRL",
-        "timestamp": "2026-09-24T16:00:00.000Z",
-        "employeeName": "Luciana Mendes"
-      }
-    ],
-    "sessionNumber": 142
+    "transactions": [],
+    "sessionNumber": 1
   },
   "fichasTecnicas": [
     {
@@ -1618,83 +830,6 @@
     }
   ],
   "sessionHistory": [],
-  "stockMovements": [
-    {
-      "id": "mov-1",
-      "type": "producao",
-      "unit": "kg",
-      "reason": "Fornada matinal das 06:00",
-      "newStock": 52.5,
-      "quantity": 50,
-      "productId": "prod-1",
-      "timestamp": "2026-09-24T09:15:00.000Z",
-      "productName": "Pão Francês Tradicional",
-      "employeeName": "Seu Zé Padeiro",
-      "previousStock": 2.5
-    },
-    {
-      "id": "mov-2",
-      "type": "saida_venda",
-      "unit": "pct",
-      "reason": "Consumo na masseira da produção matinal",
-      "newStock": 14,
-      "quantity": 2,
-      "productId": "prod-14",
-      "timestamp": "2026-09-24T08:45:00.000Z",
-      "productName": "Farinha de Trigo Especial Tipo 1",
-      "employeeName": "Seu Zé Padeiro",
-      "previousStock": 16
-    },
-    {
-      "id": "mov-3",
-      "type": "entrada",
-      "unit": "un",
-      "reason": "Produção fresca confeitaria",
-      "newStock": 25,
-      "quantity": 25,
-      "productId": "prod-4",
-      "timestamp": "2026-09-24T10:30:00.000Z",
-      "productName": "Sonho Recheado de Doce de Leite",
-      "employeeName": "Luciana Mendes",
-      "previousStock": 0
-    }
-  ],
-  "customerEntries": [
-    {
-      "id": "entry-1",
-      "date": "2026-09-21T01:32:34.635Z",
-      "type": "debito_compra",
-      "amountBrl": 65.5,
-      "customerId": "cust-1",
-      "recordedBy": "Carlos Eduardo",
-      "description": "Compra no balcão - Comanda #14"
-    },
-    {
-      "id": "entry-2",
-      "date": "2026-09-23T01:32:34.635Z",
-      "type": "debito_compra",
-      "amountBrl": 80,
-      "customerId": "cust-1",
-      "recordedBy": "Luciana Mendes",
-      "description": "Encomenda 2kg pão de queijo"
-    },
-    {
-      "id": "entry-3",
-      "date": "2026-09-20T01:32:34.635Z",
-      "type": "debito_compra",
-      "amountBrl": 220,
-      "customerId": "cust-3",
-      "recordedBy": "Carlos Eduardo",
-      "description": "Coffee break corporativo - Salgados e cafés"
-    },
-    {
-      "id": "entry-4",
-      "date": "2026-09-24T01:32:34.635Z",
-      "type": "debito_compra",
-      "amountBrl": 200,
-      "customerId": "cust-3",
-      "recordedBy": "Carlos Eduardo",
-      "description": "Lanches e sucos da semana"
-    }
-  ]
+  "stockMovements": [],
+  "customerEntries": []
 }
