@@ -20,10 +20,12 @@ import {
   X,
   Play,
   Pause,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { formatCurrency, fromBrl } from '../utils/currency';
 import { ReceiptModal } from './modals/ReceiptModal';
+import { DeleteSaleModal } from './modals/DeleteSaleModal';
 
 interface Props {
   mode?: 'embedded' | 'drawer';
@@ -37,8 +39,10 @@ export const LiveSalesStream: React.FC<Props> = ({
   onNavigateToPdv 
 }) => {
   const { sales, exchangeRates, t, language, currentUser } = useBakery();
+  const isAdmin = currentUser.role === 'admin';
   
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
+  const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [filterPeriod, setFilterPeriod] = useState<'today' | 'all'>('today');
@@ -350,14 +354,27 @@ export const LiveSalesStream: React.FC<Props> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setInspectSale(sale)}
-                      className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
-                      title={language === 'es' ? 'Ver Comprobante' : 'Ver Cupom Fiscal'}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setInspectSale(sale)}
+                        className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+                        title={language === 'es' ? 'Ver Comprobante' : 'Ver Cupom Fiscal'}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setSaleToDelete(sale)}
+                          className="p-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                          title={language === 'es' ? 'Excluir Venta (Solo Admin)' : 'Excluir Venda (Somente Admin)'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -374,6 +391,13 @@ export const LiveSalesStream: React.FC<Props> = ({
           onClose={() => setInspectSale(null)}
         />
       )}
+
+      {/* Delete Sale Modal (Admin Exclusive) */}
+      <DeleteSaleModal
+        isOpen={Boolean(saleToDelete)}
+        sale={saleToDelete}
+        onClose={() => setSaleToDelete(null)}
+      />
     </>
   );
 };

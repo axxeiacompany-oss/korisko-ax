@@ -318,6 +318,17 @@ export async function insertVenda(saleData: Omit<Sale, 'saleNumber'>): Promise<S
   return rowToSale(data);
 }
 
+export async function deleteVenda(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('vendas')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`[Erro ao excluir venda no Supabase]: ${error.message}`);
+  }
+}
+
 // ==========================================
 // DATA ACCESS LAYER: CAIXA SESSOES
 // ==========================================

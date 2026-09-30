@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Sale } from '../../types';
 import { formatCurrency } from '../../utils/currency';
-import { Printer, X, Check, Share2, Copy } from 'lucide-react';
+import { Printer, X, Check, Share2, Copy, Trash2 } from 'lucide-react';
+import { useBakery } from '../../context/BakeryContext';
+import { DeleteSaleModal } from './DeleteSaleModal';
 
 interface Props {
   sale: Sale | null;
@@ -11,7 +13,10 @@ interface Props {
 export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
   if (!sale) return null;
 
+  const { currentUser, language } = useBakery();
+  const isAdmin = currentUser.role === 'admin';
   const [copied, setCopied] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const handlePrint = () => {
     window.print();
@@ -75,6 +80,17 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-neutral-950/60 no-print">
           <span className="text-xs font-semibold text-neutral-300">Cupom Não-Fiscal</span>
           <div className="flex items-center gap-1.5">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="px-2.5 py-1.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={language === 'es' ? 'Excluir Venta (Solo Admin)' : 'Excluir Venda (Somente Admin)'}
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">{language === 'es' ? 'Excluir Venta' : 'Excluir Venda'}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleShare}
@@ -255,9 +271,31 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
             <Check className="w-4 h-4 stroke-[2.5]" />
             Nova Venda (Concluído)
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="w-full py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>{language === 'es' ? 'Excluir Venta Definitivamente (Admin)' : 'Excluir Venda Definitivamente (Admin)'}</span>
+            </button>
+          )}
         </div>
 
       </div>
+
+      {/* Delete Sale Modal (Admin Exclusive) */}
+      <DeleteSaleModal
+        isOpen={isDeleteModalOpen}
+        sale={sale}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDeleted={() => {
+          setIsDeleteModalOpen(false);
+          onClose();
+        }}
+      />
     </div>
   );
 };

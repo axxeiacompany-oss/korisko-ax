@@ -309,6 +309,59 @@ app.post('/api/state', async (req, res) => {
   }
 });
 
+// DELETE Single Sale (Admin Only Endpoint)
+app.delete('/api/sales/:id', async (req, res) => {
+  if (dbInitPromise) await dbInitPromise;
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: 'ID da venda é obrigatório' });
+  }
+
+  try {
+    // 1. Update local state file
+    const currentState = safeReadJsonFile(LOCAL_STATE_FILE);
+    if (currentState && Array.isArray(currentState.sales)) {
+      const prevCount = currentState.sales.length;
+      currentState.sales = currentState.sales.filter((s: any) => s.id !== id);
+      if (currentState.sales.length !== prevCount) {
+        currentState.timestamp = new Date().toISOString();
+        safeWriteJsonFile(LOCAL_STATE_FILE, currentState);
+      }
+    }
+
+    // 2. Delete from PostgreSQL if connected
+    if (isPgConnected && pool) {
+      pool.query('DELETE FROM vendas WHERE id = $1', [id]).catch(() => {});
+      if (currentState) {
+        pool.query(
+          `INSERT INTO korisko_system_state (id, data, updated_at) 
+           VALUES ('active_state', $1, NOW()) 
+           ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
+          [JSON.stringify(currentState)]
+        ).catch(() => {});
+      }
+    }
+
+    // 3. Delete from Supabase if client is ready
+    if (supabaseServer) {
+      supabaseServer.from('vendas').delete().eq('id', id).then(
+        ({ error }) => {
+          if (error && error.code !== 'PGRST205') {
+            console.warn('[Korisko Server] Supabase delete sale warning:', error.message);
+          }
+        },
+        () => {}
+      );
+    }
+
+    return res.json({ success: true, deletedId: id });
+  } catch (err: any) {
+    console.error('[Korisko DB] Error deleting sale:', err);
+    return res.status(500).json({ error: 'Falha ao excluir venda', details: err.message });
+  }
+});
+
 // GET Backup Points
 app.get('/api/backups', async (_req, res) => {
   if (dbInitPromise) await dbInitPromise;

@@ -12,19 +12,28 @@ import {
   CreditCard, 
   CheckCircle2, 
   AlertCircle,
-  FileText
+  FileText,
+  Trash2,
+  Eye,
+  ShoppingBag
 } from 'lucide-react';
 import { SangriaSuprimentoModal } from '../modals/SangriaSuprimentoModal';
 import { CloseRegisterModal } from '../modals/CloseRegisterModal';
 import { OpenRegisterModal } from '../modals/OpenRegisterModal';
+import { ReceiptModal } from '../modals/ReceiptModal';
+import { DeleteSaleModal } from '../modals/DeleteSaleModal';
+import { Sale } from '../../types';
 
 export const CashRegisterView: React.FC = () => {
-  const { currentSession, sessionHistory, sales, hasPermission, t, language } = useBakery();
+  const { currentSession, sessionHistory, sales, hasPermission, t, language, currentUser, exchangeRates } = useBakery();
+  const isAdmin = currentUser.role === 'admin';
 
   const [isSangriaOpen, setIsSangriaOpen] = useState(false);
   const [isSuprimentoOpen, setIsSuprimentoOpen] = useState(false);
   const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
   const [isOpenRegisterOpen, setIsOpenRegisterOpen] = useState(false);
+  const [inspectSale, setInspectSale] = useState<Sale | null>(null);
+  const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
 
   const canManageRegister = hasPermission(['admin', 'gerente']);
 
@@ -371,6 +380,96 @@ export const CashRegisterView: React.FC = () => {
 
       </div>
 
+      {/* Sales Completed in Current Register Session */}
+      <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-semibold text-neutral-100">
+              {language === 'es' ? 'Ventas Registradas en este Turno' : 'Vendas Registradas neste Turno'} ({currentSessionSales.length})
+            </h3>
+          </div>
+          <span className="text-xs text-neutral-400 font-mono-nums">
+            {formatCurrency(currentSessionSales.reduce((acc, s) => acc + s.totalBrl, 0), 'BRL')}
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {currentSessionSales.length === 0 ? (
+            <p className="text-xs text-neutral-500 py-6 text-center">
+              {language === 'es' ? 'Ninguna venta registrada aún en este turno.' : 'Nenhuma venda registrada ainda neste turno.'}
+            </p>
+          ) : (
+            currentSessionSales.map(s => {
+              const timeStr = new Date(s.timestamp).toLocaleTimeString(
+                language === 'es' ? 'es-PY' : 'pt-BR',
+                { hour: '2-digit', minute: '2-digit' }
+              );
+              const pygVal = fromBrl(s.totalBrl, 'PYG', exchangeRates);
+              const usdVal = fromBrl(s.totalBrl, 'USD', exchangeRates);
+
+              return (
+                <div
+                  key={s.id}
+                  className="p-3 rounded-xl bg-neutral-950 border border-neutral-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0 font-bold text-neutral-200 font-mono-nums">
+                      #{s.saleNumber || s.id.slice(-4)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-neutral-200">{s.employeeName || 'Operador'}</span>
+                        <span className="text-[11px] text-neutral-500 font-mono-nums">· {timeStr}</span>
+                        {s.customerName && (
+                          <span className="text-[11px] text-amber-400 font-medium">({s.customerName})</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 mt-0.5">
+                        {s.items.length} {language === 'es' ? 'artículos' : 'itens'}: {s.items.map(it => `${it.quantity}x ${it.product.name}`).join(', ').slice(0, 50)}...
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-850">
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-neutral-100 font-mono-nums block">
+                        {formatCurrency(s.totalBrl, 'BRL')}
+                      </span>
+                      <span className="text-[10px] text-neutral-500 font-mono-nums">
+                        ₲ {Math.round(pygVal).toLocaleString('es-PY')} · $ {usdVal.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setInspectSale(s)}
+                        className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+                        title={language === 'es' ? 'Ver Comprobante' : 'Ver Cupom'}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setSaleToDelete(s)}
+                          className="p-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                          title={language === 'es' ? 'Excluir Venta (Solo Admin)' : 'Excluir Venda (Somente Admin)'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
       {/* Modals */}
       <SangriaSuprimentoModal
         isOpen={isSangriaOpen}
@@ -393,6 +492,21 @@ export const CashRegisterView: React.FC = () => {
       <OpenRegisterModal
         isOpen={isOpenRegisterOpen}
         onClose={() => setIsOpenRegisterOpen(false)}
+      />
+
+      {/* Receipt Inspection Modal */}
+      {inspectSale && (
+        <ReceiptModal
+          sale={inspectSale}
+          onClose={() => setInspectSale(null)}
+        />
+      )}
+
+      {/* Delete Sale Modal (Admin Exclusive) */}
+      <DeleteSaleModal
+        isOpen={Boolean(saleToDelete)}
+        sale={saleToDelete}
+        onClose={() => setSaleToDelete(null)}
       />
 
     </div>

@@ -37,6 +37,7 @@ import {
   deleteCliente, 
   listVendas, 
   insertVenda, 
+  deleteVenda,
   listCaixaSessoes, 
   upsertCaixaSessao, 
   listUsuarios, 
@@ -146,6 +147,7 @@ interface BakeryContextType {
     subtotalBrl?: number,
     customerId?: string
   ) => Promise<Sale>;
+  deleteSale: (saleId: string, restoreStock?: boolean) => Promise<void>;
 
   // Cash Register Sessions
   currentSession: CashRegisterSession;
@@ -1329,6 +1331,90 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return persistedSale;
   }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, removeComanda]);
 
+  // ==========================================
+  // EXCLUIR VENDA - EXCLUSIVO DO ADMINISTRADOR
+  // ==========================================
+  const deleteSale = useCallback(async (saleId: string, restoreStock: boolean = true) => {
+    // Validação de segurança estrita: apenas o administrador tem autorização
+    if (currentUser.role !== 'admin') {
+      const msg = language === 'es'
+        ? 'Acceso denegado: solo el Administrador (Ax) tiene autorización para eliminar ventas.'
+        : 'Acesso negado: apenas o Administrador (Ax) tem autorização para excluir vendas.';
+      setDbError(msg);
+      throw new Error(msg);
+    }
+
+    const saleToDelete = data.sales.find(s => s.id === saleId);
+    if (!saleToDelete) {
+      throw new Error(language === 'es' ? 'Venta no encontrada.' : 'Venda não encontrada.');
+    }
+
+    try {
+      // 1. Estorno de estoque: devolve os itens vendidos ao estoque
+      if (restoreStock && Array.isArray(saleToDelete.items)) {
+        for (const item of saleToDelete.items) {
+          if (item.product && item.product.id) {
+            const currentProd = data.products.find(p => p.id === item.product.id);
+            if (currentProd) {
+              const restoredStock = Math.round((currentProd.stock + item.quantity) * 100) / 100;
+              try {
+                await upsertProduto({ ...currentProd, stock: restoredStock });
+                setData(prev => ({
+                  ...prev,
+                  products: prev.products.map(p => p.id === currentProd.id ? { ...p, stock: restoredStock } : p),
+                }));
+              } catch (stockErr) {
+                console.warn('Erro ao devolver estoque:', stockErr);
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Estorno de fiado no CRM se houver
+      if (saleToDelete.customerId) {
+        const fiadoAmount = (saleToDelete.payments || [])
+          .filter(p => p.method === 'fiado')
+          .reduce((sum, p) => sum + p.equivalentBrl, 0);
+
+        if (fiadoAmount > 0) {
+          try {
+            const newBal = await rpcAjustarSaldoCliente(saleToDelete.customerId, -fiadoAmount);
+            setData(prev => ({
+              ...prev,
+              customers: (prev.customers || []).map(c => c.id === saleToDelete.customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+            }));
+          } catch (custErr) {
+            console.warn('Erro ao estornar fiado do cliente:', custErr);
+          }
+        }
+      }
+
+      // 3. Exclusão no banco de dados Supabase
+      await deleteVenda(saleId);
+
+      // 4. Exclusão na API local (disco/memória)
+      try {
+        await fetch(`/api/sales/${encodeURIComponent(saleId)}`, { method: 'DELETE' });
+      } catch {}
+
+      // 5. Atualização do estado global
+      setData(prev => {
+        const next = {
+          ...prev,
+          sales: prev.sales.filter(s => s.id !== saleId),
+        };
+        saveSystemStateDoc(next);
+        return next;
+      });
+
+    } catch (err: any) {
+      const errMsg = `Erro ao excluir venda: ${err.message}`;
+      setDbError(errMsg);
+      throw err;
+    }
+  }, [currentUser.role, data.products, data.sales, language]);
+
   // Venda Direta Rápida (Apenas Valor & Confirme com Suporte Multimoeda)
   const registerDirectSale = useCallback(async (
     amountBrl: number,
@@ -1659,6 +1745,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeComanda,
         sales: data.sales,
         completeSale,
+        deleteSale,
         currentSession: data.currentSession,
         sessionHistory: data.sessionHistory,
         openRegister,
