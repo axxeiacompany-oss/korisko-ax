@@ -445,6 +445,7 @@ app.post('/api/reset', async (_req, res) => {
 // Reset State to Factory Zero (Admin Ax Permanently Preserved)
 app.post('/api/factory-zero', async (_req, res) => {
   try {
+    const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
     const adminUser = {
       id: 'emp-admin-ax',
       name: 'Ax',
@@ -465,7 +466,7 @@ app.post('/api/factory-zero', async (_req, res) => {
       version: '2.0.0',
       timestamp: new Date().toISOString(),
       employees: [adminUser],
-      products: [],
+      products: defaultSeed?.products || [],
       stockMovements: [],
       sales: [],
       currentSession: {
@@ -488,15 +489,22 @@ app.post('/api/factory-zero', async (_req, res) => {
     };
 
     safeWriteJsonFile(LOCAL_STATE_FILE, zeroState);
+    safeWriteJsonFile(LOCAL_BACKUPS_FILE, []);
 
     if (isPgConnected && pool) {
-      pool.query(`TRUNCATE TABLE vendas; TRUNCATE TABLE caixa_sessoes;`).catch(() => {});
+      pool.query(`TRUNCATE TABLE vendas; TRUNCATE TABLE caixa_sessoes; TRUNCATE TABLE clientes;`).catch(() => {});
       pool.query(
         `INSERT INTO korisko_system_state (id, data, updated_at) 
          VALUES ('active_state', $1, NOW()) 
          ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
         [JSON.stringify(zeroState)]
       ).catch(() => {});
+    }
+
+    if (supabaseServer) {
+      supabaseServer.from('vendas').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('caixa_sessoes').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('clientes').delete().neq('id', 'none').then(() => {}, () => {});
     }
 
     safeSupabaseUpsert('korisko_system_state', {

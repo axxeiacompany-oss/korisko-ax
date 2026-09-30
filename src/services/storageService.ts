@@ -1205,12 +1205,14 @@ export class StorageService {
   static loadState(): SystemBackupData {
     try {
       // Auto-purge old mock data to deliver zeroed factory state
-      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V2') !== 'true') {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V3') !== 'true') {
+        localStorage.removeItem(DB_KEY);
         localStorage.removeItem('KORISKO_STATE_V1');
         localStorage.removeItem('PANETTIERE_STATE_V1');
+        localStorage.removeItem(BACKUPS_KEY);
         localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
         localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
-        localStorage.setItem('KORISKO_ZERO_CLEANSED_V2', 'true');
+        localStorage.setItem('KORISKO_ZERO_CLEANSED_V3', 'true');
       }
 
       const serialized = typeof localStorage !== 'undefined' ? localStorage.getItem(DB_KEY) : null;

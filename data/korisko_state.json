@@ -1,195 +1,219 @@
 {
-  "goals": [
-    {
-      "month": "2026-09",
-      "targetRevenueBrl": 85000,
-      "targetTransactions": 3200,
-      "targetTicketMedioBrl": 26.5,
-      "targetDailyAverageBrl": 2833
-    }
-  ],
-  "sales": [],
   "version": "2.0.0",
-  "fornadas": [],
+  "timestamp": "2026-09-30T21:52:37.042Z",
   "products": [
     {
       "id": "prod-1",
       "code": "PAO-001",
       "name": "Pão Francês Tradicional",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
       "category": "paes",
-      "minStock": 15,
       "priceBrl": 18.9,
-      "costPriceBrl": 6.5
+      "costPriceBrl": 6.5,
+      "stock": 0,
+      "minStock": 15,
+      "unit": "kg",
+      "active": true
     },
     {
       "id": "prod-2",
       "code": "PAO-002",
       "name": "Pão de Queijo Mineiro",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
       "category": "salgados",
-      "minStock": 8,
       "priceBrl": 54,
-      "costPriceBrl": 22
+      "costPriceBrl": 22,
+      "stock": 0,
+      "minStock": 8,
+      "unit": "kg",
+      "active": true
     },
     {
       "id": "prod-3",
       "code": "PAO-003",
       "name": "Baguete Artesanal de Fermentação Natural",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "paes",
-      "minStock": 10,
       "priceBrl": 14.5,
-      "costPriceBrl": 4.8
+      "costPriceBrl": 4.8,
+      "stock": 0,
+      "minStock": 10,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-4",
       "code": "CONF-001",
       "name": "Sonho Recheado de Doce de Leite",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "confeitaria",
-      "minStock": 12,
       "priceBrl": 8.5,
-      "costPriceBrl": 3.2
+      "costPriceBrl": 3.2,
+      "stock": 0,
+      "minStock": 12,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-5",
       "code": "CONF-002",
       "name": "Bolo Caseiro de Cenoura com Chocolate",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "confeitaria",
-      "minStock": 4,
       "priceBrl": 36,
-      "costPriceBrl": 12.5
+      "costPriceBrl": 12.5,
+      "stock": 0,
+      "minStock": 4,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-6",
       "code": "SALG-001",
       "name": "Chipa Tradicional Paraguaia",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "salgados",
-      "minStock": 15,
       "priceBrl": 6,
-      "costPriceBrl": 2.1
+      "costPriceBrl": 2.1,
+      "stock": 0,
+      "minStock": 15,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-7",
       "code": "SALG-002",
       "name": "Croissant de Manteiga Folhado",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "paes",
-      "minStock": 10,
       "priceBrl": 12,
-      "costPriceBrl": 4.5
+      "costPriceBrl": 4.5,
+      "stock": 0,
+      "minStock": 10,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-8",
       "code": "SALG-003",
       "name": "Empada Especial de Palmito e Queijo",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "salgados",
-      "minStock": 10,
       "priceBrl": 9,
-      "costPriceBrl": 3.2
+      "costPriceBrl": 3.2,
+      "stock": 0,
+      "minStock": 10,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-9",
       "code": "BEB-001",
       "name": "Café Expresso Especial Italiano",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "bebidas",
-      "minStock": 30,
       "priceBrl": 7,
-      "costPriceBrl": 1.8
+      "costPriceBrl": 1.8,
+      "stock": 0,
+      "minStock": 30,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-10",
       "code": "BEB-002",
       "name": "Cappuccino Cremoso com Canela",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "bebidas",
-      "minStock": 20,
       "priceBrl": 11.5,
-      "costPriceBrl": 3.2
+      "costPriceBrl": 3.2,
+      "stock": 0,
+      "minStock": 20,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-11",
       "code": "BEB-003",
       "name": "Suco Natural de Laranja 400ml",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "bebidas",
-      "minStock": 15,
       "priceBrl": 9,
-      "costPriceBrl": 3
+      "costPriceBrl": 3,
+      "stock": 0,
+      "minStock": 15,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-12",
       "code": "BEB-004",
       "name": "Água Mineral sem Gás 500ml",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "bebidas",
-      "minStock": 40,
       "priceBrl": 4.5,
-      "costPriceBrl": 1.2
+      "costPriceBrl": 1.2,
+      "stock": 0,
+      "minStock": 40,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-13",
       "code": "OUT-001",
       "name": "Manteiga de Primeira Qualidade 200g",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "outros",
-      "minStock": 10,
       "priceBrl": 14.9,
-      "costPriceBrl": 9.2
+      "costPriceBrl": 9.2,
+      "stock": 0,
+      "minStock": 10,
+      "unit": "un",
+      "active": true
     },
     {
       "id": "prod-14",
       "code": "OUT-002",
       "name": "Requeijão Cremoso Tradicional 200g",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
       "category": "outros",
-      "minStock": 10,
       "priceBrl": 12.5,
-      "costPriceBrl": 7.8
+      "costPriceBrl": 7.8,
+      "stock": 0,
+      "minStock": 10,
+      "unit": "un",
+      "active": true
     }
   ],
-  "customers": [],
+  "stockMovements": [],
+  "sales": [],
+  "currentSession": {
+    "id": "sess-1790805157043",
+    "sessionNumber": 1,
+    "openedAt": "2026-09-30T21:52:37.042Z",
+    "closedAt": "2026-09-30T21:52:37.042Z",
+    "openedBy": "Ax",
+    "closedBy": "Ax",
+    "status": "fechado",
+    "initialFloat": {
+      "brl": 0,
+      "pyg": 0,
+      "usd": 0
+    },
+    "transactions": []
+  },
+  "sessionHistory": [],
+  "exchangeRates": {
+    "USD_TO_BRL": 5.62,
+    "BRL_TO_USD": 0.178,
+    "PYG_TO_BRL": 0.000678,
+    "BRL_TO_PYG": 1475,
+    "lastUpdated": "2026-09-30T21:52:37.042Z",
+    "status": "online"
+  },
+  "goals": [
+    {
+      "month": "2026-09",
+      "targetRevenueBrl": 80000,
+      "targetDailyAverageBrl": 2666,
+      "targetTransactions": 3000,
+      "targetTicketMedioBrl": 26
+    }
+  ],
   "employees": [
     {
       "id": "emp-admin-ax",
-      "pin": "9APG_47z-EgF4yz",
       "name": "Ax",
-      "role": "admin",
       "email": "axxeiacompany@gmail.com",
+      "role": "admin",
       "password": "9APG_47z-EgF4yz",
+      "pin": "9APG_47z-EgF4yz",
       "avatarColor": "bg-indigo-600",
       "allowedFeatures": [
         "dashboard",
@@ -204,50 +228,13 @@
         "cambio",
         "backup",
         "afiliados"
-      ]
-    },
-    {
-      "id": "emp-1790618698985",
-      "pin": "446183",
-      "name": "claudia",
-      "role": "afiliado",
-      "email": "claudia@korisko.com",
-      "password": "446183",
-      "avatarColor": "bg-indigo-600",
-      "allowedFeatures": [
-        "dashboard",
-        "pdv",
-        "venda_direta",
-        "crm"
-      ]
+      ],
+      "active": true
     }
   ],
-  "timestamp": "2026-09-30T17:56:44.251Z",
   "openComandas": [],
-  "exchangeRates": {
-    "brlToPyg": 1475,
-    "brlToUsd": 0.178,
-    "pygToBrl": 0.000678,
-    "usdToBrl": 5.62,
-    "updatedAt": "2026-09-30T17:56:21.363Z"
-  },
-  "currentSession": {
-    "id": "sess-1790790981363",
-    "status": "fechado",
-    "closedAt": "2026-09-30T17:56:21.363Z",
-    "closedBy": "Ax",
-    "openedAt": "2026-09-30T17:56:21.363Z",
-    "openedBy": "Ax",
-    "initialFloat": {
-      "brl": 0,
-      "pyg": 0,
-      "usd": 0
-    },
-    "transactions": [],
-    "sessionNumber": 1
-  },
+  "fornadas": [],
   "fichasTecnicas": [],
-  "sessionHistory": [],
-  "stockMovements": [],
+  "customers": [],
   "customerEntries": []
 }
