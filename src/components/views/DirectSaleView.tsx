@@ -19,8 +19,8 @@ import {
   RotateCcw,
   Plus
 } from 'lucide-react';
-import { PaymentMethod } from '../../types';
-import { formatCurrency } from '../../utils/currency';
+import { PaymentMethod, Currency } from '../../types';
+import { formatCurrency, toBrl, fromBrl } from '../../utils/currency';
 
 interface Props {
   onSaleCompleted?: () => void;
@@ -39,6 +39,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   } = useBakery();
 
   // Sale form states
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>('BRL');
   const [amountStr, setAmountStr] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('dinheiro');
@@ -53,25 +54,53 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   // Success Feedback
   const [lastSaleReceipt, setLastSaleReceipt] = useState<{
     totalBrl: number;
+    amountInCurrency: number;
+    currency: Currency;
     paymentMethod: string;
     customerName: string;
     timestamp: string;
     id: string;
   } | null>(null);
 
-  // Parse amount
-  const amountBrl = useMemo(() => {
-    const clean = amountStr.replace(',', '.');
+  // Parse raw number typed in selected currency
+  const rawInputNumber = useMemo(() => {
+    const clean = amountStr.replace(/\./g, '').replace(',', '.');
     const val = parseFloat(clean);
-    return isNaN(val) || val <= 0 ? 0 : Math.round(val * 100) / 100;
+    return isNaN(val) || val <= 0 ? 0 : val;
   }, [amountStr]);
+
+  // Equivalent in BRL (internal accounting)
+  const amountBrl = useMemo(() => {
+    if (selectedCurrency === 'BRL') {
+      return Math.round(rawInputNumber * 100) / 100;
+    }
+    const val = toBrl(rawInputNumber, selectedCurrency, exchangeRates);
+    return Math.round(val * 100) / 100;
+  }, [rawInputNumber, selectedCurrency, exchangeRates]);
+
+  // Equivalent in PYG
+  const amountPyg = useMemo(() => {
+    if (selectedCurrency === 'PYG') return Math.round(rawInputNumber);
+    return Math.round(fromBrl(amountBrl, 'PYG', exchangeRates));
+  }, [rawInputNumber, selectedCurrency, amountBrl, exchangeRates]);
+
+  // Equivalent in USD
+  const amountUsd = useMemo(() => {
+    if (selectedCurrency === 'USD') return Math.round(rawInputNumber * 100) / 100;
+    return Math.round(fromBrl(amountBrl, 'USD', exchangeRates) * 100) / 100;
+  }, [rawInputNumber, selectedCurrency, amountBrl, exchangeRates]);
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
-  // Quick preset amount additions
+  // Quick preset amount additions based on active currency
   const addPreset = (val: number) => {
-    const current = amountBrl;
-    setAmountStr((current + val).toFixed(2).replace('.', ','));
+    const current = rawInputNumber;
+    const nextVal = current + val;
+    if (selectedCurrency === 'PYG') {
+      setAmountStr(Math.round(nextVal).toString());
+    } else {
+      setAmountStr(nextVal.toFixed(2).replace('.', ','));
+    }
   };
 
   const handleKeypadPress = (digit: string) => {
@@ -83,7 +112,18 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       setAmountStr(prev => prev.slice(0, -1));
       return;
     }
+    if (digit === '000') {
+      if (!amountStr || amountStr === '0') return;
+      setAmountStr(prev => prev + '000');
+      return;
+    }
     if (digit === ',' || digit === '.') {
+      if (selectedCurrency === 'PYG') {
+        // Guaraní has no decimals, treat comma as adding triple zero
+        if (!amountStr || amountStr === '0') return;
+        setAmountStr(prev => prev + '000');
+        return;
+      }
       if (!amountStr.includes(',') && !amountStr.includes('.')) {
         setAmountStr(prev => (prev ? prev + ',' : '0,'));
       }
@@ -91,6 +131,37 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
     }
     setAmountStr(prev => prev + digit);
   };
+
+  // Change currency and convert or reset
+  const handleSelectCurrency = (cur: Currency) => {
+    if (cur === selectedCurrency) return;
+    if (rawInputNumber > 0) {
+      // Converte valor digitado para a nova moeda selecionada
+      if (cur === 'BRL') {
+        setAmountStr(amountBrl > 0 ? amountBrl.toFixed(2).replace('.', ',') : '');
+      } else if (cur === 'PYG') {
+        setAmountStr(amountPyg > 0 ? Math.round(amountPyg).toString() : '');
+      } else if (cur === 'USD') {
+        setAmountStr(amountUsd > 0 ? amountUsd.toFixed(2).replace('.', ',') : '');
+      }
+    }
+    setSelectedCurrency(cur);
+  };
+
+  // Quick presets by currency
+  const quickPresets = useMemo(() => {
+    switch (selectedCurrency) {
+      case 'PYG':
+        return [5000, 10000, 20000, 50000, 100000, 200000];
+      case 'USD':
+        return [1, 2, 5, 10, 20, 50];
+      case 'BRL':
+      default:
+        return [2, 5, 10, 20, 50, 100];
+    }
+  }, [selectedCurrency]);
+
+  const currencySymbol = selectedCurrency === 'BRL' ? 'R$' : selectedCurrency === 'PYG' ? '₲' : 'US$';
 
   // Handle Quick Add Customer
   const handleSaveCustomer = async (e: React.FormEvent) => {
@@ -150,12 +221,16 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
         amountBrl,
         description.trim() || (language === 'es' ? 'Venta Directa Mostrador' : 'Venda Direta Balcão'),
         paymentMethod,
-        selectedCustomerId || undefined
+        selectedCustomerId || undefined,
+        selectedCurrency,
+        rawInputNumber
       );
 
       setLastSaleReceipt({
         id: sale.id,
         totalBrl: sale.totalBrl,
+        amountInCurrency: rawInputNumber,
+        currency: selectedCurrency,
         paymentMethod: paymentMethod === 'dinheiro' ? (language === 'es' ? 'Efectivo' : 'Dinheiro')
           : paymentMethod === 'pix' ? 'Pix / QR'
           : paymentMethod === 'cartao_debito' ? (language === 'es' ? 'Débito' : 'Débito')
@@ -219,28 +294,126 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         
         {/* Left Column: Big Amount & Keypad */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-3 sm:space-y-4">
+
+          {/* Currency Selector (Qual moeda será paga?) */}
+          <div className="p-3 sm:p-4 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'es' ? '¿En qué moneda pagará?' : 'Qual moeda será paga?'}</span>
+              </label>
+              <span className="text-[10px] text-neutral-400 font-mono-nums">
+                {language === 'es' ? 'Câmbio: ' : 'Câmbio: '}1 R$ = ₲ {exchangeRates.BRL_TO_PYG?.toLocaleString() || '1.380'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSelectCurrency('BRL')}
+                className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
+                  selectedCurrency === 'BRL'
+                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 shadow-md ring-1 ring-amber-400/40'
+                    : 'border-[#1C2538] bg-[#090D15] text-neutral-400 hover:text-white hover:border-neutral-700'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">🇧🇷</span>
+                  <span>Real</span>
+                </div>
+                <span className="text-[10px] text-amber-400/80 font-mono">BRL (R$)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectCurrency('PYG')}
+                className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
+                  selectedCurrency === 'PYG'
+                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 shadow-md ring-1 ring-amber-400/40'
+                    : 'border-[#1C2538] bg-[#090D15] text-neutral-400 hover:text-white hover:border-neutral-700'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">🇵🇾</span>
+                  <span>Guaraní</span>
+                </div>
+                <span className="text-[10px] text-amber-400/80 font-mono">PYG (₲)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectCurrency('USD')}
+                className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
+                  selectedCurrency === 'USD'
+                    ? 'border-amber-400 bg-amber-400/15 text-amber-300 shadow-md ring-1 ring-amber-400/40'
+                    : 'border-[#1C2538] bg-[#090D15] text-neutral-400 hover:text-white hover:border-neutral-700'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">🇺🇸</span>
+                  <span>Dólar</span>
+                </div>
+                <span className="text-[10px] text-amber-400/80 font-mono">USD ($)</span>
+              </button>
+            </div>
+          </div>
           
           {/* Big Amount Card */}
           <div className="p-4 sm:p-6 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-3 sm:space-y-4">
             
             <div>
-              <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1">
-                {language === 'es' ? 'Monto de la Venta (R$)' : 'Valor da Venda (R$)'}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
+                  {language === 'es' ? `Monto a Cobrar (${selectedCurrency})` : `Valor a Cobrar (${selectedCurrency})`}
+                </label>
+                {rawInputNumber > 0 && selectedCurrency !== 'BRL' && (
+                  <span className="text-xs text-amber-400 font-mono-nums font-bold">
+                    ≈ {formatCurrency(amountBrl, 'BRL')}
+                  </span>
+                )}
+              </div>
+
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-amber-400">
-                  R$
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-amber-400 font-mono">
+                  {currencySymbol}
                 </span>
                 <input
                   type="text"
                   autoFocus
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
-                  placeholder="0,00"
+                  placeholder={selectedCurrency === 'PYG' ? '0' : '0,00'}
                   className="w-full pl-16 pr-4 py-3.5 sm:py-4 bg-[#090D15] border-2 border-indigo-500/50 rounded-2xl text-3xl sm:text-4xl font-black text-white placeholder-neutral-600 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all font-mono-nums tracking-tight"
                 />
               </div>
+
+              {/* Live multi-currency conversion preview pill */}
+              {rawInputNumber > 0 && (
+                <div className="mt-2.5 p-2 sm:p-2.5 rounded-xl bg-[#090D15] border border-[#1F273A] flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs font-mono-nums">
+                  <div className="flex items-center gap-1.5 text-neutral-400">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>{language === 'es' ? 'Equivalencias:' : 'Equivalências:'}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {selectedCurrency !== 'BRL' && (
+                      <span className="text-neutral-300">
+                        🇧🇷 <strong className="text-white">{formatCurrency(amountBrl, 'BRL')}</strong>
+                      </span>
+                    )}
+                    {selectedCurrency !== 'PYG' && (
+                      <span className="text-neutral-300">
+                        🇵🇾 <strong className="text-amber-300">{formatCurrency(amountPyg, 'PYG')}</strong>
+                      </span>
+                    )}
+                    {selectedCurrency !== 'USD' && (
+                      <span className="text-neutral-300">
+                        🇺🇸 <strong className="text-emerald-300">{formatCurrency(amountUsd, 'USD')}</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick value chips - Smooth swipe on mobile */}
@@ -248,14 +421,14 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               <span className="text-[11px] text-neutral-500 shrink-0 mr-0.5">
                 {language === 'es' ? 'Atajos:' : 'Atalhos:'}
               </span>
-              {[2, 5, 10, 20, 50, 100].map(val => (
+              {quickPresets.map(val => (
                 <button
                   key={val}
                   type="button"
                   onClick={() => addPreset(val)}
                   className="px-3 py-1.5 rounded-lg bg-[#141B2B] hover:bg-indigo-600/30 active:scale-95 text-neutral-200 hover:text-white border border-[#222E46] text-xs font-mono font-bold transition-all shrink-0 cursor-pointer"
                 >
-                  +{val}
+                  +{selectedCurrency === 'PYG' ? val.toLocaleString('es-PY') : val}
                 </button>
               ))}
               <button
@@ -269,7 +442,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
 
             {/* Touch Numerical Keypad with ergonomic thumb height */}
             <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(key => (
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', selectedCurrency === 'PYG' ? '000' : ',', '0', '⌫'].map(key => (
                 <button
                   key={key}
                   type="button"
@@ -277,6 +450,8 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                   className={`h-13 sm:h-14 rounded-2xl font-mono text-xl sm:text-lg font-bold transition-all cursor-pointer shadow-sm active:scale-90 flex items-center justify-center ${
                     key === '⌫' 
                       ? 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30' 
+                      : key === '000'
+                      ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 text-base font-extrabold'
                       : 'bg-[#121828] text-white hover:bg-neutral-800 border border-[#1E283D]'
                   }`}
                 >
@@ -400,7 +575,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
             <span>
               {isSubmittingDirect 
                 ? (language === 'es' ? 'Guardando en Supabase...' : 'Gravando no Supabase...')
-                : `${language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} (${formatCurrency(amountBrl, 'BRL')})`
+                : `${language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} (${formatCurrency(rawInputNumber, selectedCurrency)}${selectedCurrency !== 'BRL' ? ` ≈ ${formatCurrency(amountBrl, 'BRL')}` : ''})`
               }
             </span>
           </button>
@@ -419,7 +594,15 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               </div>
               <div className="flex items-center justify-between font-mono-nums text-sm font-black text-white">
                 <span>{lastSaleReceipt.customerName}</span>
-                <span>{formatCurrency(lastSaleReceipt.totalBrl, 'BRL')} ({lastSaleReceipt.paymentMethod})</span>
+                <span>
+                  {formatCurrency(lastSaleReceipt.amountInCurrency, lastSaleReceipt.currency)}
+                  {lastSaleReceipt.currency !== 'BRL' && (
+                    <span className="text-xs text-neutral-400 font-normal ml-1">
+                      (≈ {formatCurrency(lastSaleReceipt.totalBrl, 'BRL')})
+                    </span>
+                  )}
+                  {' '}({lastSaleReceipt.paymentMethod})
+                </span>
               </div>
             </div>
           )}
@@ -446,9 +629,16 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                 }
               </span>
             </div>
-            <span className="font-mono-nums text-base font-black">
-              {formatCurrency(amountBrl, 'BRL')}
-            </span>
+            <div className="text-right">
+              <span className="font-mono-nums text-base font-black block">
+                {formatCurrency(rawInputNumber, selectedCurrency)}
+              </span>
+              {selectedCurrency !== 'BRL' && (
+                <span className="text-[10px] text-emerald-200 font-mono-nums block">
+                  ≈ {formatCurrency(amountBrl, 'BRL')}
+                </span>
+              )}
+            </div>
           </button>
         </div>
       )}

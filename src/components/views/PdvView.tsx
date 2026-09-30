@@ -569,11 +569,16 @@ export const PdvView: React.FC = () => {
               </div>
               <div className="truncate">
                 <p className="text-[10px] font-black uppercase tracking-wider text-neutral-900 leading-tight">
-                  {language === 'es' ? 'Ver Carrito' : 'Ver Carrinho'}
+                  {language === 'es' ? 'Ver Carrito' : 'Ver Carrinho'} • {cart.length} {cart.length === 1 ? (language === 'es' ? 'ítem' : 'item') : (language === 'es' ? 'ítems' : 'itens')}
                 </p>
-                <p className="text-base font-black font-mono-nums leading-none text-neutral-950 mt-0.5 truncate">
-                  {formatCurrency(cartTotalBrl, 'BRL')}
-                </p>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-base font-black font-mono-nums leading-none text-neutral-950 mt-0.5">
+                    {formatCurrency(cartTotalBrl, 'BRL')}
+                  </span>
+                  <span className="text-[11px] font-bold font-mono-nums text-neutral-800">
+                    ({formatCurrency(cartTotalPyg, 'PYG')})
+                  </span>
+                </div>
               </div>
             </button>
 

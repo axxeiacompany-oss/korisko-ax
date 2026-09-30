@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { CartItem, Currency, PaymentEntry, PaymentMethod, Sale } from '../../types';
 import { formatCurrency, toBrl, fromBrl } from '../../utils/currency';
-import { CreditCard, Banknote, QrCode, Plus, Trash2, CheckCircle2, X, Calculator, ArrowRight, UserCheck, BookOpen, Gift, AlertTriangle } from 'lucide-react';
+import { CreditCard, Banknote, QrCode, Plus, Trash2, CheckCircle2, X, Calculator, ArrowRight, UserCheck, BookOpen, Gift, AlertTriangle, Zap } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -148,6 +148,38 @@ export const PaymentModal: React.FC<Props> = ({
 
   const handleSetExactRemaining = () => {
     setInputAmount(suggestedAmountForSelectedCur.toString());
+  };
+
+  const handlePayFullInCurrency = (cur: Currency) => {
+    if (remainingBrl <= 0) return;
+    const converted = fromBrl(remainingBrl, cur, exchangeRates);
+    const amountVal = cur === 'PYG' ? Math.round(converted) : Math.round(converted * 100) / 100;
+    
+    let eqBrl = 0;
+    let rateUsed = 1;
+
+    if (cur === 'BRL') {
+      eqBrl = remainingBrl;
+      rateUsed = 1;
+    } else if (cur === 'USD') {
+      eqBrl = remainingBrl;
+      rateUsed = exchangeRates.USD_TO_BRL;
+    } else if (cur === 'PYG') {
+      eqBrl = remainingBrl;
+      rateUsed = 1 / (exchangeRates.BRL_TO_PYG || 1380);
+    }
+
+    const newPayment: PaymentEntry = {
+      id: `pay-${Date.now()}-${Math.random()}`,
+      currency: cur,
+      amountReceived: amountVal,
+      exchangeRateUsed: rateUsed,
+      equivalentBrl: eqBrl,
+      method: selectedMethod,
+    };
+
+    setPayments(prev => [...prev, newPayment]);
+    setInputAmount('');
   };
 
   const handleQuickAddBill = (val: number) => {
@@ -390,42 +422,66 @@ export const PaymentModal: React.FC<Props> = ({
               </span>
             </div>
 
-            {/* Currency selector tabs */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCurrency('BRL')}
-                className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                  selectedCurrency === 'BRL'
-                    ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-semibold'
-                    : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <span>🇧🇷 Real (BRL)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCurrency('PYG')}
-                className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                  selectedCurrency === 'PYG'
-                    ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-semibold'
-                    : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <span>🇵🇾 Guaraní (PYG)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCurrency('USD')}
-                className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                  selectedCurrency === 'USD'
-                    ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-semibold'
-                    : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <span>🇺🇸 Dólar (USD)</span>
-              </button>
+            {/* Currency selector tabs with live converted values */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                  {language === 'es' ? 'Seleccione la moneda a pagar:' : 'Escolha a moeda que o cliente vai pagar:'}
+                </span>
+                <span className="text-[10px] text-neutral-400 font-mono-nums">
+                  1 R$ = ₲ {exchangeRates.BRL_TO_PYG?.toLocaleString() || '1.380'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(['BRL', 'PYG', 'USD'] as const).map(cur => {
+                  const remInCur = fromBrl(remainingBrl, cur, exchangeRates);
+                  const isSelected = selectedCurrency === cur;
+                  return (
+                    <button
+                      key={cur}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCurrency(cur);
+                        setInputAmount(cur === 'PYG' ? Math.round(remInCur).toString() : remInCur.toFixed(2));
+                      }}
+                      className={`py-2 px-2 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? 'border-amber-400 bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/40 shadow-sm'
+                          : 'border-neutral-800 bg-neutral-900/90 text-neutral-400 hover:text-neutral-200'
+                      }`}
+                    >
+                      <span className="font-bold flex items-center gap-1">
+                        <span>{cur === 'BRL' ? '🇧🇷 Real' : cur === 'PYG' ? '🇵🇾 Guaraní' : '🇺🇸 Dólar'}</span>
+                      </span>
+                      <span className="text-[11px] font-mono-nums font-bold text-neutral-200">
+                        {formatCurrency(remInCur, cur)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Quick 1-click Pay Remaining Full in Selected Currency */}
+            {remainingBrl > 0 && (
+              <button
+                type="button"
+                onClick={() => handlePayFullInCurrency(selectedCurrency)}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-emerald-500/15 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 text-xs font-bold transition-all flex items-center justify-between cursor-pointer active:scale-98"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />
+                  <span>
+                    {language === 'es' 
+                      ? `Pagar Todo en ${selectedCurrency === 'BRL' ? 'Reales (BRL)' : selectedCurrency === 'PYG' ? 'Guaraníes (PYG)' : 'Dólares (USD)'}` 
+                      : `Pagar Total em ${selectedCurrency === 'BRL' ? 'Reais (BRL)' : selectedCurrency === 'PYG' ? 'Guaranis (PYG)' : 'Dólares (USD)'}`}
+                  </span>
+                </div>
+                <span className="font-mono-nums text-white font-black">
+                  {formatCurrency(suggestedAmountForSelectedCur, selectedCurrency)}
+                </span>
+              </button>
+            )}
 
             {/* Payment Method selector with 'fiado' */}
             <div className="flex flex-wrap gap-2">

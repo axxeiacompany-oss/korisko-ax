@@ -25,7 +25,7 @@ import {
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
-import { DEFAULT_EXCHANGE_RATES, toBrl } from '../utils/currency';
+import { DEFAULT_EXCHANGE_RATES, toBrl, fromBrl } from '../utils/currency';
 import { fetchLiveExchangeRates } from '../services/exchangeRateService';
 import { supabase } from '../lib/supabase';
 import { 
@@ -84,7 +84,9 @@ interface BakeryContextType {
     amountBrl: number,
     description: string,
     paymentMethod: PaymentMethod,
-    customerId?: string
+    customerId?: string,
+    paymentCurrency?: Currency,
+    amountReceivedInCurrency?: number
   ) => Promise<Sale>;
 
   // Multi-Currency & Real-Time Live Rates
@@ -1327,13 +1329,33 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return persistedSale;
   }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, removeComanda]);
 
-  // Venda Direta Rápida (Apenas Valor & Confirme)
+  // Venda Direta Rápida (Apenas Valor & Confirme com Suporte Multimoeda)
   const registerDirectSale = useCallback(async (
     amountBrl: number,
     description: string,
     paymentMethod: PaymentMethod,
-    customerId?: string
+    customerId?: string,
+    paymentCurrency: Currency = 'BRL',
+    amountReceivedInCurrency?: number
   ): Promise<Sale> => {
+    let rateUsed = 1;
+    let received = amountReceivedInCurrency !== undefined && amountReceivedInCurrency > 0 
+      ? amountReceivedInCurrency 
+      : amountBrl;
+
+    const rates = data.exchangeRates || DEFAULT_EXCHANGE_RATES;
+    if (paymentCurrency === 'USD') {
+      rateUsed = rates.USD_TO_BRL;
+      if (!amountReceivedInCurrency) {
+        received = fromBrl(amountBrl, 'USD', rates);
+      }
+    } else if (paymentCurrency === 'PYG') {
+      rateUsed = 1 / (rates.BRL_TO_PYG || 1380);
+      if (!amountReceivedInCurrency) {
+        received = fromBrl(amountBrl, 'PYG', rates);
+      }
+    }
+
     const directProduct: Product = {
       id: `prod-vd-${Date.now()}`,
       code: 'VD-001',
@@ -1359,9 +1381,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const payments: PaymentEntry[] = [
       {
         id: `pay-${Date.now()}`,
-        currency: 'BRL',
-        amountReceived: amountBrl,
-        exchangeRateUsed: 1,
+        currency: paymentCurrency,
+        amountReceived: Math.round(received * 100) / 100,
+        exchangeRateUsed: rateUsed,
         equivalentBrl: amountBrl,
         method: paymentMethod,
       }
@@ -1377,7 +1399,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amountBrl,
       customerId
     );
-  }, [completeSale, language]);
+  }, [completeSale, data.exchangeRates, language]);
 
   // ==========================================
   // REQUIREMENT 4: CASH REGISTER SESSIONS
