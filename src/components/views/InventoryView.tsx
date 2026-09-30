@@ -18,9 +18,10 @@ import {
 } from 'lucide-react';
 import { NewProductModal } from '../modals/NewProductModal';
 import { StockMovementModal } from '../modals/StockMovementModal';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 export const InventoryView: React.FC = () => {
-  const { products, stockMovements, deleteProduct, hasPermission } = useBakery();
+  const { products, stockMovements, deleteProduct, hasPermission, showToast, language } = useBakery();
 
   const [activeTab, setActiveTab] = useState<'catalogo' | 'historico'>('catalogo');
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,6 +33,7 @@ export const InventoryView: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isStockMovementOpen, setIsStockMovementOpen] = useState(false);
   const [movementTargetProduct, setMovementTargetProduct] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const canManageProducts = hasPermission(['admin', 'gerente']);
 
@@ -64,8 +66,26 @@ export const InventoryView: React.FC = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Deseja realmente remover o produto "${name}" do sistema?`)) {
-      deleteProduct(id);
+    setProductToDelete({ id, name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    try {
+      await deleteProduct(productToDelete.id);
+      showToast(
+        language === 'es'
+          ? `Producto "${productToDelete.name}" eliminado correctamente.`
+          : `Produto "${productToDelete.name}" removido com sucesso.`,
+        'success'
+      );
+    } catch {
+      showToast(
+        language === 'es' ? 'Error al eliminar producto.' : 'Erro ao remover produto.',
+        'error'
+      );
+    } finally {
+      setProductToDelete(null);
     }
   };
 
@@ -526,6 +546,19 @@ export const InventoryView: React.FC = () => {
           setMovementTargetProduct(null);
         }}
         defaultProduct={movementTargetProduct}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(productToDelete)}
+        title={language === 'es' ? 'Eliminar Producto' : 'Excluir Produto'}
+        message={
+          language === 'es'
+            ? `¿Desea realmente eliminar el producto "${productToDelete?.name}" del catálogo?`
+            : `Deseja realmente remover o produto "${productToDelete?.name}" do sistema?`
+        }
+        confirmLabel={language === 'es' ? 'Eliminar' : 'Excluir'}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setProductToDelete(null)}
       />
 
     </div>

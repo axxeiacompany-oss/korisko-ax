@@ -19,11 +19,12 @@ import {
   TrendingUp, 
   Layers, 
   FileText, 
-  X,
-  Package,
-  ArrowRight,
-  Info
+  X, 
+  Package, 
+  ArrowRight, 
+  Info 
 } from 'lucide-react';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 export const FichaTecnicaView: React.FC = () => {
   const { 
@@ -34,12 +35,15 @@ export const FichaTecnicaView: React.FC = () => {
     deleteFichaTecnica, 
     executeProductionFromRecipe,
     hasPermission,
-    exchangeRates
+    exchangeRates,
+    language,
+    showToast
   } = useBakery();
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [selectedFichaForDetails, setSelectedFichaForDetails] = useState<FichaTecnica | null>(null);
+  const [fichaToDelete, setFichaToDelete] = useState<FichaTecnica | null>(null);
   
   // Production Modal state
   const [productionTarget, setProductionTarget] = useState<FichaTecnica | null>(null);
@@ -527,13 +531,9 @@ export const FichaTecnicaView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (confirm(`Excluir a ficha técnica "${ficha.name}"?`)) {
-                            deleteFichaTecnica(ficha.id);
-                          }
-                        }}
-                        className="p-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors"
-                        title="Excluir Ficha Técnica"
+                        onClick={() => setFichaToDelete(ficha)}
+                        className="p-1.5 rounded-lg border border-neutral-800 text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors cursor-pointer"
+                        title={language === 'es' ? 'Eliminar Ficha' : 'Excluir Ficha Técnica'}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1184,7 +1184,29 @@ export const FichaTecnicaView: React.FC = () => {
 
           </div>
         </div>
-      )}
+      {/* Confirm Delete Ficha Técnica Modal */}
+      <ConfirmModal
+        isOpen={Boolean(fichaToDelete)}
+        title={language === 'es' ? 'Eliminar Ficha Técnica' : 'Excluir Ficha Técnica'}
+        message={
+          language === 'es'
+            ? `¿Desea realmente eliminar la ficha técnica "${fichaToDelete?.name}"?`
+            : `Deseja realmente remover a ficha técnica "${fichaToDelete?.name}" do sistema?`
+        }
+        confirmLabel={language === 'es' ? 'Eliminar' : 'Excluir'}
+        onConfirm={() => {
+          if (!fichaToDelete) return;
+          deleteFichaTecnica(fichaToDelete.id);
+          showToast(
+            language === 'es'
+              ? `Ficha técnica "${fichaToDelete.name}" eliminada correctamente.`
+              : `Ficha técnica "${fichaToDelete.name}" excluída com sucesso.`,
+            'success'
+          );
+          setFichaToDelete(null);
+        }}
+        onCancel={() => setFichaToDelete(null)}
+      />
 
     </div>
   );

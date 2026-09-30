@@ -61,6 +61,12 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
     timestamp: string;
     id: string;
   } | null>(null);
+  const [statusNotice, setStatusNotice] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+
+  const showNotice = (message: string, type: 'error' | 'success' = 'error') => {
+    setStatusNotice({ type, message });
+    setTimeout(() => setStatusNotice(null), 4000);
+  };
 
   // Parse raw number typed in selected currency
   const rawInputNumber = useMemo(() => {
@@ -167,7 +173,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) {
-      alert('Informe o nome do cliente.');
+      showNotice('Informe o nome do cliente.', 'error');
       return;
     }
 
@@ -183,8 +189,9 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       setIsAddingCustomer(false);
       setNewCustName('');
       setNewCustPhone('');
+      showNotice(`Cliente "${created.name}" cadastrado com sucesso!`, 'success');
     } catch (err: any) {
-      alert(`Erro ao cadastrar cliente: ${err.message}`);
+      showNotice(`Erro ao cadastrar cliente: ${err.message}`, 'error');
     }
   };
 
@@ -193,25 +200,16 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   // Confirm Sale
   const handleConfirmDirectSale = async () => {
     if (amountBrl <= 0) {
-      alert('Digite o valor da venda.');
+      showNotice('Digite o valor da venda.', 'error');
       return;
     }
 
     if (paymentMethod === 'fiado') {
       if (!selectedCustomer) {
-        alert(language === 'es' 
+        showNotice(language === 'es' 
           ? 'Para registrar como Crédito / Fiado, por favor seleccione o agregue un cliente.' 
-          : 'Para registrar como Fiado / Caderneta, selecione ou adicione um cliente.');
+          : 'Para registrar como Fiado / Caderneta, selecione ou adicione um cliente.', 'error');
         return;
-      }
-      const availableCredit = selectedCustomer.creditLimitBrl - selectedCustomer.outstandingBalanceBrl;
-      if (amountBrl > availableCredit) {
-        const confirmOverlimit = confirm(
-          language === 'es'
-            ? `Atención: El límite disponible de ${selectedCustomer.name} es de ${formatCurrency(availableCredit, 'BRL')} y el importe es ${formatCurrency(amountBrl, 'BRL')}. ¿Desea autorizar de todos modos?`
-            : `Atenção: O limite disponível de ${selectedCustomer.name} é de ${formatCurrency(availableCredit, 'BRL')}, e o valor da compra é ${formatCurrency(amountBrl, 'BRL')}. Deseja autorizar mesmo assim?`
-        );
-        if (!confirmOverlimit) return;
       }
     }
 
@@ -249,7 +247,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
         onSaleCompleted();
       }
     } catch (err: any) {
-      alert(`Falha ao registrar venda direta: ${err.message}`);
+      showNotice(`Falha ao registrar venda direta: ${err.message}`, 'error');
     } finally {
       setIsSubmittingDirect(false);
     }
@@ -258,6 +256,20 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   return (
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-24 lg:pb-0">
       
+      {/* Notice Banner */}
+      {statusNotice && (
+        <div className={`p-3.5 rounded-xl border text-xs flex items-center justify-between shadow-lg animate-in fade-in ${
+          statusNotice.type === 'error'
+            ? 'bg-rose-500/15 border-rose-500/30 text-rose-200'
+            : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
+        }`}>
+          <span>{statusNotice.message}</span>
+          <button type="button" onClick={() => setStatusNotice(null)} className="text-neutral-400 hover:text-white p-1">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Banner */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D121E] border border-[#1E273A] flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-xl">
         <div className="flex items-center gap-3">

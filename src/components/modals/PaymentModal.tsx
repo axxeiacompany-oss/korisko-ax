@@ -21,7 +21,7 @@ export const PaymentModal: React.FC<Props> = ({
   comandaNumber,
   initialCustomerName,
 }) => {
-  const { exchangeRates, completeSale, customers, redeemCustomerPoints, language, t } = useBakery();
+  const { exchangeRates, completeSale, customers, redeemCustomerPoints, language, t, showToast } = useBakery();
 
   const rawSubtotalBrl = useMemo(() => {
     return cartItems.reduce((acc, it) => acc + it.subtotalBrl, 0);
@@ -99,7 +99,10 @@ export const PaymentModal: React.FC<Props> = ({
     if (!selectedCustomer || selectedCustomer.loyaltyPoints < 20) return;
     const maxRedeemablePts = Math.min(selectedCustomer.loyaltyPoints, Math.floor(rawSubtotalBrl * 20));
     if (maxRedeemablePts < 20) {
-      alert('Pontos insuficientes para resgate mínimo (mínimo 20 pontos).');
+      showToast(
+        language === 'es' ? 'Puntos insuficientes para canje mínimo (mínimo 20 puntos).' : 'Pontos insuficientes para resgate mínimo (mínimo 20 pontos).',
+        'error'
+      );
       return;
     }
     const discount = redeemCustomerPoints(selectedCustomer.id, maxRedeemablePts);
@@ -111,7 +114,10 @@ export const PaymentModal: React.FC<Props> = ({
     if (!val || val <= 0) return;
 
     if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
-      alert('Para lançar venda como Fiado, selecione ou identifique o cliente.');
+      showToast(
+        language === 'es' ? 'Para registrar venta como Cuenta Corriente, seleccione un cliente.' : 'Para lançar venda como Fiado, selecione ou identifique o cliente.',
+        'error'
+      );
       return;
     }
 
@@ -190,7 +196,10 @@ export const PaymentModal: React.FC<Props> = ({
 
   const handleFinishSale = async () => {
     if (remainingBrl > 0.05) {
-      alert('O valor recebido ainda é menor que o total da venda.');
+      showToast(
+        language === 'es' ? 'El valor recibido aún es menor que el total de la venta.' : 'O valor recebido ainda é menor que o total da venda.',
+        'error'
+      );
       return;
     }
 
@@ -214,7 +223,10 @@ export const PaymentModal: React.FC<Props> = ({
       );
       onSaleCompleted(sale);
     } catch (err: any) {
-      alert(`Falha ao registrar venda no banco: ${err.message || String(err)}`);
+      showToast(
+        language === 'es' ? `Error al registrar venta: ${err.message || String(err)}` : `Falha ao registrar venda: ${err.message || String(err)}`,
+        'error'
+      );
     } finally {
       setIsFinishing(false);
     }

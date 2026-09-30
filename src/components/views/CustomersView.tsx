@@ -42,7 +42,8 @@ export const CustomersView: React.FC = () => {
     redeemCustomerPoints,
     hasPermission,
     exchangeRates,
-    language
+    language,
+    showToast
   } = useBakery();
 
   const [search, setSearch] = useState('');
@@ -52,6 +53,7 @@ export const CustomersView: React.FC = () => {
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   // Statement / History Modal
   const [statementCustomer, setStatementCustomer] = useState<Customer | null>(null);
@@ -190,7 +192,12 @@ export const CustomersView: React.FC = () => {
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || !formPhone.trim()) {
-      alert('Nome e WhatsApp/Telefone são campos obrigatórios.');
+      showToast(
+        language === 'es' 
+          ? 'Nombre y Teléfono/WhatsApp son obligatorios.' 
+          : 'Nome e WhatsApp/Telefone são campos obrigatórios.',
+        'error'
+      );
       return;
     }
 
@@ -341,7 +348,12 @@ export const CustomersView: React.FC = () => {
     if (!pts || pts <= 0) return;
 
     const discount = redeemCustomerPoints(loyaltyCustomer.id, pts);
-    alert(`Resgate confirmado! Desconto de ${formatCurrency(discount, 'BRL')} concedido ao cliente.`);
+    showToast(
+      language === 'es'
+        ? `¡Puntos canjeados! Descuento de ${formatCurrency(discount, 'BRL')} concedido al cliente.`
+        : `Resgate confirmado! Desconto de ${formatCurrency(discount, 'BRL')} concedido ao cliente.`,
+      'success'
+    );
     setLoyaltyCustomer(null);
   };
 
@@ -651,11 +663,7 @@ export const CustomersView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (confirm(`Remover cadastro de "${cust.name}"?`)) {
-                            deleteCustomer(cust.id);
-                          }
-                        }}
+                        onClick={() => setCustomerToDelete(cust)}
                         className="p-1.5 rounded-lg border border-[#1C2538] text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors cursor-pointer"
                         title={language === 'es' ? 'Eliminar Cliente' : 'Excluir Cliente'}
                       >
@@ -1524,6 +1532,38 @@ export const CustomersView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Customer Modal */}
+      <ConfirmModal
+        isOpen={Boolean(customerToDelete)}
+        title={language === 'es' ? 'Eliminar Cliente' : 'Excluir Cliente'}
+        message={
+          language === 'es'
+            ? `¿Desea realmente eliminar el cliente "${customerToDelete?.name}"? Esta acción no se puede deshacer.`
+            : `Deseja realmente remover o cliente "${customerToDelete?.name}"? Esta ação não pode ser desfeita.`
+        }
+        confirmLabel={language === 'es' ? 'Eliminar' : 'Excluir'}
+        onConfirm={async () => {
+          if (!customerToDelete) return;
+          try {
+            await deleteCustomer(customerToDelete.id);
+            showToast(
+              language === 'es'
+                ? `Cliente "${customerToDelete.name}" eliminado correctamente.`
+                : `Cliente "${customerToDelete.name}" removido com sucesso.`,
+              'success'
+            );
+          } catch {
+            showToast(
+              language === 'es' ? 'Error al eliminar cliente.' : 'Erro ao excluir cliente.',
+              'error'
+            );
+          } finally {
+            setCustomerToDelete(null);
+          }
+        }}
+        onCancel={() => setCustomerToDelete(null)}
+      />
 
     </div>
   );

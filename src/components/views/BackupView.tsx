@@ -26,6 +26,7 @@ import {
   DEFAULT_SUPABASE_ANON_KEY,
   testSupabaseReadWrite
 } from '../../services/supabaseClient';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 export const BackupView: React.FC = () => {
   const { 
@@ -53,6 +54,12 @@ export const BackupView: React.FC = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs: number; message: string } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlCode, setShowSqlCode] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showNotification = (msg: string) => {
@@ -156,14 +163,14 @@ export const BackupView: React.FC = () => {
               : 'Dados restaurados com sucesso do arquivo JSON!'
           );
         } else {
-          alert(
+          showNotification(
             language === 'es'
               ? 'Error al importar archivo de copia. Formato incompatible.'
               : 'Erro ao importar arquivo de backup. Formato incompatível.'
           );
         }
       } catch {
-        alert(language === 'es' ? 'Archivo JSON inválido.' : 'Arquivo JSON inválido.');
+        showNotification(language === 'es' ? 'Archivo JSON inválido.' : 'Arquivo JSON inválido.');
       }
     };
     reader.readAsText(file);
@@ -171,31 +178,41 @@ export const BackupView: React.FC = () => {
   };
 
   const handleResetData = () => {
-    const confirmMsg = language === 'es'
-      ? '¿Desea restaurar todos los productos, ventas y caja al catálogo demostrativo inicial?'
-      : 'Atenção: Isso restaurará todos os produtos, vendas e caixa para o catálogo demonstrativo inicial. Deseja continuar?';
-    if (confirm(confirmMsg)) {
-      resetToSampleData();
-      showNotification(
-        language === 'es'
-          ? '¡Catálogo demostrativo restaurado con éxito!'
-          : 'Dados demonstrativos restaurados com sucesso!'
-      );
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'es' ? 'Restaurar Catálogo Demostrativo' : 'Restaurar Dados Demonstrativos',
+      message: language === 'es'
+        ? '¿Desea restaurar todos los productos, ventas y caja al catálogo demostrativo inicial?'
+        : 'Atenção: Isso restaurará todos os produtos, vendas e caixa para o catálogo demonstrativo inicial. Deseja continuar?',
+      onConfirm: () => {
+        resetToSampleData();
+        showNotification(
+          language === 'es'
+            ? '¡Catálogo demostrativo restaurado con éxito!'
+            : 'Dados demonstrativos restaurados com sucesso!'
+        );
+        setConfirmModal(null);
+      }
+    });
   };
 
-  const handleFactoryZero = async () => {
-    const confirmMsg = language === 'es'
-      ? '¿Desea restaurar al PADRÓN DE FÁBRICA ZERADO? Todas las ventas, sesiones de caja y créditos serán zerados para producción. El Administrador Ax permanece siempre con acceso total.'
-      : 'Atenção: Deseja redefinir para o PADRÃO DE FÁBRICA ZERADO? Todas as vendas, caixas e fiados serão zerados para início de produção real. O Administrador Ax permanece ativo com acesso total.';
-    if (confirm(confirmMsg)) {
-      await resetToFactoryZero();
-      showNotification(
-        language === 'es'
-          ? '¡Padrón de fábrica activado! Ventas y caja zerados. Administrador Ax permanece activo y la nube fue sincronizada en tiempo real.'
-          : 'Padrão de fábrica ativado! Vendas e caixa zerados. O Administrador Ax permanece sempre e a nuvem foi sincronizada em tempo real.'
-      );
-    }
+  const handleFactoryZero = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: language === 'es' ? 'Padrón de Fábrica Zerado' : 'Padrão de Fábrica Zerado',
+      message: language === 'es'
+        ? '¿Desea restaurar al PADRÓN DE FÁBRICA ZERADO? Todas las ventas, sesiones de caja y créditos serán zerados para producción. El Administrador Ax permanece siempre con acceso total.'
+        : 'Atenção: Deseja redefinir para o PADRÃO DE FÁBRICA ZERADO? Todas as vendas, caixas e fiados serão zerados para início de produção real. O Administrador Ax permanece ativo com acesso total.',
+      onConfirm: async () => {
+        await resetToFactoryZero();
+        showNotification(
+          language === 'es'
+            ? '¡Padrón de fábrica activado! Ventas y caja zerados. Administrador Ax permanece activo y la nube fue sincronizada en tiempo real.'
+            : 'Padrão de fábrica ativado! Vendas e caixa zerados. O Administrador Ax permanece sempre e a nuvem foi sincronizada em tempo real.'
+        );
+        setConfirmModal(null);
+      }
+    });
   };
 
   const totalRecords = sales.length + products.length + stockMovements.length + customers.length + openComandas.length;
@@ -788,7 +805,14 @@ export const BackupView: React.FC = () => {
           </div>
         </div>
 
-      </div>
+      {/* Confirm Action Modal */}
+      <ConfirmModal
+        isOpen={Boolean(confirmModal?.isOpen)}
+        title={confirmModal?.title || ''}
+        message={confirmModal?.message || ''}
+        onConfirm={() => confirmModal?.onConfirm()}
+        onCancel={() => setConfirmModal(null)}
+      />
 
     </div>
   );

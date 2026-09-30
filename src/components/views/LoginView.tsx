@@ -17,6 +17,7 @@ import {
 import { Employee } from '../../types';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { StorageService } from '../../services/storageService';
+import { listUsuarios } from '../../lib/db';
 
 interface Props {
   onLoginSuccess: () => void;
@@ -76,17 +77,25 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
       let matchedEmp = findMatchingEmployee(currentList);
 
-      // 2. Real-time Cloud Fetch: If not found in current device memory (e.g. mobile opening for first time),
-      // fetch immediately from Supabase/Server!
+      // 2. Real-time Cloud Fetch: If not found in current device memory,
+      // fetch directly from Supabase usuarios table without waiting for full state!
       if (!matchedEmp) {
         try {
-          const freshState = await StorageService.fetchServerState();
-          if (freshState && Array.isArray(freshState.employees)) {
-            currentList = freshState.employees;
+          const freshUsers = await listUsuarios();
+          if (Array.isArray(freshUsers) && freshUsers.length > 0) {
+            currentList = freshUsers;
             matchedEmp = findMatchingEmployee(currentList);
           }
-        } catch (fetchErr) {
-          console.warn('[Login] Real-time fetch warning:', fetchErr);
+        } catch {
+          try {
+            const freshState = await StorageService.fetchServerState();
+            if (freshState && Array.isArray(freshState.employees)) {
+              currentList = freshState.employees;
+              matchedEmp = findMatchingEmployee(currentList);
+            }
+          } catch (fetchErr) {
+            console.warn('[Login] Real-time fetch warning:', fetchErr);
+          }
         }
       }
 
@@ -106,6 +115,11 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         }
 
         switchUser(matchedEmp.id);
+        if (rememberMe) {
+          try {
+            localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+          } catch {}
+        }
         setIsLoading(false);
         onLoginSuccess();
         return;
@@ -248,8 +262,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     href="#esqueci"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert(language === 'es' 
-                        ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) en el panel de gestão.' 
+                      setErrorMsg(language === 'es' 
+                        ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) no panel de gestão.' 
                         : 'Para recuperar a senha de acesso, solicite ao Administrador (Ax) no painel de gestão.');
                     }}
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -312,6 +326,34 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   </>
                 )}
               </button>
+
+              {/* Quick Profile Access Pills */}
+              {employees && employees.length > 0 && (
+                <div className="pt-3 border-t border-[#1C2436] space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium">
+                    <span>{t.loginQuickRoles}</span>
+                    <span className="text-[10px] text-neutral-500">1-Clique</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {employees.slice(0, 3).map((emp) => (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        onClick={() => {
+                          setEmail(emp.email || emp.name);
+                          setPassword(emp.password || emp.pin || '');
+                          setErrorMsg(null);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#141B2B] hover:bg-indigo-600/20 hover:border-indigo-500/40 border border-[#1E293B] text-[11px] text-neutral-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span className={`w-2 h-2 rounded-full ${emp.role === 'admin' ? 'bg-amber-400' : 'bg-indigo-400'}`} />
+                        <span>{emp.name}</span>
+                        <span className="text-[9px] text-neutral-500 uppercase">{emp.role}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             </form>
 

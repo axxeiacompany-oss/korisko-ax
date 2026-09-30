@@ -67,6 +67,11 @@ interface BakeryContextType {
   setDbError: (err: string | null) => void;
   isLoadingDb: boolean;
 
+  // Non-blocking in-app toasts
+  toast: { id: number; message: string; type: 'success' | 'error' | 'info' } | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  clearToast: () => void;
+
   // Authentication & Profile
   currentUser: Employee;
   employees: Employee[];
@@ -213,6 +218,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // REQUIREMENT 4: Real database error surface (never silent)
   const [dbError, setDbError] = useState<string | null>(null);
   const clearDbError = useCallback(() => setDbError(null), []);
+
+  // Non-blocking in-app toasts
+  const [toast, setToast] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const clearToast = useCallback(() => setToast(null), []);
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToast({ id, message, type });
+    setTimeout(() => {
+      setToast(prev => (prev?.id === id ? null : prev));
+    }, 4000);
+  }, []);
 
   // REQUIREMENT 3: Initial cache on opening, replaced by database data
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
@@ -753,7 +769,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const deleteEmployee = useCallback(async (id: string) => {
     if (id === 'emp-admin-ax') {
-      alert('Não é possível remover o administrador principal (Ax).');
+      setDbError('Não é possível remover o administrador principal (Ax).');
       return;
     }
 
@@ -1280,41 +1296,33 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw err;
     }
 
-    // REQUIREMENT 6: Deduct stock via RPC baixar_estoque
-    for (const it of items) {
-      if (it.product && it.product.id) {
+    // REQUIREMENT 6: Deduct stock concurrently via RPC baixar_estoque
+    const stockUpdates = new Map<string, number>();
+    await Promise.all(
+      items.map(async (it) => {
+        if (!it.product || !it.product.id) return;
         try {
           const newStock = await rpcBaixarEstoque(it.product.id, it.quantity);
-          setData(prev => ({
-            ...prev,
-            products: prev.products.map(p => p.id === it.product.id ? { ...p, stock: newStock } : p),
-          }));
+          stockUpdates.set(it.product.id, newStock);
         } catch (rpcErr: any) {
           console.warn(`RPC baixar_estoque warning (${it.product.name}):`, rpcErr);
-          // Fallback direct stock adjustment if RPC function is not yet created in Supabase
           try {
             const currentP = data.products.find(p => p.id === it.product.id);
             if (currentP) {
               const fallbackStock = Math.max(0, currentP.stock - it.quantity);
               await upsertProduto({ ...currentP, stock: fallbackStock });
-              setData(prev => ({
-                ...prev,
-                products: prev.products.map(p => p.id === it.product.id ? { ...p, stock: fallbackStock } : p),
-              }));
+              stockUpdates.set(it.product.id, fallbackStock);
             }
           } catch {}
         }
-      }
-    }
+      })
+    );
 
     // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente
+    let newCustomerBal: number | undefined;
     if (customerId && fiadoAmountBrl > 0) {
       try {
-        const newBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
-        setData(prev => ({
-          ...prev,
-          customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-        }));
+        newCustomerBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
       } catch (rpcBalErr: any) {
         console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
       }
@@ -1325,9 +1333,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeComanda(comandaNumber);
     }
 
-    // Update local sales list with the persisted sale (including the real sale_number!)
+    // Single atomic state update for stock, customer balance, and sales list
     setData(prev => ({
       ...prev,
+      products: stockUpdates.size > 0
+        ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
+        : prev.products,
+      customers: newCustomerBal !== undefined
+        ? (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newCustomerBal! } : c)
+        : prev.customers,
       sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
     }));
 
@@ -1726,83 +1740,102 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  const contextValue = useMemo<BakeryContextType>(() => ({
+    language,
+    setLanguage,
+    t,
+    dbError,
+    clearDbError,
+    setDbError,
+    isLoadingDb,
+    currentUser,
+    employees: data.employees,
+    switchUser,
+    updateEmployeePin,
+    hasPermission,
+    isFeatureAllowed,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+    updateEmployeePermissions,
+    registerDirectSale,
+    exchangeRates: data.exchangeRates,
+    updateExchangeRates,
+    liveRateStatus,
+    fetchLiveRates,
+    toggleAutoRateRefresh,
+    products: data.products,
+    stockMovements: data.stockMovements,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    adjustStock,
+    fornadas: data.fornadas || [],
+    registerFornada,
+    fichasTecnicas: data.fichasTecnicas || [],
+    addFichaTecnica,
+    updateFichaTecnica,
+    deleteFichaTecnica,
+    executeProductionFromRecipe,
+    customers: data.customers || [],
+    customerEntries: data.customerEntries || [],
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    recordCustomerDebt,
+    recordCustomerPayment,
+    redeemCustomerPoints,
+    openComandas: data.openComandas || [],
+    saveComanda,
+    removeComanda,
+    sales: data.sales,
+    completeSale,
+    deleteSale,
+    currentSession: data.currentSession,
+    sessionHistory: data.sessionHistory,
+    openRegister,
+    closeRegister,
+    recordSaidaCaixa,
+    recordEntradaCaixa,
+    recordSangria,
+    recordSuprimento,
+    goals: data.goals,
+    getCurrentGoal,
+    updateGoal,
+    backupPoints,
+    lastBackupTime,
+    isCloudSyncing,
+    createManualBackup,
+    exportDatabaseBackup,
+    importDatabaseBackup,
+    restoreFromPoint,
+    resetToSampleData,
+    resetToFactoryZero,
+    dbStatus,
+    refreshDbStatus,
+    toast,
+    showToast,
+    clearToast,
+  }), [
+    language, setLanguage, t, dbError, clearDbError, setDbError, isLoadingDb,
+    toast, showToast, clearToast,
+    currentUser, data, switchUser, updateEmployeePin, hasPermission, isFeatureAllowed,
+    addEmployee, updateEmployee, deleteEmployee, updateEmployeePermissions,
+    registerDirectSale, updateExchangeRates, liveRateStatus, fetchLiveRates,
+    toggleAutoRateRefresh, addProduct, updateProduct, deleteProduct, adjustStock,
+    registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,
+    executeProductionFromRecipe, addCustomer, updateCustomer, deleteCustomer,
+    recordCustomerDebt, recordCustomerPayment, redeemCustomerPoints,
+    saveComanda, removeComanda, completeSale, deleteSale,
+    openRegister, closeRegister, recordSaidaCaixa, recordEntradaCaixa,
+    recordSangria, recordSuprimento, getCurrentGoal, updateGoal,
+    backupPoints, lastBackupTime, isCloudSyncing, createManualBackup,
+    exportDatabaseBackup, importDatabaseBackup, restoreFromPoint,
+    resetToSampleData, resetToFactoryZero, dbStatus, refreshDbStatus
+  ]);
+
   return (
-    <BakeryContext.Provider
-      value={{
-        language,
-        setLanguage,
-        t,
-        dbError,
-        clearDbError,
-        setDbError,
-        isLoadingDb,
-        currentUser,
-        employees: data.employees,
-        switchUser,
-        updateEmployeePin,
-        hasPermission,
-        isFeatureAllowed,
-        addEmployee,
-        updateEmployee,
-        deleteEmployee,
-        updateEmployeePermissions,
-        registerDirectSale,
-        exchangeRates: data.exchangeRates,
-        updateExchangeRates,
-        liveRateStatus,
-        fetchLiveRates,
-        toggleAutoRateRefresh,
-        products: data.products,
-        stockMovements: data.stockMovements,
-        addProduct,
-        updateProduct,
-        deleteProduct,
-        adjustStock,
-        fornadas: data.fornadas || [],
-        registerFornada,
-        fichasTecnicas: data.fichasTecnicas || [],
-        addFichaTecnica,
-        updateFichaTecnica,
-        deleteFichaTecnica,
-        executeProductionFromRecipe,
-        customers: data.customers || [],
-        customerEntries: data.customerEntries || [],
-        addCustomer,
-        updateCustomer,
-        deleteCustomer,
-        recordCustomerDebt,
-        recordCustomerPayment,
-        redeemCustomerPoints,
-        openComandas: data.openComandas || [],
-        saveComanda,
-        removeComanda,
-        sales: data.sales,
-        completeSale,
-        deleteSale,
-        currentSession: data.currentSession,
-        sessionHistory: data.sessionHistory,
-        openRegister,
-        closeRegister,
-        recordSaidaCaixa,
-        recordEntradaCaixa,
-        recordSangria,
-        recordSuprimento,
-        goals: data.goals,
-        getCurrentGoal,
-        updateGoal,
-        backupPoints,
-        lastBackupTime,
-        isCloudSyncing,
-        createManualBackup,
-        exportDatabaseBackup,
-        importDatabaseBackup,
-        restoreFromPoint,
-        resetToSampleData,
-        resetToFactoryZero,
-        dbStatus,
-        refreshDbStatus,
-      }}
-    >
+    <BakeryContext.Provider value={contextValue}>
       {children}
     </BakeryContext.Provider>
   );

@@ -32,6 +32,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { AppFeature, Employee, UserRole } from '../../types';
+import { ConfirmModal } from '../modals/ConfirmModal';
 
 interface Props {
   onNavigate?: (tab: any) => void;
@@ -142,8 +143,12 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     addEmployee, 
     updateEmployee, 
     deleteEmployee,
-    updateEmployeePermissions
+    updateEmployeePermissions,
+    language,
+    showToast
   } = useBakery();
+
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
   // Flexible check: Admin Ax, users with admin role or manager role can manage affiliates
   const isAx = 
@@ -230,7 +235,12 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   const handleCreateAffiliate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !password.trim()) {
-      alert('Por favor, informe pelo menos o nome e a senha do afiliado.');
+      showToast(
+        language === 'es'
+          ? 'Por favor, ingrese al menos el nombre y la clave del afiliado.'
+          : 'Por favor, informe pelo menos o nome e a senha do afiliado.',
+        'error'
+      );
       return;
     }
 
@@ -258,7 +268,10 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
-      alert(`Falha ao cadastrar afiliado: ${err.message}`);
+      showToast(
+        language === 'es' ? `Error al registrar afiliado: ${err.message}` : `Falha ao cadastrar afiliado: ${err.message}`,
+        'error'
+      );
     }
   };
 
@@ -618,11 +631,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                     {!isAxCard && (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (confirm(`Deseja realmente excluir o colaborador ${emp.name} (${emp.email})?`)) {
-                            deleteEmployee(emp.id);
-                          }
-                        }}
+                        onClick={() => setEmployeeToDelete(emp)}
                         className="p-2 rounded-lg text-neutral-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Excluir colaborador"
                       >
@@ -848,7 +857,37 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
           </div>
         </div>
-      )}
+      {/* Confirm Delete Affiliate Modal */}
+      <ConfirmModal
+        isOpen={Boolean(employeeToDelete)}
+        title={language === 'es' ? 'Eliminar Colaborador' : 'Excluir Colaborador'}
+        message={
+          language === 'es'
+            ? `¿Desea realmente eliminar el colaborador "${employeeToDelete?.name}" (${employeeToDelete?.email})?`
+            : `Deseja realmente excluir o colaborador "${employeeToDelete?.name}" (${employeeToDelete?.email})?`
+        }
+        confirmLabel={language === 'es' ? 'Eliminar' : 'Excluir'}
+        onConfirm={async () => {
+          if (!employeeToDelete) return;
+          try {
+            await deleteEmployee(employeeToDelete.id);
+            showToast(
+              language === 'es'
+                ? `Colaborador "${employeeToDelete.name}" eliminado correctamente.`
+                : `Colaborador "${employeeToDelete.name}" excluído com sucesso.`,
+              'success'
+            );
+          } catch (err: any) {
+            showToast(
+              language === 'es' ? 'Error al eliminar colaborador.' : 'Erro ao excluir colaborador.',
+              'error'
+            );
+          } finally {
+            setEmployeeToDelete(null);
+          }
+        }}
+        onCancel={() => setEmployeeToDelete(null)}
+      />
 
     </div>
   );

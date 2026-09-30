@@ -27,14 +27,20 @@ import { UserProfileModal } from './components/modals/UserProfileModal';
 import { Lock, ShieldAlert, AlertTriangle, X } from 'lucide-react';
 
 function MainAppShell() {
-  const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError } = useBakery();
+  const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError, toast, clearToast } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    // Require strict authentication on any new device or new tab
-    const saved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
-    return saved === 'true';
+    try {
+      const sessionSaved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
+      if (sessionSaved === 'true') return true;
+      const localSaved = localStorage.getItem('KORISKO_AUTH_SESSION');
+      return localSaved === 'true';
+    } catch {
+      return true;
+    }
   });
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(() => new Set(['dashboard']));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
@@ -42,16 +48,34 @@ function MainAppShell() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('KORISKO_AUTH_SESSION');
-    sessionStorage.setItem('KORISKO_AUTH_SESSION', 'false');
     try {
+      sessionStorage.removeItem('KORISKO_AUTH_SESSION');
+      localStorage.removeItem('KORISKO_AUTH_SESSION');
       localStorage.removeItem('KORISKO_CURRENT_USER_ID');
     } catch {}
   };
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
-    sessionStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+    try {
+      sessionStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+      localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+    } catch {}
+  };
+
+  // Instant scroll & tab switch with tab cache
+  const handleSelectTab = (tab: TabType) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    setIsMobileMenuOpen(false);
+    try {
+      window.scrollTo({ top: 0, behavior: 'instant' as any });
+    } catch {}
   };
 
   // Keyboard shortcut for Cmd/Ctrl + K (Search)
@@ -74,13 +98,27 @@ function MainAppShell() {
   return (
     <div className="min-h-screen max-w-full overflow-x-hidden bg-[#0A0D14] text-neutral-100 font-sans flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       
+      {/* Toast Notification Surface */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#0F1422] border border-[#232E45] shadow-2xl animate-in slide-in-from-top-4 fade-in duration-200 max-w-sm">
+          <div className={`w-2 h-2 rounded-full shrink-0 ${
+            toast.type === 'error' ? 'bg-rose-500' : toast.type === 'success' ? 'bg-emerald-500' : 'bg-amber-500'
+          }`} />
+          <span className="text-xs font-medium text-neutral-100 flex-1">{toast.message}</span>
+          <button
+            type="button"
+            onClick={clearToast}
+            className="p-1 text-neutral-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* UTMify-Style Left Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setIsMobileMenuOpen(false);
-        }}
+        onSelectTab={handleSelectTab}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         onLogout={handleLogout}
@@ -93,19 +131,16 @@ function MainAppShell() {
       {/* Top Header */}
       <TopNav
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setIsMobileMenuOpen(false);
-        }}
+        onSelectTab={handleSelectTab}
         onLogout={handleLogout}
         isSidebarCollapsed={isSidebarCollapsed}
         onOpenProfile={() => setIsProfileOpen(true)}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
       />
 
-      {/* Main Content Area with adaptive left padding based on sidebar */}
+      {/* Main Content Area with optimized padding transition */}
       <main 
-        className={`flex-1 w-full max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-all duration-300 ${
+        className={`flex-1 w-full max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-[padding-left] duration-200 ease-out ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >
@@ -150,27 +185,73 @@ function MainAppShell() {
               </p>
               <button
                 type="button"
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => handleSelectTab('dashboard')}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
               >
                 {language === 'es' ? 'Volver al Dashboard' : 'Voltar ao Dashboard'}
               </button>
             </div>
           ) : (
-            <>
-              {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
-              {activeTab === 'pdv' && <PdvView />}
-              {activeTab === 'venda_direta' && <DirectSaleView />}
-              {activeTab === 'estoque' && <InventoryView />}
-              {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
-              {activeTab === 'crm' && <CustomersView />}
-              {activeTab === 'caixa' && <CashRegisterView />}
-              {activeTab === 'mais_vendidos' && <MonthlyTopProductsView />}
-              {activeTab === 'metas' && <GoalsView />}
-              {activeTab === 'cambio' && <CurrencyReportsView />}
-              {activeTab === 'backup' && <BackupView />}
-              {activeTab === 'afiliados' && <AfiliadosView onNavigate={setActiveTab} />}
-            </>
+            <div className="w-full">
+              <div className={activeTab === 'dashboard' ? 'block' : 'hidden'} role="tabpanel">
+                <DashboardView onNavigate={handleSelectTab} />
+              </div>
+              {visitedTabs.has('pdv') && (
+                <div className={activeTab === 'pdv' ? 'block' : 'hidden'} role="tabpanel">
+                  <PdvView />
+                </div>
+              )}
+              {visitedTabs.has('venda_direta') && (
+                <div className={activeTab === 'venda_direta' ? 'block' : 'hidden'} role="tabpanel">
+                  <DirectSaleView />
+                </div>
+              )}
+              {visitedTabs.has('estoque') && (
+                <div className={activeTab === 'estoque' ? 'block' : 'hidden'} role="tabpanel">
+                  <InventoryView />
+                </div>
+              )}
+              {visitedTabs.has('fichas_tecnicas') && (
+                <div className={activeTab === 'fichas_tecnicas' ? 'block' : 'hidden'} role="tabpanel">
+                  <FichaTecnicaView />
+                </div>
+              )}
+              {visitedTabs.has('crm') && (
+                <div className={activeTab === 'crm' ? 'block' : 'hidden'} role="tabpanel">
+                  <CustomersView />
+                </div>
+              )}
+              {visitedTabs.has('caixa') && (
+                <div className={activeTab === 'caixa' ? 'block' : 'hidden'} role="tabpanel">
+                  <CashRegisterView />
+                </div>
+              )}
+              {visitedTabs.has('mais_vendidos') && (
+                <div className={activeTab === 'mais_vendidos' ? 'block' : 'hidden'} role="tabpanel">
+                  <MonthlyTopProductsView />
+                </div>
+              )}
+              {visitedTabs.has('metas') && (
+                <div className={activeTab === 'metas' ? 'block' : 'hidden'} role="tabpanel">
+                  <GoalsView />
+                </div>
+              )}
+              {visitedTabs.has('cambio') && (
+                <div className={activeTab === 'cambio' ? 'block' : 'hidden'} role="tabpanel">
+                  <CurrencyReportsView />
+                </div>
+              )}
+              {visitedTabs.has('backup') && (
+                <div className={activeTab === 'backup' ? 'block' : 'hidden'} role="tabpanel">
+                  <BackupView />
+                </div>
+              )}
+              {visitedTabs.has('afiliados') && (
+                <div className={activeTab === 'afiliados' ? 'block' : 'hidden'} role="tabpanel">
+                  <AfiliadosView onNavigate={handleSelectTab} />
+                </div>
+              )}
+            </div>
           )}
         </div>
       </main>
@@ -178,16 +259,13 @@ function MainAppShell() {
       {/* Mobile Sticky Quick Navigation Bar (PDV, 1-Clique, Dashboard, Afiliados, Menu) */}
       <MobileBottomNav
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setIsMobileMenuOpen(false);
-        }}
+        onSelectTab={handleSelectTab}
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
       />
 
       {/* Footer */}
       <footer 
-        className={`border-t border-[#141A28] bg-[#080B11]/80 py-4 px-6 text-center text-xs text-neutral-400 no-print transition-all duration-300 ${
+        className={`border-t border-[#141A28] bg-[#080B11]/80 py-4 px-6 text-center text-xs text-neutral-400 no-print transition-[padding-left] duration-200 ease-out ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >

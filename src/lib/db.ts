@@ -195,12 +195,21 @@ export async function fetchAllRowsPaged<T>(table: string): Promise<T[]> {
 
   while (hasMore) {
     const to = from + PAGE_SIZE - 1;
-    const { data, error } = await supabase
+    
+    // Protection against slow network or cold start hanging
+    const queryPromise = supabase
       .from(table)
       .select('*')
       .range(from, to);
 
+    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { message: 'Tempo limite esgotado' } }), 4000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
     if (error) {
+      if (allRows.length > 0) return allRows;
       throw new Error(`[Supabase ${table}] Falha ao carregar registros: ${error.message}`);
     }
 
