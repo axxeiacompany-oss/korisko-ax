@@ -136,6 +136,22 @@ async function initPostgres() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT,
+        role TEXT NOT NULL DEFAULT 'caixa',
+        password TEXT NOT NULL,
+        pin TEXT,
+        avatar_color TEXT DEFAULT 'bg-indigo-600',
+        allowed_features JSONB DEFAULT '["dashboard","pdv","venda_direta","crm"]'::jsonb,
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
     isPgConnected = true;
   } catch (err) {

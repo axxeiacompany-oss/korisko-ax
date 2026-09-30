@@ -490,17 +490,17 @@ export const BackupView: React.FC = () => {
                 <h4 className="text-xs font-bold text-neutral-200">
                   {dbStatus.supabase?.tablesExist
                     ? (language === 'es' ? '¡Tablas en Supabase Creadas y Operacionales!' : 'Tabelas no Supabase Criadas e Operacionais!')
-                    : (language === 'es' ? 'Script de Configuración de Tablas en Supabase' : 'Script de Inicialização das Tabelas no Supabase')}
+                    : (language === 'es' ? 'Script SQL para Crear Tablas Funcionales (Table Editor)' : 'Script SQL para Criar Tabelas Funcionais (Table Editor)')}
                 </h4>
               </div>
               <p className="text-[11px] text-neutral-400">
                 {dbStatus.supabase?.tablesExist
                   ? (language === 'es'
-                      ? 'Las tablas korisko_system_state y korisko_backup_points están activas y recibiendo datos automáticamente.'
-                      : 'As tabelas korisko_system_state e korisko_backup_points estão ativas e sincronizando em nuvem automaticamente.')
+                      ? 'Las tablas funcionales (usuarios, productos, ventas, etc.) y estado están activas en el Table Editor de Supabase.'
+                      : 'As tabelas funcionais (usuarios, produtos, vendas, etc.) e estado estão ativas no Table Editor do Supabase.')
                   : (language === 'es'
-                      ? 'Copia y ejecuta este script en el SQL Editor de tu panel de Supabase para activar las tablas korisko_system_state y korisko_backup_points.'
-                      : 'Copie e execute este script no SQL Editor do painel do Supabase para criar as tabelas korisko_system_state e korisko_backup_points com RLS.')}
+                      ? 'Copia y ejecuta este script en el SQL Editor para crear la tabla funcional "usuarios" y demás módulos visibles en el Table Editor de Supabase.'
+                      : 'Copie e execute este script no SQL Editor para criar a tabela funcional "usuarios" e demais módulos visíveis no Table Editor do Supabase.')}
               </p>
             </div>
 
