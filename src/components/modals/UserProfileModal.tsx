@@ -67,7 +67,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const myPin = currentUser.pin || '••••';
 
   const handleCopyCredentials = () => {
-    const text = `Meu Perfil Korisko:\nNome: ${currentUser.name}\nGmail: ${currentUser.email || 'Não informado'}\nSenha: ${currentUser.password || currentUser.pin}\nPIN: ${currentUser.pin}\nCargo: ${currentUser.role}`;
+    const text = `Meu Perfil Korizko:\nNome: ${currentUser.name}\nGmail: ${currentUser.email || 'Não informado'}\nSenha: ${currentUser.password || currentUser.pin}\nPIN: ${currentUser.pin}\nCargo: ${currentUser.role}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -301,7 +301,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </h3>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
                   {isAx 
-                    ? 'Você possui acesso total como Administrador Geral do Korisko.' 
+                    ? 'Você possui acesso total como Administrador Geral do Korizko.' 
                     : 'Módulos liberados individualmente para a sua conta pelo Administrador Ax:'}
                 </p>
               </div>

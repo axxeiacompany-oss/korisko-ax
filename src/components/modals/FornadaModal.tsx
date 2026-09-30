@@ -65,7 +65,7 @@ export const FornadaModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <h2 className="text-base font-bold text-neutral-100 flex items-center gap-2">
                 Fornada do Padeiro · Pão Quente
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold uppercase tracking-wider">
-                  Korisko
+                  Korizko
                 </span>
               </h2>
               <p className="text-xs text-neutral-400">

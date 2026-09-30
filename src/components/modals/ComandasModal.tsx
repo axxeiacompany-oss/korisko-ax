@@ -100,7 +100,7 @@ export const ComandasModal: React.FC<Props> = ({
                 </span>
               </div>
               <p className="text-xs text-neutral-400">
-                Atendimento no balcão e salão da Padaria Korisko
+                Atendimento no balcão e salão da Padaria, Confeitaria & Salão Korizko
               </p>
             </div>
           </div>
@@ -321,7 +321,7 @@ export const ComandasModal: React.FC<Props> = ({
 
         {/* Modal Footer */}
         <div className="p-4 bg-neutral-950/80 border-t border-neutral-800 flex justify-between items-center text-xs text-neutral-500">
-          <span>Korisko · Controle de Comandas e Mesas</span>
+          <span>Korizko · Controle de Comandas e Mesas</span>
           <button
             type="button"
             onClick={onClose}

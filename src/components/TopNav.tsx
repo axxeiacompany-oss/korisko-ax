@@ -86,7 +86,7 @@ export const TopNav: React.FC<Props> = ({
     afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
   };
 
-  const currentTabInfo = tabTitles[activeTab] || { title: 'Korisko', subtitle: 'Gestão Inteligente' };
+  const currentTabInfo = tabTitles[activeTab] || { title: t.appName, subtitle: t.appSlogan };
 
   // Search Results
   const searchResults = React.useMemo(() => {
@@ -336,7 +336,7 @@ export const TopNav: React.FC<Props> = ({
 
             <div className="p-2.5 border-t border-[#1A2234] bg-[#0A0D15] flex items-center justify-between text-[11px] text-neutral-500">
               <span>{language === 'es' ? 'Presione' : 'Pressione'} <kbd className="px-1 rounded bg-[#161E30] text-neutral-300">ESC</kbd> {language === 'es' ? 'para cerrar' : 'para fechar'}</span>
-              <span>Korisko</span>
+              <span>{t.appName}</span>
             </div>
 
           </div>

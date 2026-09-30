@@ -32,7 +32,7 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
   });
 
   const getReceiptPlainText = () => {
-    let text = `🥖 *PADARIA & CONFEITARIA KORISKO*\n`;
+    let text = `🥖 *PADARIA, CONFEITARIA & SALÃO KORIZKO*\n`;
     text += `Cupom da Venda #${sale.saleNumber}\n`;
     text += `Data: ${formattedDate}\n`;
     text += `Operador: ${sale.employeeName}\n`;
@@ -52,7 +52,7 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Cupom Korisko #${sale.saleNumber}`,
+          title: `Cupom Korizko #${sale.saleNumber}`,
           text: text,
         });
         return;
@@ -123,8 +123,8 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
           
           {/* Header */}
           <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
-            <h3 className="text-base font-bold tracking-tight uppercase">KORISKO</h3>
-            <p className="text-[11px] text-neutral-600">Padaria Artesanal & Confeitaria</p>
+            <h3 className="text-base font-bold tracking-tight uppercase">KORIZKO</h3>
+            <p className="text-[11px] text-neutral-600">Padaria, Confeitaria & Salão</p>
             <p className="text-[10px] text-neutral-500">Câmbio Multi-Moeda BRL · PYG · USD</p>
             <p className="text-[10px] text-neutral-500">CNPJ: 12.345.678/0001-90</p>
           </div>

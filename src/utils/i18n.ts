@@ -196,7 +196,7 @@ export interface I18nDictionary {
 export const translations: Record<AppLanguage, I18nDictionary> = {
   es: {
     // Brand & Slogan
-    appName: 'Korisko',
+    appName: 'Korizko',
     appSlogan: 'Panadería, Confitería & Salón',
     systemDescription: 'Sistema Integrado de Gestión de Panadería, Pastelería & Salón',
 
@@ -242,7 +242,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
 
     // TopNav & Common Actions
     searchPlaceholder: 'Buscar por panes, bebidas, clientes, comandas...',
-    searchTitle: 'Atajos de búsqueda rápida en Korisko',
+    searchTitle: 'Atajos de búsqueda rápida en Korizko',
     searchHint: 'Escriba el nombre de cualquier producto, cliente o número de comanda.',
     searchProducts: 'Productos',
     searchCustomers: 'Clientes',
@@ -277,7 +277,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     all: 'Todos',
 
     // Login View
-    loginTitle: 'Acceso al Sistema Korisko',
+    loginTitle: 'Acceso al Sistema Korizko',
     loginSubtitle: 'Ingrese sus credenciales de operador o administrador para continuar',
     loginEmailLabel: 'Correo Electrónico / Gmail',
     loginPasswordLabel: 'Contraseña de Acceso',
@@ -288,7 +288,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginErrorInvalid: 'Usuario o contraseña incorrectos.',
     loginErrorEmpty: 'Por favor ingrese sus credenciales completas.',
     loginLoggingIn: 'Verificando credenciales...',
-    loginSecurityNotice: 'Korisko Gestión & PDV',
+    loginSecurityNotice: 'Korizko Gestión & PDV',
 
     // Database / Cloud Sync
     dbConnected: 'Base de Datos Conectada y Operacional',
@@ -297,7 +297,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     dbSyncing: 'Sincronizando...',
     dbLastBackup: 'Último backup',
     dbTestConnection: 'Verificar Conexión BD',
-    dbTitle: 'Base de Datos Korisko',
+    dbTitle: 'Base de Datos Korizko',
 
     // Roles
     roleAdmin: 'Administrador Ax',
@@ -389,7 +389,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
 
   pt: {
     // Brand & Slogan
-    appName: 'Korisko',
+    appName: 'Korizko',
     appSlogan: 'Padaria, Confeitaria & Salão',
     systemDescription: 'Sistema Integrado de Gestão de Padaria, Confeitaria & Salão',
 
@@ -435,7 +435,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
 
     // TopNav & Common Actions
     searchPlaceholder: 'Buscar produto, cliente ou comanda...',
-    searchTitle: 'Atalhos de busca rápida no Korisko',
+    searchTitle: 'Atalhos de busca rápida no Korizko',
     searchHint: 'Digite o nome de qualquer pão, doce, cliente ou número de comanda.',
     searchProducts: 'Produtos',
     searchCustomers: 'Clientes',
@@ -470,7 +470,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     all: 'Todos',
 
     // Login View
-    loginTitle: 'Acesso ao Sistema Korisko',
+    loginTitle: 'Acesso ao Sistema Korizko',
     loginSubtitle: 'Entre com as credenciais do seu operador ou administrador para continuar',
     loginEmailLabel: 'E-mail / Gmail Cadastrado',
     loginPasswordLabel: 'Senha de Acesso',
@@ -481,7 +481,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     loginErrorInvalid: 'E-mail, usuário ou senha incorretos.',
     loginErrorEmpty: 'Por favor preencha suas credenciais completas.',
     loginLoggingIn: 'Verificando credenciais...',
-    loginSecurityNotice: 'Korisko Gestão & PDV',
+    loginSecurityNotice: 'Korizko Gestão & PDV',
 
     // Database / Cloud Sync
     dbConnected: 'Banco de Dados Conectado e Operacional',
@@ -490,7 +490,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     dbSyncing: 'Sincronizando...',
     dbLastBackup: 'Último backup',
     dbTestConnection: 'Testar Conexão BD',
-    dbTitle: 'Banco de Dados Korisko',
+    dbTitle: 'Banco de Dados Korizko',
 
     // Roles
     roleAdmin: 'Administrador Ax',

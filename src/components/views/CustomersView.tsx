@@ -353,7 +353,7 @@ export const CustomersView: React.FC = () => {
       : `55${cleanPhone}`;
 
     const text = encodeURIComponent(
-      `Olá ${c.name}, tudo bem? Aqui é da Panificadora & Confeitaria Korisko!\n\n` +
+      `Olá ${c.name}, tudo bem? Aqui é da Padaria, Confeitaria & Salão Korizko!\n\n` +
       `Passando para informar o seu saldo atual da conta/fiado: ${formatCurrency(c.outstandingBalanceBrl, 'BRL')} (aprox. ₲ ${Math.round(c.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}).\n\n` +
       `Seus pontos de fidelidade acumulados: ${c.loyaltyPoints} pontos.\n` +
       `Se precisar de entrega ou encomendar pão quente, avise a gente por aqui! Tenha um ótimo dia!`
@@ -412,7 +412,7 @@ export const CustomersView: React.FC = () => {
           <div className="text-lg sm:text-2xl font-bold text-white font-mono-nums">
             {stats.total}
           </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'En el sistema' : 'Cadastrados no Korisko'}</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'En el sistema' : 'Cadastrados no Korizko'}</p>
         </div>
 
         <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">

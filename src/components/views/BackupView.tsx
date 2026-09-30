@@ -304,7 +304,7 @@ export const BackupView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-neutral-100">
-                  {language === 'es' ? 'Motor de Base de Datos Nativo Korisko' : 'Motor de Banco de Dados Nativo Korisko'}
+                  {language === 'es' ? 'Motor de Base de Datos Nativo Korizko' : 'Motor de Banco de Dados Nativo Korizko'}
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   ● {language === 'es' ? 'Conectado y Activo' : 'Conectado e Ativo'}

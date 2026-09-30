@@ -168,9 +168,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-base tracking-tight text-white">
-              Korisko
+              {t.appName}
             </span>
-            <span className="text-[11px] text-neutral-400">Padaria, Confeitaria & Salão</span>
+            <span className="text-[11px] text-neutral-400">{t.appSlogan}</span>
           </div>
         </div>
 
@@ -318,7 +318,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           {/* Bottom helper */}
           <div className="text-center text-xs text-neutral-500 space-y-1">
             <p>
-              {language === 'es' ? 'Sistema Administrativo Korisko' : 'Sistema Administrativo Korisko'}
+              {language === 'es' ? 'Sistema Administrativo Korizko' : 'Sistema Administrativo Korizko'}
             </p>
           </div>
 
@@ -327,7 +327,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
       {/* Footer matching UTMify */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-[#141A28] text-neutral-500 text-xs">
-        <p>© 2026 Korisko Sistemas. Todos os direitos reservados.</p>
+        <p>© 2026 Korizko Sistemas. Todos os direitos reservados.</p>
         <div className="flex items-center gap-4 text-[11px]">
           <a href="#termos" onClick={(e) => e.preventDefault()} className="hover:text-neutral-300 transition-colors">Termos de Uso</a>
           <span aria-hidden="true">·</span>

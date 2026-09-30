@@ -205,12 +205,12 @@ export const Sidebar: React.FC<Props> = ({
             <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : 'block'}`}>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-sm text-white tracking-tight truncate">
-                  Korisko
+                  {t.appName}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               </div>
               <p className="text-[10px] text-neutral-400 truncate">
-                Padaria & Confeitaria
+                {t.appSlogan}
               </p>
             </div>
           </div>
