@@ -24,6 +24,7 @@ import { formatCurrency, fromBrl } from '../../utils/currency';
 import { Sale } from '../../types';
 import { ReceiptModal } from '../modals/ReceiptModal';
 import { TabType } from '../Header';
+import { LiveSalesStream } from '../LiveSalesStream';
 
 interface Props {
   onNavigate: (tab: TabType) => void;
@@ -665,75 +666,12 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Recent sales feed */}
-        <div className="lg:col-span-2 p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-emerald-400" />
-              {language === 'es' ? 'Últimas Ventas Realizadas' : 'Últimas Vendas Realizadas'}
-            </h3>
-            <span className="text-xs text-neutral-500">{language === 'es' ? 'Feed en vivo' : 'Feed ao vivo'}</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-neutral-800 text-neutral-500 text-[11px]">
-                  <th className="pb-2 font-medium">{language === 'es' ? 'Venta #' : 'Venda #'}</th>
-                  <th className="pb-2 font-medium">{language === 'es' ? 'Horario' : 'Horário'}</th>
-                  <th className="pb-2 font-medium">{language === 'es' ? 'Operador' : 'Operador'}</th>
-                  <th className="pb-2 font-medium">{language === 'es' ? 'Ítems' : 'Itens'}</th>
-                  <th className="pb-2 font-medium">{language === 'es' ? 'Moneda / Método' : 'Moeda / Forma'}</th>
-                  <th className="pb-2 font-medium text-right">Total (BRL)</th>
-                  <th className="pb-2 font-medium text-right">{language === 'es' ? 'Acciones' : 'Ações'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-800/60">
-                {sales.slice(0, 5).map(s => {
-                  const timeStr = new Date(s.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                  const primaryPayment = s.payments[0];
-
-                  return (
-                    <tr key={s.id} className="hover:bg-neutral-850/40 transition-colors">
-                      <td className="py-2.5 font-mono-nums font-semibold text-neutral-200">
-                        #{s.saleNumber}
-                      </td>
-                      <td className="py-2.5 text-neutral-400 font-mono-nums">
-                        {timeStr}
-                      </td>
-                      <td className="py-2.5 text-neutral-300">
-                        {s.employeeName}
-                      </td>
-                      <td className="py-2.5 text-neutral-400">
-                        {s.items.length} {s.items.length === 1 ? (language === 'es' ? 'ítem' : 'item') : (language === 'es' ? 'ítems' : 'itens')}
-                      </td>
-                      <td className="py-2.5">
-                        {primaryPayment && (
-                          <span className="inline-flex items-center gap-1 font-mono-nums">
-                            <strong className="text-neutral-200">{primaryPayment.currency}</strong>
-                            <span className="text-neutral-500 text-[10px]">({primaryPayment.method.replace('_', ' ')})</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 font-mono-nums font-bold text-right text-neutral-100">
-                        {formatCurrency(s.totalBrl, 'BRL')}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setInspectSale(s)}
-                          className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition-colors cursor-pointer"
-                          title={language === 'es' ? 'Ver Comprobante / Detalles' : 'Ver Cupom / Detalhes'}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        {/* Fluxo Contínuo de Vendas em Tempo Real */}
+        <div className="lg:col-span-2">
+          <LiveSalesStream 
+            mode="embedded" 
+            onNavigateToPdv={() => onNavigate('pdv')} 
+          />
         </div>
 
       </div>

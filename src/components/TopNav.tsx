@@ -18,7 +18,8 @@ import {
   X, 
   Zap, 
   ShieldCheck,
-  Menu
+  Menu,
+  Radio
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
@@ -26,6 +27,7 @@ import { SwitchEmployeeModal } from './modals/SwitchEmployeeModal';
 import { FornadaModal } from './modals/FornadaModal';
 import { DirectSaleModal } from './modals/DirectSaleModal';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { LiveSalesStream } from './LiveSalesStream';
 
 interface Props {
   activeTab: TabType;
@@ -62,6 +64,7 @@ export const TopNav: React.FC<Props> = ({
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState(false);
   const [isFornadaOpen, setIsFornadaOpen] = useState(false);
   const [isDirectSaleOpen, setIsDirectSaleOpen] = useState(false);
+  const [isStreamDrawerOpen, setIsStreamDrawerOpen] = useState(false);
   
   // Quick Search Modal state (Command + K)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -162,6 +165,21 @@ export const TopNav: React.FC<Props> = ({
               <span className="text-neutral-600 hidden xl:inline">·</span>
               <span className="text-emerald-400 hidden xl:inline">US$ = R$ {exchangeRates.USD_TO_BRL.toFixed(2)}</span>
             </div>
+          </button>
+
+          {/* Live Sales Stream Continuous Button */}
+          <button
+            type="button"
+            onClick={() => setIsStreamDrawerOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            title={language === 'es' ? 'Flujo Continuo de Ventas en Vivo' : 'Fluxo Contínuo de Vendas ao Vivo'}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <Radio className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden xl:inline">{language === 'es' ? 'Flujo en Vivo' : 'Fluxo ao Vivo'}</span>
           </button>
 
           {/* Fornada Quente Action */}
@@ -349,6 +367,26 @@ export const TopNav: React.FC<Props> = ({
         isOpen={isDirectSaleOpen}
         onClose={() => setIsDirectSaleOpen(false)}
       />
+
+      {/* Live Sales Stream Drawer Modal (Slide-over) */}
+      {isStreamDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-neutral-950/70 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsStreamDrawerOpen(false)} 
+          />
+          <div className="relative w-full max-w-xl h-full shadow-2xl z-10 animate-in slide-in-from-right duration-300">
+            <LiveSalesStream
+              mode="drawer"
+              onClose={() => setIsStreamDrawerOpen(false)}
+              onNavigateToPdv={() => {
+                setIsStreamDrawerOpen(false);
+                onSelectTab('pdv');
+              }}
+            />
+          </div>
+        </div>
+      )}
 
     </>
   );

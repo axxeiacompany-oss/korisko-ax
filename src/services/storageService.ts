@@ -22,10 +22,10 @@ import {
   fetchStateFromSupabase 
 } from './supabaseClient';
 
-const DB_KEY = 'KORISKO_STATE_V1';
-const LEGACY_DB_KEY = 'PANETTIERE_STATE_V1';
-const BACKUPS_KEY = 'KORISKO_BACKUP_POINTS_V1';
-const LEGACY_BACKUPS_KEY = 'PANETTIERE_BACKUP_POINTS_V1';
+const DB_KEY = 'KORISKO_STATE_V2';
+const LEGACY_DB_KEY = 'KORISKO_STATE_V1';
+const BACKUPS_KEY = 'KORISKO_BACKUP_POINTS_V2';
+const LEGACY_BACKUPS_KEY = 'KORISKO_BACKUP_POINTS_V1';
 
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
@@ -1204,15 +1204,24 @@ export class StorageService {
    */
   static loadState(): SystemBackupData {
     try {
-      const serialized = localStorage.getItem(DB_KEY) || localStorage.getItem(LEGACY_DB_KEY);
+      // Auto-purge old mock data to deliver zeroed factory state
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V2') !== 'true') {
+        localStorage.removeItem('KORISKO_STATE_V1');
+        localStorage.removeItem('PANETTIERE_STATE_V1');
+        localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
+        localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
+        localStorage.setItem('KORISKO_ZERO_CLEANSED_V2', 'true');
+      }
+
+      const serialized = typeof localStorage !== 'undefined' ? localStorage.getItem(DB_KEY) : null;
       if (serialized) {
         const parsed = JSON.parse(serialized);
-        if (parsed && parsed.products && parsed.sales) {
-          if (!parsed.openComandas) parsed.openComandas = INITIAL_COMANDAS;
-          if (!parsed.fornadas) parsed.fornadas = INITIAL_FORNADAS;
+        if (parsed && Array.isArray(parsed.products)) {
+          if (!parsed.openComandas) parsed.openComandas = [];
+          if (!parsed.fornadas) parsed.fornadas = [];
           if (!parsed.fichasTecnicas || parsed.fichasTecnicas.length === 0) parsed.fichasTecnicas = INITIAL_FICHAS_TECNICAS;
-          if (!parsed.customers || parsed.customers.length === 0) parsed.customers = INITIAL_CUSTOMERS;
-          if (!parsed.customerEntries || parsed.customerEntries.length === 0) parsed.customerEntries = INITIAL_CUSTOMER_ENTRIES;
+          if (!parsed.customers) parsed.customers = [];
+          if (!parsed.customerEntries) parsed.customerEntries = [];
           if (!parsed.employees || parsed.employees.length === 0) {
             parsed.employees = INITIAL_EMPLOYEES;
           } else {
@@ -1243,27 +1252,10 @@ export class StorageService {
         }
       }
     } catch (e) {
-      console.warn('Could not read from localStorage, using initial seed data', e);
+      console.warn('Could not read from localStorage, using factory zero data', e);
     }
 
-    const initialState: SystemBackupData = {
-      version: '1.2.0',
-      timestamp: new Date().toISOString(),
-      products: INITIAL_PRODUCTS,
-      stockMovements: INITIAL_STOCK_MOVEMENTS,
-      sales: generateInitialSales(),
-      currentSession: INITIAL_CASH_SESSION,
-      sessionHistory: [],
-      exchangeRates: DEFAULT_EXCHANGE_RATES,
-      goals: INITIAL_GOALS,
-      employees: INITIAL_EMPLOYEES,
-      openComandas: INITIAL_COMANDAS,
-      fornadas: INITIAL_FORNADAS,
-      fichasTecnicas: INITIAL_FICHAS_TECNICAS,
-      customers: INITIAL_CUSTOMERS,
-      customerEntries: INITIAL_CUSTOMER_ENTRIES,
-    };
-
+    const initialState = StorageService.getFactoryDefaultState();
     StorageService.saveState(initialState);
     return initialState;
   }
@@ -1276,7 +1268,7 @@ export class StorageService {
     return {
       version: '2.0.0',
       timestamp: new Date().toISOString(),
-      products: INITIAL_PRODUCTS,
+      products: INITIAL_PRODUCTS.map(p => ({ ...p, stock: 0 })),
       stockMovements: [],
       sales: [], // ZERADO
       currentSession: {

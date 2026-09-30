@@ -6,17 +6,10 @@
       "targetTransactions": 3200,
       "targetTicketMedioBrl": 26.5,
       "targetDailyAverageBrl": 2833
-    },
-    {
-      "month": "2026-08",
-      "targetRevenueBrl": 80000,
-      "targetTransactions": 3000,
-      "targetTicketMedioBrl": 25,
-      "targetDailyAverageBrl": 2666
     }
   ],
   "sales": [],
-  "version": "1.2.0",
+  "version": "2.0.0",
   "fornadas": [],
   "products": [
     {
@@ -29,8 +22,7 @@
       "category": "paes",
       "minStock": 15,
       "priceBrl": 18.9,
-      "costPriceBrl": 6.5,
-      "expirationDate": "2026-09-26"
+      "costPriceBrl": 6.5
     },
     {
       "id": "prod-2",
@@ -66,8 +58,7 @@
       "category": "confeitaria",
       "minStock": 12,
       "priceBrl": 8.5,
-      "costPriceBrl": 3.2,
-      "expirationDate": "2026-09-27"
+      "costPriceBrl": 3.2
     },
     {
       "id": "prod-5",
@@ -108,14 +99,14 @@
     {
       "id": "prod-8",
       "code": "SALG-003",
-      "name": "Coxinha Gourmet de Frango com Catupiry",
+      "name": "Empada Especial de Palmito e Queijo",
       "unit": "un",
       "stock": 0,
       "active": true,
       "category": "salgados",
-      "minStock": 12,
-      "priceBrl": 9.5,
-      "costPriceBrl": 3.8
+      "minStock": 10,
+      "priceBrl": 9,
+      "costPriceBrl": 3.2
     },
     {
       "id": "prod-9",
@@ -137,298 +128,60 @@
       "stock": 0,
       "active": true,
       "category": "bebidas",
-      "minStock": 25,
+      "minStock": 20,
       "priceBrl": 11.5,
-      "costPriceBrl": 3.5
+      "costPriceBrl": 3.2
     },
     {
       "id": "prod-11",
       "code": "BEB-003",
-      "name": "Suco Natural de Laranja 500ml",
+      "name": "Suco Natural de Laranja 400ml",
       "unit": "un",
       "stock": 0,
       "active": true,
       "category": "bebidas",
-      "minStock": 10,
-      "priceBrl": 10,
-      "costPriceBrl": 3.2
+      "minStock": 15,
+      "priceBrl": 9,
+      "costPriceBrl": 3
     },
     {
       "id": "prod-12",
-      "code": "FRIO-001",
-      "name": "Queijo Mussarela Fatiado",
-      "unit": "kg",
+      "code": "BEB-004",
+      "name": "Água Mineral sem Gás 500ml",
+      "unit": "un",
       "stock": 0,
       "active": true,
-      "category": "frios",
-      "minStock": 5,
-      "priceBrl": 58,
-      "costPriceBrl": 34,
-      "expirationDate": "2026-09-30"
+      "category": "bebidas",
+      "minStock": 40,
+      "priceBrl": 4.5,
+      "costPriceBrl": 1.2
     },
     {
       "id": "prod-13",
-      "code": "FRIO-002",
-      "name": "Presunto Cozido Especial Fatiado",
-      "unit": "kg",
+      "code": "OUT-001",
+      "name": "Manteiga de Primeira Qualidade 200g",
+      "unit": "un",
       "stock": 0,
       "active": true,
-      "category": "frios",
-      "minStock": 4,
-      "priceBrl": 46,
-      "costPriceBrl": 26,
-      "expirationDate": "2026-10-01"
+      "category": "outros",
+      "minStock": 10,
+      "priceBrl": 14.9,
+      "costPriceBrl": 9.2
     },
     {
       "id": "prod-14",
-      "code": "INGR-001",
-      "name": "Farinha de Trigo Especial Tipo 1 (Saco 25kg)",
-      "unit": "pct",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 6,
-      "priceBrl": 115,
-      "costPriceBrl": 95,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-15",
-      "code": "INGR-002",
-      "name": "Fermento Biológico Fresco (Bloco 500g)",
+      "code": "OUT-002",
+      "name": "Requeijão Cremoso Tradicional 200g",
       "unit": "un",
       "stock": 0,
       "active": true,
-      "category": "ingredientes",
-      "minStock": 8,
-      "priceBrl": 12,
-      "costPriceBrl": 8.5,
-      "isIngredient": true,
-      "expirationDate": "2026-10-03"
-    },
-    {
-      "id": "prod-16",
-      "code": "INGR-003",
-      "name": "Manteiga Extra sem Sal Artesanal (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 5,
-      "priceBrl": 42,
-      "costPriceBrl": 31.5,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-17",
-      "code": "INGR-004",
-      "name": "Polvilho Azedo Especial (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 15,
-      "priceBrl": 14,
-      "costPriceBrl": 8.9,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-18",
-      "code": "INGR-005",
-      "name": "Queijo Meia Cura Ralado Artesanal (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 8,
-      "priceBrl": 48,
-      "costPriceBrl": 34,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-19",
-      "code": "INGR-006",
-      "name": "Açúcar Cristal Especial (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 20,
-      "priceBrl": 6.5,
-      "costPriceBrl": 4.2,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-20",
-      "code": "INGR-007",
-      "name": "Ovos Brancos Selecionados (unidade)",
-      "unit": "un",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 60,
-      "priceBrl": 1.2,
-      "costPriceBrl": 0.7,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-21",
-      "code": "INGR-008",
-      "name": "Leite Integral Pasteurizado (L)",
-      "unit": "l",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 15,
-      "priceBrl": 6.8,
-      "costPriceBrl": 4.6,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-22",
-      "code": "INGR-009",
-      "name": "Sal Refinado Iodado (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
+      "category": "outros",
       "minStock": 10,
-      "priceBrl": 3.5,
-      "costPriceBrl": 2.1,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-23",
-      "code": "INGR-010",
-      "name": "Cenoura In Natura Selecionada (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 5,
-      "priceBrl": 7.9,
-      "costPriceBrl": 4.5,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-24",
-      "code": "INGR-011",
-      "name": "Chocolate Nobre Meio Amargo (kg)",
-      "unit": "kg",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 4,
-      "priceBrl": 46,
-      "costPriceBrl": 32,
-      "isIngredient": true
-    },
-    {
-      "id": "prod-25",
-      "code": "INGR-012",
-      "name": "Óleo de Girassol / Soja (L)",
-      "unit": "l",
-      "stock": 0,
-      "active": true,
-      "category": "ingredientes",
-      "minStock": 8,
-      "priceBrl": 9.5,
-      "costPriceBrl": 6.8,
-      "isIngredient": true
+      "priceBrl": 12.5,
+      "costPriceBrl": 7.8
     }
   ],
-  "customers": [
-    {
-      "id": "cust-1",
-      "name": "Carlos Drummond da Silva",
-      "email": "carlos.drummond@gmail.com",
-      "notes": "Paga todo dia 10. Sempre leva 6 pães franceses pela manhã.",
-      "phone": "+55 45 99123-4567",
-      "address": "Av. Brasil, 420 - Centro",
-      "birthday": "15/04",
-      "category": "mensalista",
-      "createdAt": "2026-06-27T01:32:34.635Z",
-      "documentCpf": "012.345.678-90",
-      "loyaltyPoints": 0,
-      "purchaseCount": 0,
-      "totalSpentBrl": 0,
-      "creditLimitBrl": 600,
-      "lastPurchaseDate": "2026-09-24T01:32:34.635Z",
-      "outstandingBalanceBrl": 0
-    },
-    {
-      "id": "cust-2",
-      "name": "Mariana Duarte Souza",
-      "email": "mariana.duarte@hotmail.com",
-      "notes": "Encomenda bolos e tortas com frequência. Aniversariante do mês!",
-      "phone": "+55 45 99876-5432",
-      "address": "Rua das Flores, 88 - Vila Nova",
-      "birthday": "28/09",
-      "category": "confeitaria",
-      "createdAt": "2026-05-28T01:32:34.635Z",
-      "documentCpf": "321.654.987-11",
-      "loyaltyPoints": 0,
-      "purchaseCount": 0,
-      "totalSpentBrl": 0,
-      "creditLimitBrl": 300,
-      "lastPurchaseDate": "2026-09-23T01:32:34.635Z",
-      "outstandingBalanceBrl": 0
-    },
-    {
-      "id": "cust-3",
-      "name": "Escritório Fronteira Contabilidade",
-      "email": "financeiro@fronteiracontabil.com.br",
-      "notes": "Coffee break diário às 08h30. Fatura fechada no último dia do mês.",
-      "phone": "+55 45 3522-8899",
-      "address": "Rua Jorge Sanwais, 1200 - Sl 402",
-      "birthday": "10/11",
-      "category": "empresa",
-      "createdAt": "2026-03-29T01:32:34.635Z",
-      "documentCpf": "14.882.910/0001-44",
-      "loyaltyPoints": 0,
-      "purchaseCount": 0,
-      "totalSpentBrl": 0,
-      "creditLimitBrl": 1500,
-      "lastPurchaseDate": "2026-09-24T13:32:34.635Z",
-      "outstandingBalanceBrl": 0
-    },
-    {
-      "id": "cust-4",
-      "name": "Dona Neide Café & Lanches",
-      "email": "neide.salgados@yahoo.com.br",
-      "notes": "Compra salgados fritos e pão de queijo no atacado toda terça e sexta.",
-      "phone": "+55 45 99944-1122",
-      "address": "Rua Almirante Barroso, 310",
-      "birthday": "03/05",
-      "category": "mensalista",
-      "createdAt": "2026-04-28T01:32:34.635Z",
-      "documentCpf": "654.321.098-77",
-      "loyaltyPoints": 0,
-      "purchaseCount": 0,
-      "totalSpentBrl": 0,
-      "creditLimitBrl": 800,
-      "lastPurchaseDate": "2026-09-22T01:32:34.635Z",
-      "outstandingBalanceBrl": 0
-    },
-    {
-      "id": "cust-5",
-      "name": "Prof. Lucas Guimarães",
-      "email": "lucas.guimaraes@unila.edu.br",
-      "notes": "Cliente fiel do café espresso e croissant. Aniversariante esta semana!",
-      "phone": "+55 45 99188-7766",
-      "address": "Av. Tarquínio Joslin dos Santos, 100",
-      "birthday": "24/09",
-      "category": "varejo",
-      "createdAt": "2026-03-09T01:32:34.635Z",
-      "documentCpf": "890.123.456-33",
-      "loyaltyPoints": 0,
-      "purchaseCount": 0,
-      "totalSpentBrl": 0,
-      "creditLimitBrl": 200,
-      "lastPurchaseDate": "2026-09-24T19:32:34.635Z",
-      "outstandingBalanceBrl": 0
-    }
-  ],
+  "customers": [],
   "employees": [
     {
       "id": "emp-admin-ax",
@@ -460,7 +213,6 @@
       "role": "afiliado",
       "email": "claudia@korisko.com",
       "password": "446183",
-      "createdAt": "2026-09-28T18:04:58.985Z",
       "avatarColor": "bg-indigo-600",
       "allowedFeatures": [
         "dashboard",
@@ -470,18 +222,21 @@
       ]
     }
   ],
-  "timestamp": "2026-09-28T18:14:10.315Z",
+  "timestamp": "2026-09-30T17:56:44.251Z",
   "openComandas": [],
   "exchangeRates": {
-    "updatedAt": "2026-09-28T18:13:44.357Z",
-    "BRL_TO_PYG": 1090,
-    "USD_TO_BRL": 5.22,
-    "USD_TO_PYG": 5689
+    "brlToPyg": 1475,
+    "brlToUsd": 0.178,
+    "pygToBrl": 0.000678,
+    "usdToBrl": 5.62,
+    "updatedAt": "2026-09-30T17:56:21.363Z"
   },
   "currentSession": {
-    "id": "session-1",
-    "status": "aberto",
-    "openedAt": "2026-09-28T18:14:10.315Z",
+    "id": "sess-1790790981363",
+    "status": "fechado",
+    "closedAt": "2026-09-30T17:56:21.363Z",
+    "closedBy": "Ax",
+    "openedAt": "2026-09-30T17:56:21.363Z",
     "openedBy": "Ax",
     "initialFloat": {
       "brl": 0,
@@ -491,344 +246,7 @@
     "transactions": [],
     "sessionNumber": 1
   },
-  "fichasTecnicas": [
-    {
-      "id": "ft-1",
-      "code": "FT-001",
-      "name": "Pão Francês Tradicional Crocante",
-      "active": true,
-      "category": "paes",
-      "yieldUnit": "un",
-      "ingredients": [
-        {
-          "name": "Farinha de Trigo Especial Tipo 1",
-          "unit": "kg",
-          "quantity": 2,
-          "unitCostBrl": 3.8,
-          "totalCostBrl": 7.6,
-          "ingredientProductId": "prod-14"
-        },
-        {
-          "name": "Fermento Biológico Fresco",
-          "unit": "kg",
-          "quantity": 0.08,
-          "unitCostBrl": 17,
-          "totalCostBrl": 1.36,
-          "ingredientProductId": "prod-15"
-        },
-        {
-          "name": "Sal Refinado Iodado",
-          "unit": "kg",
-          "quantity": 0.04,
-          "unitCostBrl": 2.1,
-          "totalCostBrl": 0.08,
-          "ingredientProductId": "prod-22"
-        },
-        {
-          "name": "Açúcar Cristal (Reforço)",
-          "unit": "kg",
-          "quantity": 0.02,
-          "unitCostBrl": 4.2,
-          "totalCostBrl": 0.08,
-          "ingredientProductId": "prod-19"
-        }
-      ],
-      "lastUpdated": "2026-09-25T01:32:34.635Z",
-      "instructions": "1. Bater farinha com 60% de água gelada por 5 min na masseira lenta.\n2. Adicionar o sal e o açúcar. Bater em velocidade rápida até ponto de véu.\n3. Incorporar o fermento fresco nos últimos 2 minutos.\n4. Dividir em porções de 65g, bolear e descansar 15 min.\n5. Modelar, fermentar na câmara por 1h40 a 28°C.\n6. Cortar pestana e assar a 220°C com 10s de vapor inicial por 18 min.",
-      "yieldQuantity": 60,
-      "costPerUnitBrl": 0.17,
-      "prepTimeMinutes": 140,
-      "targetProductId": "prod-1",
-      "additionalCostBrl": 1.37,
-      "bakingTempCelsius": 220,
-      "bakingTimeMinutes": 18,
-      "suggestedPriceBrl": 0.45,
-      "totalRecipeCostBrl": 10.49,
-      "additionalCostPercent": 15,
-      "suggestedMarginPercent": 160,
-      "totalIngredientsCostBrl": 9.12
-    },
-    {
-      "id": "ft-2",
-      "code": "FT-002",
-      "name": "Pão de Queijo Mineiro Artesanal",
-      "active": true,
-      "category": "salgados",
-      "yieldUnit": "un",
-      "ingredients": [
-        {
-          "name": "Polvilho Azedo Especial",
-          "unit": "kg",
-          "quantity": 0.8,
-          "unitCostBrl": 8.9,
-          "totalCostBrl": 7.12,
-          "ingredientProductId": "prod-17"
-        },
-        {
-          "name": "Queijo Meia Cura Ralado Artesanal",
-          "unit": "kg",
-          "quantity": 0.6,
-          "unitCostBrl": 34,
-          "totalCostBrl": 20.4,
-          "ingredientProductId": "prod-18"
-        },
-        {
-          "name": "Leite Integral Pasteurizado",
-          "unit": "l",
-          "quantity": 0.3,
-          "unitCostBrl": 4.6,
-          "totalCostBrl": 1.38,
-          "ingredientProductId": "prod-21"
-        },
-        {
-          "name": "Óleo de Girassol / Soja",
-          "unit": "l",
-          "quantity": 0.15,
-          "unitCostBrl": 6.8,
-          "totalCostBrl": 1.02,
-          "ingredientProductId": "prod-25"
-        },
-        {
-          "name": "Ovos Brancos Selecionados",
-          "unit": "un",
-          "quantity": 4,
-          "unitCostBrl": 0.7,
-          "totalCostBrl": 2.8,
-          "ingredientProductId": "prod-20"
-        },
-        {
-          "name": "Sal Refinado Iodado",
-          "unit": "kg",
-          "quantity": 0.015,
-          "unitCostBrl": 2.1,
-          "totalCostBrl": 0.03,
-          "ingredientProductId": "prod-22"
-        }
-      ],
-      "lastUpdated": "2026-09-25T01:32:34.635Z",
-      "instructions": "1. Escaldar o polvilho com a mistura fervente de leite, óleo e sal.\n2. Misturar com a pá até amornar.\n3. Adicionar os ovos um a um até absorção.\n4. Incorporar o queijo meia cura artesanal ralado sem bater excessivamente.\n5. Modelar bolinhas de 40g e congelar ou assar direto a 190°C por 25 min até dourar.",
-      "yieldQuantity": 40,
-      "costPerUnitBrl": 0.92,
-      "prepTimeMinutes": 45,
-      "targetProductId": "prod-2",
-      "additionalCostBrl": 3.93,
-      "bakingTempCelsius": 190,
-      "bakingTimeMinutes": 25,
-      "suggestedPriceBrl": 2.3,
-      "totalRecipeCostBrl": 36.68,
-      "additionalCostPercent": 12,
-      "suggestedMarginPercent": 150,
-      "totalIngredientsCostBrl": 32.75
-    },
-    {
-      "id": "ft-3",
-      "code": "FT-003",
-      "name": "Croissant Folhado Francês de Manteiga",
-      "active": true,
-      "category": "paes",
-      "yieldUnit": "un",
-      "ingredients": [
-        {
-          "name": "Farinha de Trigo Especial",
-          "unit": "kg",
-          "quantity": 1.2,
-          "unitCostBrl": 3.8,
-          "totalCostBrl": 4.56,
-          "ingredientProductId": "prod-14"
-        },
-        {
-          "name": "Manteiga Extra sem Sal (Folhagem)",
-          "unit": "kg",
-          "quantity": 0.6,
-          "unitCostBrl": 31.5,
-          "totalCostBrl": 18.9,
-          "ingredientProductId": "prod-16"
-        },
-        {
-          "name": "Açúcar Cristal",
-          "unit": "kg",
-          "quantity": 0.12,
-          "unitCostBrl": 4.2,
-          "totalCostBrl": 0.5,
-          "ingredientProductId": "prod-19"
-        },
-        {
-          "name": "Leite Integral",
-          "unit": "l",
-          "quantity": 0.4,
-          "unitCostBrl": 4.6,
-          "totalCostBrl": 1.84,
-          "ingredientProductId": "prod-21"
-        },
-        {
-          "name": "Fermento Biológico",
-          "unit": "kg",
-          "quantity": 0.05,
-          "unitCostBrl": 17,
-          "totalCostBrl": 0.85,
-          "ingredientProductId": "prod-15"
-        },
-        {
-          "name": "Ovos (Egg wash / Pincelar)",
-          "unit": "un",
-          "quantity": 1,
-          "unitCostBrl": 0.7,
-          "totalCostBrl": 0.7,
-          "ingredientProductId": "prod-20"
-        }
-      ],
-      "lastUpdated": "2026-09-25T01:32:34.635Z",
-      "instructions": "1. Fazer o détrempe com farinha, leite, fermento e açúcar. Descansar refrigerado 4h.\n2. Abrir a manteiga em bloco quadrado frio.\n3. Envelopar e dar 3 dobras simples com descanso de 40 min em geladeira entre cada volta.\n4. Cortar triângulos de 10x25cm, enrolar e fermentar 2h a 24°C.\n5. Pincelar com gema e assar a 195°C por 20 min.",
-      "yieldQuantity": 24,
-      "costPerUnitBrl": 1.34,
-      "prepTimeMinutes": 240,
-      "targetProductId": "prod-7",
-      "additionalCostBrl": 4.92,
-      "bakingTempCelsius": 195,
-      "bakingTimeMinutes": 20,
-      "suggestedPriceBrl": 4.2,
-      "totalRecipeCostBrl": 32.27,
-      "additionalCostPercent": 18,
-      "suggestedMarginPercent": 200,
-      "totalIngredientsCostBrl": 27.35
-    },
-    {
-      "id": "ft-4",
-      "code": "FT-004",
-      "name": "Bolo Caseiro de Cenoura com Calda de Chocolate",
-      "active": true,
-      "category": "confeitaria",
-      "yieldUnit": "un",
-      "ingredients": [
-        {
-          "name": "Cenoura In Natura Selecionada",
-          "unit": "kg",
-          "quantity": 0.75,
-          "unitCostBrl": 4.5,
-          "totalCostBrl": 3.38,
-          "ingredientProductId": "prod-23"
-        },
-        {
-          "name": "Ovos Brancos",
-          "unit": "un",
-          "quantity": 9,
-          "unitCostBrl": 0.7,
-          "totalCostBrl": 6.3,
-          "ingredientProductId": "prod-20"
-        },
-        {
-          "name": "Óleo de Girassol",
-          "unit": "l",
-          "quantity": 0.6,
-          "unitCostBrl": 6.8,
-          "totalCostBrl": 4.08,
-          "ingredientProductId": "prod-25"
-        },
-        {
-          "name": "Açúcar Cristal",
-          "unit": "kg",
-          "quantity": 0.9,
-          "unitCostBrl": 4.2,
-          "totalCostBrl": 3.78,
-          "ingredientProductId": "prod-19"
-        },
-        {
-          "name": "Farinha de Trigo Especial",
-          "unit": "kg",
-          "quantity": 0.8,
-          "unitCostBrl": 3.8,
-          "totalCostBrl": 3.04,
-          "ingredientProductId": "prod-14"
-        },
-        {
-          "name": "Chocolate Nobre Meio Amargo (Calda)",
-          "unit": "kg",
-          "quantity": 0.45,
-          "unitCostBrl": 32,
-          "totalCostBrl": 14.4,
-          "ingredientProductId": "prod-24"
-        }
-      ],
-      "lastUpdated": "2026-09-25T01:32:34.635Z",
-      "instructions": "1. Bater as cenouras raladas, óleo, ovos e açúcar no liquidificador por 4 min.\n2. Verter na bacia e incorporar a farinha peneirada delicadamente.\n3. Colocar nas formas untadas e assar a 180°C por 40 min.\n4. Fazer a calda de chocolate e cobrir ainda quente.",
-      "yieldQuantity": 3,
-      "costPerUnitBrl": 13.41,
-      "prepTimeMinutes": 60,
-      "targetProductId": "prod-5",
-      "additionalCostBrl": 5.25,
-      "bakingTempCelsius": 180,
-      "bakingTimeMinutes": 40,
-      "suggestedPriceBrl": 36,
-      "totalRecipeCostBrl": 40.23,
-      "additionalCostPercent": 15,
-      "suggestedMarginPercent": 170,
-      "totalIngredientsCostBrl": 34.98
-    },
-    {
-      "id": "ft-5",
-      "code": "FT-005",
-      "name": "Chipa Tradicional Paraguaia",
-      "active": true,
-      "category": "salgados",
-      "yieldUnit": "un",
-      "ingredients": [
-        {
-          "name": "Polvilho Azedo",
-          "unit": "kg",
-          "quantity": 0.7,
-          "unitCostBrl": 8.9,
-          "totalCostBrl": 6.23,
-          "ingredientProductId": "prod-17"
-        },
-        {
-          "name": "Queijo Meia Cura Artesanal",
-          "unit": "kg",
-          "quantity": 0.45,
-          "unitCostBrl": 34,
-          "totalCostBrl": 15.3,
-          "ingredientProductId": "prod-18"
-        },
-        {
-          "name": "Manteiga Extra sem Sal",
-          "unit": "kg",
-          "quantity": 0.15,
-          "unitCostBrl": 31.5,
-          "totalCostBrl": 4.73,
-          "ingredientProductId": "prod-16"
-        },
-        {
-          "name": "Ovos Brancos",
-          "unit": "un",
-          "quantity": 3,
-          "unitCostBrl": 0.7,
-          "totalCostBrl": 2.1,
-          "ingredientProductId": "prod-20"
-        },
-        {
-          "name": "Leite Integral",
-          "unit": "l",
-          "quantity": 0.1,
-          "unitCostBrl": 4.6,
-          "totalCostBrl": 0.46,
-          "ingredientProductId": "prod-21"
-        }
-      ],
-      "lastUpdated": "2026-09-25T01:32:34.635Z",
-      "instructions": "1. Bater manteiga com ovos até creme.\n2. Adicionar queijo ralado e incorporar polvilho azedo com leite até massa homogênea.\n3. Formatar ferraduras de 45g.\n4. Assar a 200°C por 18 min até dourar.",
-      "yieldQuantity": 30,
-      "costPerUnitBrl": 1.08,
-      "prepTimeMinutes": 40,
-      "targetProductId": "prod-6",
-      "additionalCostBrl": 3.46,
-      "bakingTempCelsius": 200,
-      "bakingTimeMinutes": 18,
-      "suggestedPriceBrl": 2.8,
-      "totalRecipeCostBrl": 32.28,
-      "additionalCostPercent": 12,
-      "suggestedMarginPercent": 160,
-      "totalIngredientsCostBrl": 28.82
-    }
-  ],
+  "fichasTecnicas": [],
   "sessionHistory": [],
   "stockMovements": [],
   "customerEntries": []
