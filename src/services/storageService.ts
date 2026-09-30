@@ -1315,25 +1315,14 @@ export class StorageService {
   }
 
   /**
-   * Queue debounced persistence to Supabase and server database
+   * Queue debounced persistence to Supabase
    */
   static queueServerSync(data: SystemBackupData): void {
     if (saveTimer) {
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(async () => {
-      // 1. Direct resilient Server API database sync
-      try {
-        await fetch('/api/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data }),
-        });
-      } catch (err) {
-        console.warn('[Korisko DB] Server sync notice:', err);
-      }
-
-      // 2. Direct Supabase Cloud sync
+      // Direct Supabase Cloud sync
       try {
         await saveStateToSupabase(data);
       } catch (err) {
@@ -1343,36 +1332,9 @@ export class StorageService {
   }
 
   /**
-   * Fetch current state from server database, Supabase cloud or initialize
+   * Fetch current state from Supabase cloud or initialize
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
-    try {
-      const res = await fetch('/api/state');
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.data && json.data.products && json.data.products.length > 0) {
-          // Merge local employees to prevent wiping newly created affiliates
-          try {
-            const local = StorageService.loadState();
-            const localEmployees = local?.employees || [];
-            const serverEmployees = json.data.employees || [];
-            const mergedEmployees = [...serverEmployees];
-            for (const le of localEmployees) {
-              if (!mergedEmployees.some(se => se.id === le.id)) {
-                mergedEmployees.push(le);
-              }
-            }
-            json.data.employees = mergedEmployees;
-          } catch {}
-
-          StorageService.saveState(json.data, false);
-          return json.data;
-        }
-      }
-    } catch (err) {
-      console.warn('[Korisko DB] Could not fetch state from server, checking Supabase/local storage:', err);
-    }
-
     // Try fetching from Supabase cloud directly
     try {
       const supabaseData = await fetchStateFromSupabase();
@@ -1398,22 +1360,11 @@ export class StorageService {
       console.warn('[Korisko DB] Supabase state fetch notice:', err);
     }
 
-    // If server has no state yet, seed server with current local state
-    try {
-      const currentState = StorageService.loadState();
-      await fetch('/api/state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: currentState }),
-      });
-      return currentState;
-    } catch {
-      return null;
-    }
+    return null;
   }
 
   /**
-   * Check connection status to Korisko database and Supabase
+   * Check connection status to Supabase directly (no /api/ calls)
    */
   static async checkDatabaseHealth(): Promise<{ 
     connected: boolean; 
@@ -1429,24 +1380,18 @@ export class StorageService {
       console.warn('[Korisko DB] Supabase health check exception:', err);
     }
 
-    try {
-      const res = await fetch('/api/health');
-      if (res.ok) {
-        const json = await res.json();
-        return {
-          connected: Boolean(json.databaseConnected),
-          mode: json.mode || 'banco_operacional',
-          railwayDetected: json.mode === 'postgresql',
-          totalRecords: json.totalRecords || 0,
-          supabase: supabaseHealth,
-        };
-      }
-    } catch (err) {
-      console.warn('[Korisko DB] Health check offline, operating in client storage mode');
+    if (supabaseHealth && supabaseHealth.reachable) {
+      return {
+        connected: true,
+        mode: 'supabase_cloud',
+        railwayDetected: false,
+        totalRecords: supabaseHealth.tableCount || 0,
+        supabase: supabaseHealth,
+      };
     }
 
     return { 
-      connected: true, 
+      connected: Boolean(supabaseHealth?.authenticated), 
       mode: 'banco_operacional', 
       railwayDetected: false,
       totalRecords: 0,
@@ -1514,13 +1459,6 @@ export class StorageService {
 
     const updated = [newPoint, ...currentPoints].slice(0, 20); // keep last 20
     localStorage.setItem(BACKUPS_KEY, JSON.stringify(updated));
-
-    // Send backup point to server database
-    fetch('/api/backups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ point: newPoint }),
-    }).catch(() => {});
 
     // Send backup point to Supabase cloud
     saveBackupPointToSupabase(newPoint).catch((err) => {

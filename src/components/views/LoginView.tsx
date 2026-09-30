@@ -184,7 +184,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         <div className="w-full max-w-[440px] space-y-6">
           
           {/* Main Card with UTMify styling */}
-          <div className="rounded-2xl border border-[#1E273A] bg-[#0D121D]/90 backdrop-blur-xl p-7 sm:p-9 shadow-2xl shadow-black/80 relative overflow-hidden">
+          <div className="rounded-2xl border border-[#1E273A] bg-[#0D121D]/90 backdrop-blur-xl p-5 sm:p-9 shadow-2xl shadow-black/80 relative overflow-hidden">
             
             {/* Ambient top highlight line */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />

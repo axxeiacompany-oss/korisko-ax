@@ -254,59 +254,59 @@ export const CustomersView: React.FC = () => {
         )}
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards - 2 cols on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span>Total de Clientes</span>
-            <Users className="w-4 h-4 text-amber-400" />
+            <span className="truncate">Total Clientes</span>
+            <Users className="w-4 h-4 text-amber-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
             {stats.total}
           </div>
-          <p className="text-[11px] text-neutral-500 mt-1">Cadastrados no sistema Korisko</p>
+          <p className="text-[10px] sm:text-[11px] text-neutral-500 mt-1 truncate">Cadastrados no Korisko</p>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span>Total a Receber (Fiado)</span>
-            <DollarSign className="w-4 h-4 text-rose-400" />
+            <span className="truncate">Total Fiado</span>
+            <DollarSign className="w-4 h-4 text-rose-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-rose-400 font-mono-nums">
+          <div className="text-xl sm:text-2xl font-bold text-rose-400 font-mono-nums">
             {formatCurrency(stats.totalDebtBrl, 'BRL')}
           </div>
-          <p className="text-[11px] text-neutral-500 mt-1">
-            ≈ ₲ {stats.totalDebtPyg.toLocaleString('pt-BR')} Guaranis
+          <p className="text-[10px] sm:text-[11px] text-neutral-500 mt-1 truncate">
+            ≈ ₲ {stats.totalDebtPyg.toLocaleString('pt-BR')}
           </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span>Contas com Débito</span>
-            <CreditCard className="w-4 h-4 text-amber-400" />
+            <span className="truncate">Com Débito</span>
+            <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-amber-400 font-mono-nums">
+          <div className="text-xl sm:text-2xl font-bold text-amber-400 font-mono-nums">
             {stats.debtorsCount}
           </div>
-          <p className="text-[11px] text-neutral-500 mt-1">Clientes com saldo devedor em aberto</p>
+          <p className="text-[10px] sm:text-[11px] text-neutral-500 mt-1 truncate">Contas em aberto</p>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span>Pontos Fidelidade Ativos</span>
-            <Award className="w-4 h-4 text-emerald-400" />
+            <span className="truncate">Pontos Fidelidade</span>
+            <Award className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono-nums">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono-nums">
             {stats.totalLoyaltyPoints.toLocaleString('pt-BR')}
           </div>
-          <p className="text-[11px] text-neutral-500 mt-1">Resgatáveis em descontos no caixa</p>
+          <p className="text-[10px] sm:text-[11px] text-neutral-500 mt-1 truncate">Resgate em descontos</p>
         </div>
 
       </div>
 
       {/* Toolbar / Search & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl bg-neutral-900/60 border border-neutral-800">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-neutral-900/60 border border-neutral-800">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
           <input
@@ -314,27 +314,27 @@ export const CustomersView: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome, telefone WhatsApp ou CPF..."
-            className="w-full pl-9 pr-4 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+            className="w-full pl-9 pr-4 py-2 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
           {/* Debt toggle filter */}
           <button
             type="button"
             onClick={() => setOnlyDebtors(!onlyDebtors)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 shrink-0 active:scale-95 ${
               onlyDebtors 
                 ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 font-semibold' 
                 : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <AlertCircle className="w-3.5 h-3.5" />
-            Apenas com Débito / Fiado
+            <span>Apenas com Fiado</span>
           </button>
 
           {/* Categories */}
-          <div className="flex items-center gap-1 bg-neutral-950 p-0.5 rounded-lg border border-neutral-800">
+          <div className="flex items-center gap-1 bg-neutral-950 p-0.5 rounded-xl border border-neutral-800 shrink-0">
             {[
               { id: 'todas', label: 'Todos' },
               { id: 'varejo', label: 'Varejo' },
@@ -344,10 +344,11 @@ export const CustomersView: React.FC = () => {
             ].map(cat => (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setCategoryFilter(cat.id)}
-                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors whitespace-nowrap active:scale-95 ${
                   categoryFilter === cat.id
-                    ? 'bg-amber-500 text-neutral-950 font-semibold'
+                    ? 'bg-amber-500 text-neutral-950 font-semibold shadow-sm'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >

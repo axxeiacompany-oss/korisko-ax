@@ -24,10 +24,10 @@ import { AfiliadosView } from './components/views/AfiliadosView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { SwitchEmployeeModal } from './components/modals/SwitchEmployeeModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
-import { Lock, ShieldAlert } from 'lucide-react';
+import { Lock, ShieldAlert, AlertTriangle, X } from 'lucide-react';
 
 function MainAppShell() {
-  const { isFeatureAllowed, currentUser, t, language } = useBakery();
+  const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     // Require strict authentication on any new device or new tab
     const saved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
@@ -110,6 +110,30 @@ function MainAppShell() {
         }`}
       >
         <div className="max-w-7xl mx-auto">
+          {/* REQUIREMENT 4: Real Database Error Banner - Never silent */}
+          {dbError && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 flex items-start justify-between shadow-xl gap-3 animate-in fade-in zoom-in-95">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-red-300 uppercase tracking-wider">
+                    {language === 'es' ? 'Aviso de Base de Datos Supabase' : 'Aviso do Banco de Dados Supabase'}
+                  </h4>
+                  <p className="text-xs text-red-200/90 mt-0.5 break-all">{dbError}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearDbError}
+                className="p-1 rounded-lg text-red-400 hover:text-white hover:bg-red-500/20 transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {!isFeatureAllowed(activeTab as any) ? (
             <div className="p-8 rounded-2xl bg-[#0D121E] border border-[#1E273A] text-center max-w-lg mx-auto my-12 space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">

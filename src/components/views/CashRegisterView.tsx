@@ -85,12 +85,12 @@ export const CashRegisterView: React.FC = () => {
   const isRegisterOpen = currentSession.status === 'aberto';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300 pb-24 lg:pb-0">
       
       {/* Session Header Card */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
-        <div className="flex items-center gap-3.5">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
             isRegisterOpen
               ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
               : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
@@ -99,7 +99,7 @@ export const CashRegisterView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-neutral-100">
+              <h2 className="text-base sm:text-lg font-bold text-neutral-100">
                 {language === 'es' ? 'Caja' : 'Caixa'} #{currentSession.sessionNumber}
               </h2>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
@@ -112,42 +112,42 @@ export const CashRegisterView: React.FC = () => {
                   : (language === 'es' ? 'CERRADA' : 'FECHADO')}
               </span>
             </div>
-            <p className="text-xs text-neutral-400 mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-neutral-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span>{language === 'es' ? 'Abierta por:' : 'Aberto por:'} <strong className="text-neutral-300">{currentSession.openedBy}</strong></span>
-              <span aria-hidden="true">·</span>
+              <span aria-hidden="true" className="hidden sm:inline">·</span>
               <span>{language === 'es' ? 'Inicio:' : 'Início:'} {new Date(currentSession.openedAt).toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Action buttons - 2 columns on mobile for easy tapping */}
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
           {isRegisterOpen ? (
             <>
               <button
                 type="button"
                 onClick={() => setIsSuprimentoOpen(true)}
-                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-                {language === 'es' ? 'Ingreso / Suplido' : 'Suprimento (Entrada)'}
+                <span>{language === 'es' ? 'Ingreso' : 'Suprimento'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIsSangriaOpen(true)}
-                className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <ArrowDownRight className="w-4 h-4 text-rose-400" />
-                {language === 'es' ? 'Retiro / Sangría' : 'Sangria (Retirada)'}
+                <span>{language === 'es' ? 'Sangría' : 'Sangria'}</span>
               </button>
               {canManageRegister && (
                 <button
                   type="button"
                   onClick={() => setIsCloseRegisterOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="col-span-2 sm:col-span-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Lock className="w-4 h-4" />
-                  {language === 'es' ? 'Cerrar Caja' : 'Fechar Caixa'}
+                  <span>{language === 'es' ? 'Cerrar Caja' : 'Fechar Caixa'}</span>
                 </button>
               )}
             </>
@@ -155,10 +155,10 @@ export const CashRegisterView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsOpenRegisterOpen(true)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="col-span-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Unlock className="w-4 h-4" />
-              {language === 'es' ? 'Abrir Nueva Caja' : 'Abrir Novo Caixa'}
+              <span>{language === 'es' ? 'Abrir Nueva Caja' : 'Abrir Novo Caixa'}</span>
             </button>
           )}
         </div>

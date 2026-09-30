@@ -70,40 +70,40 @@ export const InventoryView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300 pb-24 lg:pb-0">
       
       {/* Top Header & Quick KPI Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
         
         {/* Total Products */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1 sm:space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Itens Cadastrados</span>
-            <Package className="w-4 h-4 text-amber-400" />
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">Itens Cadastrados</span>
+            <Package className="w-4 h-4 text-amber-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
-            {totalItemsCount} <span className="text-xs font-normal text-neutral-500">produtos / insumos</span>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
+            {totalItemsCount} <span className="text-[11px] sm:text-xs font-normal text-neutral-500">itens</span>
           </div>
         </div>
 
         {/* Low Stock Alert */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1 sm:space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Estoque Baixo / Reposição</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">Estoque Baixo</span>
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-rose-400 font-mono-nums">
-            {lowStockCount} <span className="text-xs font-normal text-neutral-500">itens em alerta</span>
+          <div className="text-xl sm:text-2xl font-bold text-rose-400 font-mono-nums">
+            {lowStockCount} <span className="text-[11px] sm:text-xs font-normal text-neutral-500">alertas</span>
           </div>
         </div>
 
         {/* Total Inventory Value */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+        <div className="col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1 sm:space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">Valor Estimado do Estoque</span>
-            <Layers className="w-4 h-4 text-emerald-400" />
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">Valor em Estoque</span>
+            <Layers className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono-nums">
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono-nums">
             {formatCurrency(totalStockValuation, 'BRL')}
           </div>
         </div>
@@ -111,7 +111,7 @@ export const InventoryView: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-5">
+      <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4 sm:space-y-5">
         
         {/* Actions & Tab Switcher Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-neutral-800">
@@ -222,8 +222,119 @@ export const InventoryView: React.FC = () => {
 
             </div>
 
-            {/* Products Table */}
-            <div className="overflow-x-auto rounded-xl border border-neutral-800">
+            {/* Mobile Product Cards (sm:hidden) */}
+            <div className="sm:hidden space-y-2.5">
+              {filteredProducts.map((p) => {
+                const isLow = p.stock <= p.minStock;
+                const isZero = p.stock <= 0;
+
+                return (
+                  <div 
+                    key={`m-${p.id}`}
+                    className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800/90 space-y-2.5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-mono-nums mb-0.5">
+                          <span>{p.code}</span>
+                          <span>·</span>
+                          <span className="capitalize text-neutral-400">{p.category}</span>
+                        </div>
+                        <h4 className="text-xs font-semibold text-neutral-100 leading-snug">
+                          {p.name}
+                          {p.isIngredient && (
+                            <span className="ml-1 text-[10px] text-amber-400/80 font-normal">
+                              (Insumo)
+                            </span>
+                          )}
+                        </h4>
+                      </div>
+
+                      {/* Status badge */}
+                      {isZero ? (
+                        <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-md shrink-0">
+                          Esgotado
+                        </span>
+                      ) : isLow ? (
+                        <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md shrink-0">
+                          Baixo
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md shrink-0">
+                          Regular
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-neutral-850">
+                      <div>
+                        <span className="text-neutral-400 text-[11px] block">Estoque Atual:</span>
+                        <span className="font-bold text-neutral-100 font-mono-nums text-sm">
+                          {p.stock} <span className="text-xs font-normal text-neutral-400">{p.unit}</span>
+                        </span>
+                        {isLow && (
+                          <span className="text-[10px] text-rose-400 font-mono-nums block">
+                            (Mín: {p.minStock} {p.unit})
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-neutral-400 text-[11px] block">Preço de Venda:</span>
+                        <span className="font-bold text-amber-400 font-mono-nums text-sm">
+                          {formatCurrency(p.priceBrl, 'BRL')}
+                        </span>
+                        {p.costPriceBrl && (
+                          <span className="text-[10px] text-neutral-500 font-mono-nums block">
+                            Custo: {formatCurrency(p.costPriceBrl, 'BRL')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick mobile action bar with touch friendly buttons */}
+                    <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-neutral-850">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickMovement(p)}
+                        className="py-2 px-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-sky-300 text-[11px] font-semibold border border-neutral-800 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                      >
+                        <ArrowUpDown className="w-3.5 h-3.5" />
+                        <span>Estoque</span>
+                      </button>
+
+                      {canManageProducts ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleEditProduct(p)}
+                            className="py-2 px-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-300 text-[11px] font-semibold border border-neutral-800 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(p.id, p.name)}
+                            className="py-2 px-2 rounded-xl bg-neutral-900 hover:bg-rose-950/40 text-rose-400 text-[11px] font-semibold border border-neutral-800 hover:border-rose-500/30 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="col-span-2 text-[10px] text-neutral-500 flex items-center justify-center">
+                          Apenas leitura
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Products Table */}
+            <div className="hidden sm:block overflow-x-auto rounded-xl border border-neutral-800">
               <table className="w-full text-left text-xs">
                 <thead className="bg-neutral-950 border-b border-neutral-800 text-neutral-400">
                   <tr>

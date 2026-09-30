@@ -167,11 +167,11 @@ export const TopNav: React.FC<Props> = ({
             </div>
           </button>
 
-          {/* Live Sales Stream Continuous Button */}
+          {/* Live Sales Stream Continuous Button - hidden on small mobile, visible sm+ */}
           <button
             type="button"
             onClick={() => setIsStreamDrawerOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors items-center gap-1.5 cursor-pointer"
             title={language === 'es' ? 'Flujo Continuo de Ventas en Vivo' : 'Fluxo Contínuo de Vendas ao Vivo'}
           >
             <span className="relative flex h-2 w-2">
@@ -182,37 +182,36 @@ export const TopNav: React.FC<Props> = ({
             <span className="hidden xl:inline">{language === 'es' ? 'Flujo en Vivo' : 'Fluxo ao Vivo'}</span>
           </button>
 
-          {/* Fornada Quente Action */}
+          {/* Fornada Quente Action - hidden on mobile */}
           <button
             type="button"
             onClick={() => setIsFornadaOpen(true)}
-            className="px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold transition-colors flex items-center gap-1.5"
+            className="hidden sm:flex px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold transition-colors items-center gap-1.5"
             title="Registrar Fornada do Padeiro"
           >
             <Flame className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t.quickActionFornada}</span>
+            <span className="hidden md:inline">{t.quickActionFornada}</span>
           </button>
 
-          {/* Venda Direta Rápida (1-Clique: Apenas Valor e Confirme) */}
+          {/* Venda Direta Rápida - hidden on mobile (already main action in MobileBottomNav) */}
           <button
             type="button"
             onClick={() => setIsDirectSaleOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="hidden md:flex px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all items-center gap-1.5 cursor-pointer"
             title={t.directSaleSubtitle}
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
-            <span className="hidden sm:inline">{t.quickActionDirectSale}</span>
-            <span className="sm:hidden">⚡</span>
+            <span>{t.quickActionDirectSale}</span>
           </button>
 
-          {/* Nova Venda Action */}
+          {/* Nova Venda Action - hidden on mobile */}
           <button
             type="button"
             onClick={() => onSelectTab('pdv')}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span className="hidden sm:inline">{t.quickActionNewSale}</span>
+            <span className="hidden md:inline">{t.quickActionNewSale}</span>
           </button>
 
           {/* User Profile Online & Password View Pill */}

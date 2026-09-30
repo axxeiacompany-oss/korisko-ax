@@ -1,4 +1,8 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+
+// Re-export single client instance
+export { supabase };
 
 // Default configuration with the user-provided Supabase project credentials
 export const DEFAULT_SUPABASE_URL = 'https://lmbpvdpmrdfxfqednwxd.supabase.co';
@@ -15,8 +19,6 @@ export function normalizeSupabaseUrl(url: string): string {
 const rawEnvUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
 export const supabaseUrl = normalizeSupabaseUrl(rawEnvUrl);
 export const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
-
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface SupabaseHealthResult {
   reachable: boolean;

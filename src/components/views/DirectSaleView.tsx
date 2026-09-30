@@ -93,28 +93,34 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   };
 
   // Handle Quick Add Customer
-  const handleSaveCustomer = (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) {
       alert('Informe o nome do cliente.');
       return;
     }
 
-    const created = addCustomer({
-      name: newCustName.trim(),
-      phone: newCustPhone.trim(),
-      creditLimitBrl: parseFloat(newCustLimit) || 150,
-      category: 'varejo',
-    });
+    try {
+      const created = await addCustomer({
+        name: newCustName.trim(),
+        phone: newCustPhone.trim(),
+        creditLimitBrl: parseFloat(newCustLimit) || 150,
+        category: 'varejo',
+      });
 
-    setSelectedCustomerId(created.id);
-    setIsAddingCustomer(false);
-    setNewCustName('');
-    setNewCustPhone('');
+      setSelectedCustomerId(created.id);
+      setIsAddingCustomer(false);
+      setNewCustName('');
+      setNewCustPhone('');
+    } catch (err: any) {
+      alert(`Erro ao cadastrar cliente: ${err.message}`);
+    }
   };
 
+  const [isSubmittingDirect, setIsSubmittingDirect] = useState(false);
+
   // Confirm Sale
-  const handleConfirmDirectSale = () => {
+  const handleConfirmDirectSale = async () => {
     if (amountBrl <= 0) {
       alert('Digite o valor da venda.');
       return;
@@ -138,49 +144,56 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       }
     }
 
-    const sale = registerDirectSale(
-      amountBrl,
-      description.trim() || (language === 'es' ? 'Venta Directa Mostrador' : 'Venda Direta Balcão'),
-      paymentMethod,
-      selectedCustomerId || undefined
-    );
+    setIsSubmittingDirect(true);
+    try {
+      const sale = await registerDirectSale(
+        amountBrl,
+        description.trim() || (language === 'es' ? 'Venta Directa Mostrador' : 'Venda Direta Balcão'),
+        paymentMethod,
+        selectedCustomerId || undefined
+      );
 
-    setLastSaleReceipt({
-      id: sale.id,
-      totalBrl: sale.totalBrl,
-      paymentMethod: paymentMethod === 'dinheiro' ? (language === 'es' ? 'Efectivo' : 'Dinheiro')
-        : paymentMethod === 'pix' ? 'Pix / QR'
-        : paymentMethod === 'cartao_debito' ? (language === 'es' ? 'Débito' : 'Débito')
-        : paymentMethod === 'cartao_credito' ? (language === 'es' ? 'Crédito' : 'Crédito')
-        : (language === 'es' ? 'Crédito / Fiado' : 'Fiado / Caderneta'),
-      customerName: sale.customerName || (language === 'es' ? 'Cliente Casual' : 'Cliente Avulso'),
-      timestamp: new Date().toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR'),
-    });
+      setLastSaleReceipt({
+        id: sale.id,
+        totalBrl: sale.totalBrl,
+        paymentMethod: paymentMethod === 'dinheiro' ? (language === 'es' ? 'Efectivo' : 'Dinheiro')
+          : paymentMethod === 'pix' ? 'Pix / QR'
+          : paymentMethod === 'cartao_debito' ? (language === 'es' ? 'Débito' : 'Débito')
+          : paymentMethod === 'cartao_credito' ? (language === 'es' ? 'Crédito' : 'Crédito')
+          : (language === 'es' ? 'Crédito / Fiado' : 'Fiado / Caderneta'),
+        customerName: sale.customerName || (language === 'es' ? 'Cliente Casual' : 'Cliente Avulso'),
+        timestamp: new Date().toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR'),
+      });
 
-    // Reset fields for next fast sale
-    setAmountStr('');
-    setDescription('');
-    setSelectedCustomerId('');
+      // Reset fields for next fast sale
+      setAmountStr('');
+      setDescription('');
+      setSelectedCustomerId('');
 
-    if (onSaleCompleted) {
-      onSaleCompleted();
+      if (onSaleCompleted) {
+        onSaleCompleted();
+      }
+    } catch (err: any) {
+      alert(`Falha ao registrar venda direta: ${err.message}`);
+    } finally {
+      setIsSubmittingDirect(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-24 lg:pb-0">
       
       {/* Top Banner */}
-      <div className="p-5 rounded-2xl bg-[#0D121E] border border-[#1E273A] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-500 p-[2px] shadow-lg shadow-amber-500/10 shrink-0">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#0D121E] border border-[#1E273A] flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-500 p-[2px] shadow-lg shadow-amber-500/10 shrink-0">
             <div className="w-full h-full bg-[#0B0F17] rounded-[14px] flex items-center justify-center text-amber-400">
               <Zap className="w-5 h-5 fill-current" />
             </div>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+              <h1 className="text-base sm:text-xl font-black text-white tracking-tight">
                 {t.directSaleTitle}
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
@@ -203,13 +216,13 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       </div>
 
       {/* Main Fast Sale Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         
         {/* Left Column: Big Amount & Keypad */}
         <div className="lg:col-span-7 space-y-4">
           
           {/* Big Amount Card */}
-          <div className="p-6 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-3 sm:space-y-4">
             
             <div>
               <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1">
@@ -225,14 +238,14 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder="0,00"
-                  className="w-full pl-16 pr-4 py-4 bg-[#090D15] border-2 border-indigo-500/50 rounded-2xl text-3xl sm:text-4xl font-black text-white placeholder-neutral-600 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all font-mono-nums tracking-tight"
+                  className="w-full pl-16 pr-4 py-3.5 sm:py-4 bg-[#090D15] border-2 border-indigo-500/50 rounded-2xl text-3xl sm:text-4xl font-black text-white placeholder-neutral-600 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition-all font-mono-nums tracking-tight"
                 />
               </div>
             </div>
 
-            {/* Quick value chips */}
-            <div className="flex flex-wrap gap-2">
-              <span className="text-[11px] text-neutral-500 flex items-center mr-1">
+            {/* Quick value chips - Smooth swipe on mobile */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+              <span className="text-[11px] text-neutral-500 shrink-0 mr-0.5">
                 {language === 'es' ? 'Atajos:' : 'Atalhos:'}
               </span>
               {[2, 5, 10, 20, 50, 100].map(val => (
@@ -240,7 +253,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                   key={val}
                   type="button"
                   onClick={() => addPreset(val)}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#141B2B] hover:bg-indigo-600/30 text-neutral-200 hover:text-white border border-[#222E46] text-xs font-mono font-bold transition-all cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-[#141B2B] hover:bg-indigo-600/30 active:scale-95 text-neutral-200 hover:text-white border border-[#222E46] text-xs font-mono font-bold transition-all shrink-0 cursor-pointer"
                 >
                   +{val}
                 </button>
@@ -248,23 +261,23 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               <button
                 type="button"
                 onClick={() => setAmountStr('')}
-                className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium ml-auto cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/20 text-xs font-medium shrink-0 ml-auto cursor-pointer"
               >
                 {language === 'es' ? 'Borrar' : 'Limpar'}
               </button>
             </div>
 
-            {/* Touch Numerical Keypad */}
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', ','].map(key => (
+            {/* Touch Numerical Keypad with ergonomic thumb height */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(key => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => handleKeypadPress(key)}
-                  className={`py-3.5 rounded-xl font-mono text-base font-bold transition-all cursor-pointer ${
-                    key === 'C' 
+                  className={`h-13 sm:h-14 rounded-2xl font-mono text-xl sm:text-lg font-bold transition-all cursor-pointer shadow-sm active:scale-90 flex items-center justify-center ${
+                    key === '⌫' 
                       ? 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30' 
-                      : 'bg-[#121828] text-white hover:bg-neutral-800 border border-[#1E283D] active:scale-95'
+                      : 'bg-[#121828] text-white hover:bg-neutral-800 border border-[#1E283D]'
                   }`}
                 >
                   {key}
@@ -380,11 +393,16 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
           <button
             type="button"
             onClick={handleConfirmDirectSale}
-            disabled={amountBrl <= 0}
+            disabled={amountBrl <= 0 || isSubmittingDirect}
             className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 disabled:opacity-40 disabled:pointer-events-none text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center gap-3 cursor-pointer group"
           >
             <Check className="w-5 h-5 stroke-[3] group-hover:scale-110 transition-transform" />
-            <span>{language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} ({formatCurrency(amountBrl, 'BRL')})</span>
+            <span>
+              {isSubmittingDirect 
+                ? (language === 'es' ? 'Guardando en Supabase...' : 'Gravando no Supabase...')
+                : `${language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} (${formatCurrency(amountBrl, 'BRL')})`
+              }
+            </span>
           </button>
 
           {/* Last Sale Receipt Notification */}
@@ -409,6 +427,31 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
         </div>
 
       </div>
+
+      {/* Mobile Sticky Quick Confirm Bar */}
+      {amountBrl > 0 && (
+        <div className="lg:hidden fixed bottom-[68px] left-3 right-3 z-30 animate-in slide-in-from-bottom-2 duration-150">
+          <button
+            type="button"
+            onClick={handleConfirmDirectSale}
+            disabled={isSubmittingDirect}
+            className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white font-black text-sm shadow-2xl flex items-center justify-between active:scale-98 transition-all cursor-pointer border border-emerald-400 ring-2 ring-emerald-500/20"
+          >
+            <div className="flex items-center gap-2">
+              <Check className="w-5 h-5 stroke-[3]" />
+              <span>
+                {isSubmittingDirect 
+                  ? (language === 'es' ? 'Guardando...' : 'Gravando...')
+                  : (language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda')
+                }
+              </span>
+            </div>
+            <span className="font-mono-nums text-base font-black">
+              {formatCurrency(amountBrl, 'BRL')}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* MODAL: Cadastrar Cliente Instantaneamente */}
       {isAddingCustomer && (

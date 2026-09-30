@@ -154,10 +154,10 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
   }, [products]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300 pb-24 lg:pb-0">
       
       {/* Top Banner / Welcome & Quick Action */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-neutral-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-neutral-800">
         <div>
           <div className="flex items-center gap-2 text-xs text-neutral-400 mb-1">
             <Calendar className="w-3.5 h-3.5 text-amber-400" />
@@ -169,7 +169,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               {language === 'es' ? 'Caja' : 'Caixa'} #{currentSession.sessionNumber} ({currentSession.status === 'aberto' ? (language === 'es' ? 'Abierta' : 'Aberto') : (language === 'es' ? 'Cerrada' : 'Fechado')})
             </span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-neutral-100">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-100">
             {language === 'es' ? 'Panel Financiero en Tiempo Real' : 'Painel Financeiro em Tempo Real'}
           </h1>
           <p className="text-xs text-neutral-400 mt-0.5">
@@ -179,127 +179,124 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => onNavigate('venda_direta')}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Zap className="w-4 h-4 fill-current text-white" />
-            {language === 'es' ? 'Venta Directa (1-Clic)' : 'Venda Direta (1-Clique)'}
+            <span>{language === 'es' ? 'Venta 1-Clic' : 'Venda 1-Clique'}</span>
           </button>
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
-            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-            {language === 'es' ? 'Abrir PDV' : 'Abrir PDV'}
+            <span>{language === 'es' ? 'Abrir PDV' : 'Abrir PDV'}</span>
           </button>
           {isAx && (
             <button
               type="button"
               onClick={() => onNavigate('afiliados')}
-              className="px-3.5 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 active:scale-95 text-indigo-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <ShieldCheck className="w-4 h-4" />
-              {t.tabAffiliates}
+              <span>{t.tabAffiliates}</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => onNavigate('caixa')}
-            className="px-3.5 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 text-xs font-medium transition-colors cursor-pointer"
+            className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 active:scale-95 text-neutral-200 text-xs font-medium transition-colors flex items-center justify-center cursor-pointer"
           >
             {language === 'es' ? 'Ver Caja' : 'Ver Caixa'}
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards Grid - Compact 2x2 on mobile for immediate thumb scanning */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
         {/* Card 1: Faturamento Hoje (Consolidado) */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">
               {language === 'es' ? 'Ingresos de Hoy' : 'Faturamento Hoje'}
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
+            <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
               {formatCurrency(todayRevenueBrl, 'BRL')}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-1 font-mono-nums">
-              <span>≈ {formatCurrency(fromBrl(todayRevenueBrl, 'PYG', exchangeRates), 'PYG')}</span>
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-neutral-400 mt-1 font-mono-nums truncate">
+              <span>₲ {fromBrl(todayRevenueBrl, 'PYG', exchangeRates).toLocaleString('es-PY')}</span>
               <span aria-hidden="true">·</span>
-              <span>≈ {formatCurrency(fromBrl(todayRevenueBrl, 'USD', exchangeRates), 'USD')}</span>
+              <span>$ {fromBrl(todayRevenueBrl, 'USD', exchangeRates).toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: Clientes & Atendimentos */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">
-              {language === 'es' ? 'Atenciones de Hoy' : 'Atendimentos Hoje'}
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">
+              {language === 'es' ? 'Atenciones' : 'Atendimentos'}
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
-              {todaySales.length} <span className="text-sm font-normal text-neutral-400">{language === 'es' ? 'ventas' : 'vendas'}</span>
+            <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
+              {todaySales.length} <span className="text-xs font-normal text-neutral-400">{language === 'es' ? 'vendas' : 'vendas'}</span>
             </div>
-            <div className="text-[11px] text-neutral-400 mt-1">
-              {language === 'es' 
-                ? `Ritmo de ${todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes por hora`
-                : `Ritmo de ${todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes por hora`
-              }
+            <div className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 truncate">
+              {todaySales.length > 0 ? (todaySales.length / 8).toFixed(1) : 0} clientes/hora
             </div>
           </div>
         </div>
 
         {/* Card 3: Ticket Médio */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">
               {language === 'es' ? 'Ticket Promedio' : 'Ticket Médio'}
             </span>
-            <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+            <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
               <Receipt className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
+            <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
               {formatCurrency(ticketMedio, 'BRL')}
             </div>
-            <div className="text-[11px] text-neutral-400 mt-1">
-              {language === 'es' ? 'Objetivo fijado:' : 'Meta estipulada:'} {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
+            <div className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 truncate">
+              Meta: {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
             </div>
           </div>
         </div>
 
         {/* Card 4: Lucro Bruto Estimado */}
-        <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-400">
-              {language === 'es' ? 'Margen Bruto Estimado' : 'Lucro Bruto Estimado'}
+            <span className="text-[11px] sm:text-xs font-medium text-neutral-400 truncate">
+              {language === 'es' ? 'Margen Bruto' : 'Lucro Estimado'}
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-purple-300 font-mono-nums">
+            <div className="text-xl sm:text-2xl font-bold text-purple-300 font-mono-nums">
               {formatCurrency(todayGrossProfit, 'BRL')}
             </div>
-            <div className="text-[11px] text-neutral-400 mt-1">
-              {language === 'es' ? 'Margen de contribución:' : 'Margem de contribuição:'} <strong className="text-emerald-400">{profitMarginPercent}%</strong>
+            <div className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 truncate">
+              Margem: <strong className="text-emerald-400">{profitMarginPercent}%</strong>
             </div>
           </div>
         </div>
@@ -357,7 +354,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       {/* Operational Highlights: Fornadas, Comandas, Fichas Técnicas & CRM */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
         {/* Fornadas Card */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col justify-between space-y-3">

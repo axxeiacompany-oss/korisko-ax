@@ -21,7 +21,7 @@ export const PaymentModal: React.FC<Props> = ({
   comandaNumber,
   initialCustomerName,
 }) => {
-  const { exchangeRates, completeSale, customers, redeemCustomerPoints } = useBakery();
+  const { exchangeRates, completeSale, customers, redeemCustomerPoints, language, t } = useBakery();
 
   const rawSubtotalBrl = useMemo(() => {
     return cartItems.reduce((acc, it) => acc + it.subtotalBrl, 0);
@@ -154,7 +154,9 @@ export const PaymentModal: React.FC<Props> = ({
     setInputAmount(val.toString());
   };
 
-  const handleFinishSale = () => {
+  const [isFinishing, setIsFinishing] = useState(false);
+
+  const handleFinishSale = async () => {
     if (remainingBrl > 0.05) {
       alert('O valor recebido ainda é menor que o total da venda.');
       return;
@@ -166,17 +168,24 @@ export const PaymentModal: React.FC<Props> = ({
       equivalentBrl: changeBrl,
     } : undefined;
 
-    const sale = completeSale(
-      cartItems, 
-      payments, 
-      changeData, 
-      customerName || undefined,
-      comandaNumber || undefined,
-      discountBrl > 0 ? discountBrl : undefined,
-      rawSubtotalBrl,
-      selectedCustomerId || undefined
-    );
-    onSaleCompleted(sale);
+    setIsFinishing(true);
+    try {
+      const sale = await completeSale(
+        cartItems, 
+        payments, 
+        changeData, 
+        customerName || undefined,
+        comandaNumber || undefined,
+        discountBrl > 0 ? discountBrl : undefined,
+        rawSubtotalBrl,
+        selectedCustomerId || undefined
+      );
+      onSaleCompleted(sale);
+    } catch (err: any) {
+      alert(`Falha ao registrar venda no banco: ${err.message || String(err)}`);
+    } finally {
+      setIsFinishing(false);
+    }
   };
 
   // Quick bills based on selected currency
@@ -187,34 +196,41 @@ export const PaymentModal: React.FC<Props> = ({
     : [5, 10, 20, 50, 100];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200 max-h-[94vh] sm:max-h-[92vh] flex flex-col">
         
+        {/* Mobile drag handle */}
+        <div className="sm:hidden w-12 h-1 rounded-full bg-neutral-700 mx-auto mt-2.5 mb-1" />
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950/60">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-neutral-800 bg-neutral-950/60">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider">Finalização da Venda</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-amber-500 uppercase tracking-wider">
+                {language === 'es' ? 'Finalización de la Venta' : 'Finalização da Venda'}
+              </span>
               {comandaNumber && (
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold font-mono-nums">
                   Comanda #{comandaNumber}
                 </span>
               )}
             </div>
-            <h2 className="text-lg font-bold text-neutral-100">Pagamento Multi-Moeda & CRM</h2>
+            <h2 className="text-base sm:text-lg font-bold text-neutral-100">
+              {language === 'es' ? 'Cobro Multi-Moneda' : 'Pagamento Multi-Moeda & CRM'}
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
 
           {/* CRM / Customer Selection Box */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-2">
+          <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5 text-amber-400" />
@@ -337,11 +353,11 @@ export const PaymentModal: React.FC<Props> = ({
           </div>
 
           {/* Total Overview in 3 Currencies */}
-          <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-neutral-950 border border-neutral-800">
-            <div className="text-left">
-              <span className="text-[11px] font-medium text-neutral-400 block">Total a Pagar (BRL)</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-bold text-neutral-100 font-mono-nums">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-neutral-950 border border-neutral-800">
+            <div className="text-left min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Total BRL</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-base sm:text-lg font-bold text-neutral-100 font-mono-nums">
                   {formatCurrency(totalBrl, 'BRL')}
                 </span>
                 {discountBrl > 0 && (
@@ -351,15 +367,15 @@ export const PaymentModal: React.FC<Props> = ({
                 )}
               </div>
             </div>
-            <div className="text-left border-l border-neutral-800 pl-3">
-              <span className="text-[11px] font-medium text-neutral-400 block">Total em Guaranis (PYG)</span>
-              <span className="text-lg font-bold text-amber-400 font-mono-nums">
+            <div className="text-left border-l border-neutral-800 pl-2 sm:pl-3 min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Guaranis (PYG)</span>
+              <span className="text-base sm:text-lg font-bold text-amber-400 font-mono-nums block truncate">
                 {formatCurrency(fromBrl(totalBrl, 'PYG', exchangeRates), 'PYG')}
               </span>
             </div>
-            <div className="text-left border-l border-neutral-800 pl-3">
-              <span className="text-[11px] font-medium text-neutral-400 block">Total em Dólares (USD)</span>
-              <span className="text-lg font-bold text-emerald-400 font-mono-nums">
+            <div className="text-left border-l border-neutral-800 pl-2 sm:pl-3 min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Dólares (USD)</span>
+              <span className="text-base sm:text-lg font-bold text-emerald-400 font-mono-nums block truncate">
                 {formatCurrency(fromBrl(totalBrl, 'USD', exchangeRates), 'USD')}
               </span>
             </div>
@@ -575,30 +591,30 @@ export const PaymentModal: React.FC<Props> = ({
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-800 bg-neutral-950/60">
-          <div>
-            <span className="text-xs text-neutral-400 block">Total da Venda</span>
-            <span className="text-sm font-bold text-neutral-200 font-mono-nums">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-800 bg-neutral-950/80 safe-area-pb">
+          <div className="flex items-center justify-between sm:block">
+            <span className="text-[11px] sm:text-xs text-neutral-400 block">Total da Venda</span>
+            <span className="text-base sm:text-sm font-bold text-neutral-100 font-mono-nums">
               {formatCurrency(totalBrl, 'BRL')}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-300 hover:bg-neutral-800 transition-colors"
+              className="py-3 sm:py-2.5 px-3.5 sm:px-4 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-300 hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={handleFinishSale}
-              disabled={remainingBrl > 0.05}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-2"
+              disabled={remainingBrl > 0.05 || isFinishing}
+              className="flex-1 py-3 sm:py-2.5 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Concluir Venda e Emitir Cupom
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{isFinishing ? 'Gravando no Supabase...' : 'Concluir Venda & Cupom'}</span>
             </button>
           </div>
         </div>

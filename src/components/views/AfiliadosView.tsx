@@ -227,7 +227,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     setVisiblePasswordEmpId(prev => (prev === empId ? null : empId));
   };
 
-  const handleCreateAffiliate = (e: React.FormEvent) => {
+  const handleCreateAffiliate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !password.trim()) {
       alert('Por favor, informe pelo menos o nome e a senha do afiliado.');
@@ -238,24 +238,28 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     const cleanPassword = password.trim();
     const cleanEmail = email.trim() || `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
 
-    const created = addEmployee({
-      name: cleanName,
-      email: cleanEmail,
-      pin: cleanPassword.slice(0, 6) || '1234',
-      password: cleanPassword,
-      role,
-      avatarColor: 'bg-indigo-600',
-      allowedFeatures: selectedFeatures,
-    });
+    try {
+      const created = await addEmployee({
+        name: cleanName,
+        email: cleanEmail,
+        pin: cleanPassword.slice(0, 6) || '1234',
+        password: cleanPassword,
+        role,
+        avatarColor: 'bg-indigo-600',
+        allowedFeatures: selectedFeatures,
+      });
 
-    setSuccessMessage(`Afiliado "${created.name}" salvo e sincronizado com sucesso!`);
-    setIsCreating(false);
-    setName('');
-    setEmail('');
-    setPassword('');
-    setSelectedFeatures(['dashboard', 'pdv', 'venda_direta', 'crm']);
+      setSuccessMessage(`Afiliado "${created.name}" salvo e sincronizado com sucesso!`);
+      setIsCreating(false);
+      setName('');
+      setEmail('');
+      setPassword('');
+      setSelectedFeatures(['dashboard', 'pdv', 'venda_direta', 'crm']);
 
-    setTimeout(() => setSuccessMessage(null), 4000);
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      alert(`Falha ao cadastrar afiliado: ${err.message}`);
+    }
   };
 
   const handleOpenEdit = (emp: Employee) => {
@@ -294,7 +298,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-24 lg:pb-0">
       
       {/* Header Banner - Painel de Controle de Afiliados do Admin Ax */}
       <div className="p-6 rounded-2xl bg-[#0D121E] border border-[#1E273A] relative overflow-hidden shadow-xl">

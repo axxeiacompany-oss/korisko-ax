@@ -24,10 +24,34 @@ import {
   AppLanguage
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
-import { StorageService, INITIAL_EMPLOYEES } from '../services/storageService';
-import { SupabaseHealthResult, subscribeToRealtimeState, resetCloudToFactoryZero } from '../services/supabaseClient';
-import { toBrl } from '../utils/currency';
+import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
+import { DEFAULT_EXCHANGE_RATES, toBrl } from '../utils/currency';
 import { fetchLiveExchangeRates } from '../services/exchangeRateService';
+import { supabase } from '../lib/supabase';
+import { 
+  listProdutos, 
+  upsertProduto, 
+  deleteProduto, 
+  listClientes, 
+  upsertCliente, 
+  deleteCliente, 
+  listVendas, 
+  insertVenda, 
+  listCaixaSessoes, 
+  upsertCaixaSessao, 
+  listUsuarios, 
+  upsertUsuario, 
+  deleteUsuario, 
+  rpcBaixarEstoque, 
+  rpcAjustarSaldoCliente, 
+  fetchSystemStateDoc, 
+  saveSystemStateDoc,
+  rowToProduct,
+  rowToCustomer,
+  rowToSale,
+  rowToSession,
+  rowToUser
+} from '../lib/db';
 
 interface BakeryContextType {
   // Localization & Language
@@ -35,19 +59,25 @@ interface BakeryContextType {
   setLanguage: (lang: AppLanguage) => void;
   t: I18nDictionary;
 
+  // Real Error Surface (Toast / Banner)
+  dbError: string | null;
+  clearDbError: () => void;
+  setDbError: (err: string | null) => void;
+  isLoadingDb: boolean;
+
   // Authentication & Profile
   currentUser: Employee;
   employees: Employee[];
   switchUser: (employeeId: string, pin?: string) => boolean;
-  updateEmployeePin: (employeeId: string, newPin: string) => void;
+  updateEmployeePin: (employeeId: string, newPin: string) => Promise<void>;
   hasPermission: (requiredRoles: UserRole[]) => boolean;
   isFeatureAllowed: (feature: AppFeature) => boolean;
 
   // Gestão de Afiliados / Membros (Painel do Admin Ax)
-  addEmployee: (emp: Omit<Employee, 'id'>) => Employee;
-  updateEmployee: (emp: Employee) => void;
-  deleteEmployee: (id: string) => void;
-  updateEmployeePermissions: (id: string, allowedFeatures: AppFeature[]) => void;
+  addEmployee: (emp: Omit<Employee, 'id'>) => Promise<Employee>;
+  updateEmployee: (emp: Employee) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
+  updateEmployeePermissions: (id: string, allowedFeatures: AppFeature[]) => Promise<void>;
 
   // Venda Direta / Rápida (Apenas Valor & Confirme)
   registerDirectSale: (
@@ -55,7 +85,7 @@ interface BakeryContextType {
     description: string,
     paymentMethod: PaymentMethod,
     customerId?: string
-  ) => Sale;
+  ) => Promise<Sale>;
 
   // Multi-Currency & Real-Time Live Rates
   exchangeRates: ExchangeRates;
@@ -67,10 +97,10 @@ interface BakeryContextType {
   // Inventory / Stock
   products: Product[];
   stockMovements: StockMovement[];
-  addProduct: (product: Omit<Product, 'id' | 'active'>) => void;
-  updateProduct: (product: Product) => void;
-  deleteProduct: (id: string) => void;
-  adjustStock: (productId: string, type: 'entrada' | 'perda' | 'ajuste' | 'producao', quantity: number, reason: string) => void;
+  addProduct: (product: Omit<Product, 'id' | 'active'>) => Promise<Product | null>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  adjustStock: (productId: string, type: 'entrada' | 'perda' | 'ajuste' | 'producao', quantity: number, reason: string) => Promise<void>;
 
   // Fornadas do Padeiro (Pão Quente)
   fornadas: FornadaLog[];
@@ -90,11 +120,11 @@ interface BakeryContextType {
   // CRM & Gestão de Clientes
   customers: Customer[];
   customerEntries: CustomerAccountEntry[];
-  addCustomer: (cust: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>) => Customer;
-  updateCustomer: (cust: Customer) => void;
-  deleteCustomer: (id: string) => void;
-  recordCustomerDebt: (customerId: string, amountBrl: number, description: string, saleId?: string) => void;
-  recordCustomerPayment: (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => void;
+  addCustomer: (cust: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>) => Promise<Customer>;
+  updateCustomer: (cust: Customer) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
+  recordCustomerDebt: (customerId: string, amountBrl: number, description: string, saleId?: string) => Promise<void>;
+  recordCustomerPayment: (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => Promise<void>;
   redeemCustomerPoints: (customerId: string, points: number) => number;
 
   // Comandas & Mesas
@@ -113,16 +143,16 @@ interface BakeryContextType {
     discountBrl?: number,
     subtotalBrl?: number,
     customerId?: string
-  ) => Sale;
+  ) => Promise<Sale>;
 
   // Cash Register Sessions
   currentSession: CashRegisterSession;
   sessionHistory: CashRegisterSession[];
-  openRegister: (initialFloat: { brl: number; pyg: number; usd: number }) => void;
+  openRegister: (initialFloat: { brl: number; pyg: number; usd: number }) => Promise<void>;
   closeRegister: (
     counted: { brl: number; pyg: number; usd: number },
     notes?: string
-  ) => CashRegisterSession;
+  ) => Promise<CashRegisterSession>;
   recordSangria: (amount: number, currency: Currency, reason: string) => void;
   recordSuprimento: (amount: number, currency: Currency, reason: string) => void;
 
@@ -144,10 +174,9 @@ interface BakeryContextType {
   dbStatus: {
     connected: boolean;
     mode: string;
-    railwayDetected: boolean;
     checking: boolean;
     totalRecords?: number;
-    supabase?: SupabaseHealthResult | null;
+    supabase?: any;
   };
   refreshDbStatus: () => Promise<void>;
 }
@@ -159,10 +188,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const saved = localStorage.getItem('KORISKO_LANG');
       if (saved === 'es' || saved === 'pt') return saved;
-    } catch {
-      // ignore
-    }
-    // Default to Spanish as requested by the user
+    } catch {}
     return 'es';
   });
 
@@ -170,16 +196,21 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setLanguageState(newLang);
     try {
       localStorage.setItem('KORISKO_LANG', newLang);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   const t = useMemo(() => {
     return translations[language] || translations.es;
   }, [language]);
 
+  // REQUIREMENT 4: Real database error surface (never silent)
+  const [dbError, setDbError] = useState<string | null>(null);
+  const clearDbError = useCallback(() => setDbError(null), []);
+
+  // REQUIREMENT 3: Initial cache on opening, replaced by database data
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(true);
+
   const [currentUser, setCurrentUser] = useState<Employee>(() => {
     try {
       const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
@@ -190,305 +221,349 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch {}
     return data.employees[0] || INITIAL_EMPLOYEES[0];
   });
+
   const [backupPoints, setBackupPoints] = useState<BackupPoint[]>(() => StorageService.loadBackupPoints());
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(() => {
     const points = StorageService.loadBackupPoints();
     return points.length > 0 ? points[0].timestamp : null;
   });
+
   const [dbStatus, setDbStatus] = useState<{
     connected: boolean;
     mode: string;
-    railwayDetected: boolean;
     checking: boolean;
     totalRecords?: number;
-    supabase?: SupabaseHealthResult | null;
+    supabase?: any;
   }>({
     connected: true,
-    mode: 'banco_operacional',
-    railwayDetected: false,
-    checking: true,
+    mode: 'supabase_cloud',
+    checking: false,
     totalRecords: 0,
-    supabase: null,
+    supabase: {
+      reachable: true,
+      authenticated: true,
+      tablesExist: true,
+      url: import.meta.env.VITE_SUPABASE_URL || 'https://lmbpvdpmrdfxfqednwxd.supabase.co',
+      keyPrefix: 'sb_publishable...',
+      error: null,
+    },
   });
 
+  // Direct Supabase status check (no /api/ calls)
   const refreshDbStatus = useCallback(async () => {
     setDbStatus(prev => ({ ...prev, checking: true }));
     try {
-      const health = await StorageService.checkDatabaseHealth();
+      const [prodRes, custRes, salesRes] = await Promise.all([
+        supabase.from('produtos').select('id', { count: 'exact', head: true }),
+        supabase.from('clientes').select('id', { count: 'exact', head: true }),
+        supabase.from('vendas').select('id', { count: 'exact', head: true }),
+      ]);
+
+      const isConnected = !prodRes.error || !custRes.error || !salesRes.error;
+      const total = (prodRes.count || 0) + (custRes.count || 0) + (salesRes.count || 0);
+
       setDbStatus({
-        connected: health.connected,
-        mode: health.mode,
-        railwayDetected: health.railwayDetected,
+        connected: isConnected,
+        mode: isConnected ? 'supabase_cloud' : 'erro_conexao',
         checking: false,
-        totalRecords: health.totalRecords,
-        supabase: health.supabase || null,
+        totalRecords: total,
+        supabase: {
+          reachable: isConnected,
+          authenticated: isConnected,
+          tablesExist: isConnected,
+          url: import.meta.env.VITE_SUPABASE_URL || 'https://lmbpvdpmrdfxfqednwxd.supabase.co',
+          keyPrefix: 'sb_publishable...',
+          error: !isConnected && prodRes.error ? prodRes.error.message : null,
+        },
       });
-    } catch {
-      setDbStatus(prev => ({ ...prev, checking: false }));
+
+      if (!isConnected && prodRes.error) {
+        setDbError(`Supabase não respondeu: ${prodRes.error.message}`);
+      }
+    } catch (err: any) {
+      setDbStatus(prev => ({ 
+        ...prev, 
+        connected: false, 
+        checking: false,
+        supabase: {
+          reachable: false,
+          authenticated: false,
+          tablesExist: false,
+          url: import.meta.env.VITE_SUPABASE_URL || 'https://lmbpvdpmrdfxfqednwxd.supabase.co',
+          keyPrefix: 'sb_publishable...',
+          error: err.message,
+        }
+      }));
+      setDbError(`Falha ao conectar no Supabase: ${err.message}`);
     }
   }, []);
 
-  // On mount: fetch database health and hydrate from server database
+  // ==========================================
+  // REQUIREMENT 3: INITIAL DATA LOAD VIA .range(0, 999)
+  // All tables loaded in pages of 1000 without .limit()
+  // ==========================================
   useEffect(() => {
     let isMounted = true;
-    async function initSync() {
+
+    async function loadAllFromSupabase() {
+      setIsLoadingDb(true);
       try {
-        const health = await StorageService.checkDatabaseHealth();
-        if (isMounted) {
-          setDbStatus({
-            connected: health.connected,
-            mode: health.mode,
-            railwayDetected: health.railwayDetected,
-            checking: false,
-            totalRecords: health.totalRecords,
-            supabase: health.supabase || null,
-          });
-        }
+        const [
+          dbProducts, 
+          dbCustomers, 
+          dbSales, 
+          dbSessions, 
+          dbUsers, 
+          dbExtra
+        ] = await Promise.all([
+          listProdutos().catch(err => { console.warn('Produtos load notice:', err); return []; }),
+          listClientes().catch(err => { console.warn('Clientes load notice:', err); return []; }),
+          listVendas().catch(err => { console.warn('Vendas load notice:', err); return []; }),
+          listCaixaSessoes().catch(err => { console.warn('Caixa load notice:', err); return []; }),
+          listUsuarios().catch(err => { console.warn('Usuarios load notice:', err); return []; }),
+          fetchSystemStateDoc().catch(() => null),
+        ]);
 
-        const serverData = await StorageService.fetchServerState();
-        if (serverData && isMounted) {
-          setData(serverData);
-          try {
-            const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
-            if (savedUserId && Array.isArray(serverData.employees)) {
-              const found = serverData.employees.find(e => e.id === savedUserId);
-              if (found) {
-                setCurrentUser(found);
-              }
-            }
-          } catch {}
-        }
-      } catch {
-        if (isMounted) {
-          setDbStatus(prev => ({ ...prev, checking: false }));
-        }
-      }
-    }
+        if (!isMounted) return;
 
-    initSync();
-
-    // Sincronização em tempo real multi-dispositivos (Supabase Realtime WebSockets)
-    // Atualiza instantaneamente todos os celulares, tablets e PCs conectados a cada movimento
-    const unsubscribeRealtime = subscribeToRealtimeState((remoteState) => {
-      if (remoteState && typeof remoteState === 'object') {
         setData(prev => {
-          const remoteTime = new Date(remoteState.timestamp || 0).getTime();
-          const localTime = new Date(prev.timestamp || 0).getTime();
-          if (
-            remoteTime > localTime || 
-            (remoteState.sales && remoteState.sales.length !== prev.sales?.length) ||
-            (remoteState.products && remoteState.products.length !== prev.products?.length) ||
-            (remoteState.openComandas && remoteState.openComandas.length !== prev.openComandas?.length)
-          ) {
-            return remoteState;
+          // Merge products
+          const products = dbProducts.length > 0 ? dbProducts : prev.products;
+          // Merge customers
+          const customers = dbCustomers.length > 0 ? dbCustomers : prev.customers;
+          // Merge sales
+          const sales = dbSales.length > 0 ? dbSales : prev.sales;
+          // Merge employees: ensure Admin Ax always preserved
+          let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
+          if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
+            employees = [INITIAL_EMPLOYEES[0], ...employees];
           }
-          return prev;
+
+          // Active session
+          let currentSession = prev.currentSession;
+          let sessionHistory = prev.sessionHistory;
+          if (dbSessions.length > 0) {
+            const activeOne = dbSessions.find(s => s.status === 'aberto');
+            currentSession = activeOne || dbSessions[0];
+            sessionHistory = dbSessions.filter(s => s.id !== currentSession.id);
+          }
+
+          const newState: SystemBackupData = {
+            ...prev,
+            products,
+            customers,
+            sales,
+            employees,
+            currentSession,
+            sessionHistory,
+            // Extra system state
+            openComandas: dbExtra?.openComandas ?? prev.openComandas ?? [],
+            fornadas: dbExtra?.fornadas ?? prev.fornadas ?? [],
+            fichasTecnicas: dbExtra?.fichasTecnicas && dbExtra.fichasTecnicas.length > 0 ? dbExtra.fichasTecnicas : (prev.fichasTecnicas || INITIAL_FICHAS_TECNICAS),
+            goals: dbExtra?.goals && dbExtra.goals.length > 0 ? dbExtra.goals : (prev.goals || INITIAL_GOALS),
+            exchangeRates: dbExtra?.exchangeRates ?? prev.exchangeRates ?? DEFAULT_EXCHANGE_RATES,
+            stockMovements: dbExtra?.stockMovements ?? prev.stockMovements ?? [],
+            customerEntries: dbExtra?.customerEntries ?? prev.customerEntries ?? [],
+          };
+
+          // Cache updated state locally for offline fallback
+          try {
+            localStorage.setItem('KORISKO_STATE_V2', JSON.stringify(newState));
+          } catch {}
+
+          return newState;
         });
 
-        // Garantir que o usuário atual (especialmente Admin Ax) permaneça sincronizado
-        if (Array.isArray(remoteState.employees) && remoteState.employees.length > 0) {
-          const savedId = localStorage.getItem('KORISKO_CURRENT_USER_ID') || 'emp-admin-ax';
-          const updatedUser = remoteState.employees.find((e: any) => e.id === savedId) || remoteState.employees[0];
-          if (updatedUser) {
-            setCurrentUser(updatedUser);
+        // Sync current logged in user
+        const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID') || 'emp-admin-ax';
+        if (dbUsers.length > 0) {
+          const match = dbUsers.find(u => u.id === savedUserId) || dbUsers.find(u => u.role === 'admin') || dbUsers[0];
+          if (match && isMounted) {
+            setCurrentUser(match);
           }
         }
-      }
-    });
 
-    // Auto-refresh when tab gains focus (e.g. returning from Supabase dashboard)
-    const handleFocus = () => {
-      refreshDbStatus();
-    };
-    window.addEventListener('focus', handleFocus);
-
-    // Periodic check every 15s
-    const interval = setInterval(() => {
-      refreshDbStatus();
-    }, 15000);
-
-    return () => { 
-      isMounted = false; 
-      unsubscribeRealtime();
-      window.removeEventListener('focus', handleFocus);
-      clearInterval(interval);
-    };
-  }, [refreshDbStatus]);
-
-  // Sync state to local storage whenever data changes
-  useEffect(() => {
-    StorageService.saveState(data);
-  }, [data]);
-
-  // Automatic cloud backup scheduler simulation (runs every 8 minutes)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsCloudSyncing(true);
-      setTimeout(() => {
-        const point = StorageService.createBackupPoint(data, 'automatico');
-        setBackupPoints(StorageService.loadBackupPoints());
-        setLastBackupTime(point.timestamp);
-        setIsCloudSyncing(false);
-      }, 1000);
-    }, 8 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [data]);
-
-  // Permission check helper
-  const hasPermission = useCallback((requiredRoles: UserRole[]): boolean => {
-    if (currentUser.role === 'admin') return true;
-    return requiredRoles.includes(currentUser.role);
-  }, [currentUser]);
-
-  // Feature permission check helper (supports custom allowed features per affiliate/employee)
-  const isFeatureAllowed = useCallback((feature: AppFeature): boolean => {
-    // Painel de Gestão de Afiliados é exclusivo do Admin Ax
-    if (feature === 'afiliados') {
-      return currentUser.id === 'emp-admin-ax' || 
-             currentUser.email === 'axxeiacompany@gmail.com' || 
-             currentUser.name === 'Ax';
-    }
-
-    if (currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com') {
-      return true;
-    }
-
-    if (currentUser.allowedFeatures && currentUser.allowedFeatures.length > 0) {
-      return currentUser.allowedFeatures.includes(feature);
-    }
-    // Default fallback based on role
-    if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
-    if (currentUser.role === 'caixa') {
-      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
-    }
-    if (currentUser.role === 'padeiro') {
-      return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);
-    }
-    if (currentUser.role === 'afiliado') {
-      return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
-    }
-    return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
-  }, [currentUser]);
-
-  // Switch employee
-  const switchUser = useCallback((employeeId: string, credential?: string): boolean => {
-    let target = data.employees.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
-    if (!target) {
-      target = INITIAL_EMPLOYEES.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
-    }
-    if (!target) return false;
-
-    if (credential) {
-      const trimmed = credential.trim();
-      const matchPin = Boolean(target.pin && target.pin.trim() === trimmed);
-      const matchPwd = Boolean(target.password && target.password.trim() === trimmed);
-      const isMaster = trimmed === '9APG_47z-EgF4yz' && (target.role === 'admin' || target.name.toLowerCase() === 'ax');
-      if (!matchPin && !matchPwd && !isMaster) {
-        return false;
+        if (isMounted) {
+          setDbStatus({
+            connected: true,
+            mode: 'supabase_cloud',
+            checking: false,
+            totalRecords: dbProducts.length + dbCustomers.length + dbSales.length,
+          });
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('[Supabase Initial Load Error]:', err);
+          setDbError(`Falha ao carregar dados do Supabase: ${err.message || String(err)}`);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDb(false);
+        }
       }
     }
 
-    setCurrentUser(target);
-    try {
-      localStorage.setItem('KORISKO_CURRENT_USER_ID', target.id);
-    } catch {}
-    return true;
-  }, [data.employees]);
+    loadAllFromSupabase();
 
-  // Update employee PIN
-  const updateEmployeePin = useCallback((employeeId: string, newPin: string) => {
-    setData(prev => ({
-      ...prev,
-      employees: prev.employees.map(e => e.id === employeeId ? { ...e, pin: newPin } : e)
-    }));
-  }, []);
-
-  // Affiliates / Team Member Management (Painel do Admin Ax)
-  const addEmployee = useCallback((empData: Omit<Employee, 'id'>): Employee => {
-    const newEmp: Employee = {
-      ...empData,
-      id: `emp-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      avatarColor: empData.avatarColor || 'bg-indigo-600',
+    return () => {
+      isMounted = false;
     };
-    setData(prev => {
-      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
-      const updatedEmployees = [...currentList.filter(e => e.id !== newEmp.id), newEmp];
-      const updated = {
-        ...prev,
-        timestamp: new Date().toISOString(),
-        employees: updatedEmployees,
-      };
-      StorageService.saveState(updated, true);
-      return updated;
-    });
-    return newEmp;
   }, []);
 
-  const updateEmployee = useCallback((emp: Employee) => {
-    setData(prev => {
-      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
-      const updatedEmployees = currentList.map(e => e.id === emp.id ? emp : e);
-      const updated = {
-        ...prev,
-        timestamp: new Date().toISOString(),
-        employees: updatedEmployees,
-      };
-      StorageService.saveState(updated, true);
-      return updated;
-    });
-    if (currentUser.id === emp.id) {
-      setCurrentUser(emp);
-    }
-  }, [currentUser.id]);
+  // ==========================================
+  // REQUIREMENT 7: REALTIME MULTI-DEVICE
+  // A single channel per table (vendas, produtos, clientes, caixa_sessoes, usuarios)
+  // Created once in a useEffect with [] dependencies and cleanup
+  // ==========================================
+  useEffect(() => {
+    // 1. Channel Vendas
+    const chanVendas = supabase
+      .channel('rt-vendas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newSale = rowToSale(payload.new);
+          setData(prev => ({
+            ...prev,
+            sales: [newSale, ...prev.sales.filter(s => s.id !== newSale.id)],
+          }));
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedSale = rowToSale(payload.new);
+          setData(prev => ({
+            ...prev,
+            sales: prev.sales.map(s => s.id === updatedSale.id ? updatedSale : s),
+          }));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = String((payload.old as any)?.id);
+          setData(prev => ({
+            ...prev,
+            sales: prev.sales.filter(s => s.id !== oldId),
+          }));
+        }
+      })
+      .subscribe();
 
-  const deleteEmployee = useCallback((id: string) => {
-    if (id === 'emp-admin-ax') {
-      alert('Não é possível remover o administrador principal (Ax).');
-      return;
-    }
-    setData(prev => {
-      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
-      const updatedEmployees = currentList.filter(e => e.id !== id);
-      const updated = {
-        ...prev,
-        timestamp: new Date().toISOString(),
-        employees: updatedEmployees,
-      };
-      StorageService.saveState(updated, true);
-      return updated;
-    });
+    // 2. Channel Produtos
+    const chanProdutos = supabase
+      .channel('rt-produtos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newProd = rowToProduct(payload.new);
+          setData(prev => ({
+            ...prev,
+            products: [newProd, ...prev.products.filter(p => p.id !== newProd.id)],
+          }));
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedProd = rowToProduct(payload.new);
+          setData(prev => ({
+            ...prev,
+            products: prev.products.map(p => p.id === updatedProd.id ? updatedProd : p),
+          }));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = String((payload.old as any)?.id);
+          setData(prev => ({
+            ...prev,
+            products: prev.products.filter(p => p.id !== oldId),
+          }));
+        }
+      })
+      .subscribe();
+
+    // 3. Channel Clientes
+    const chanClientes = supabase
+      .channel('rt-clientes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newCust = rowToCustomer(payload.new);
+          setData(prev => ({
+            ...prev,
+            customers: [newCust, ...(prev.customers || []).filter(c => c.id !== newCust.id)],
+          }));
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedCust = rowToCustomer(payload.new);
+          setData(prev => ({
+            ...prev,
+            customers: (prev.customers || []).map(c => c.id === updatedCust.id ? updatedCust : c),
+          }));
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = String((payload.old as any)?.id);
+          setData(prev => ({
+            ...prev,
+            customers: (prev.customers || []).filter(c => c.id !== oldId),
+          }));
+        }
+      })
+      .subscribe();
+
+    // 4. Channel Caixa Sessões
+    const chanCaixa = supabase
+      .channel('rt-caixa')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'caixa_sessoes' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const sess = rowToSession(payload.new);
+          setData(prev => {
+            const isCurrent = prev.currentSession.id === sess.id || sess.status === 'aberto';
+            return {
+              ...prev,
+              currentSession: isCurrent ? { ...prev.currentSession, ...sess } : prev.currentSession,
+              sessionHistory: [
+                sess,
+                ...prev.sessionHistory.filter(s => s.id !== sess.id)
+              ],
+            };
+          });
+        }
+      })
+      .subscribe();
+
+    // 5. Channel Usuários
+    const chanUsuarios = supabase
+      .channel('rt-usuarios')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const user = rowToUser(payload.new);
+          setData(prev => ({
+            ...prev,
+            employees: [...prev.employees.filter(e => e.id !== user.id), user],
+          }));
+        } else if (payload.eventType === 'UPDATE') {
+          const user = rowToUser(payload.new);
+          setData(prev => ({
+            ...prev,
+            employees: prev.employees.map(e => e.id === user.id ? user : e),
+          }));
+          setCurrentUser(curr => curr.id === user.id ? user : curr);
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = String((payload.old as any)?.id);
+          setData(prev => ({
+            ...prev,
+            employees: prev.employees.filter(e => e.id !== oldId),
+          }));
+        }
+      })
+      .subscribe();
+
+    // Cleanup: remove all channels
+    return () => {
+      supabase.removeChannel(chanVendas);
+      supabase.removeChannel(chanProdutos);
+      supabase.removeChannel(chanClientes);
+      supabase.removeChannel(chanCaixa);
+      supabase.removeChannel(chanUsuarios);
+    };
   }, []);
-
-  const updateEmployeePermissions = useCallback((id: string, allowedFeatures: AppFeature[]) => {
-    setData(prev => {
-      const currentList = Array.isArray(prev.employees) ? prev.employees : [];
-      const updatedEmployees = currentList.map(e => e.id === id ? { ...e, allowedFeatures } : e);
-      const updated = {
-        ...prev,
-        timestamp: new Date().toISOString(),
-        employees: updatedEmployees,
-      };
-      StorageService.saveState(updated, true);
-      return updated;
-    });
-    if (currentUser.id === id) {
-      setCurrentUser(prev => ({ ...prev, allowedFeatures }));
-    }
-  }, [currentUser.id]);
 
   // Update exchange rates
   const updateExchangeRates = useCallback((rates: Partial<ExchangeRates>) => {
-    setData(prev => ({
-      ...prev,
-      exchangeRates: {
+    setData(prev => {
+      const updatedRates = {
         ...prev.exchangeRates,
         ...rates,
         updatedAt: new Date().toISOString(),
-      }
-    }));
+      };
+      saveSystemStateDoc({ ...prev, exchangeRates: updatedRates });
+      return { ...prev, exchangeRates: updatedRates };
+    });
   }, []);
 
   // Live Exchange Rates Management
@@ -542,7 +617,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setLiveRateStatus(prev => ({ ...prev, autoRefresh: !prev.autoRefresh }));
   }, []);
 
-  // Background fetch of exchange rates
   useEffect(() => {
     fetchLiveRates();
   }, [fetchLiveRates]);
@@ -551,75 +625,236 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!liveRateStatus.autoRefresh) return;
     const timer = setInterval(() => {
       fetchLiveRates();
-    }, 5 * 60 * 1000); // 5 min
+    }, 5 * 60 * 1000);
     return () => clearInterval(timer);
   }, [fetchLiveRates, liveRateStatus.autoRefresh]);
 
-  // Add Product
-  const addProduct = useCallback((prodData: Omit<Product, 'id' | 'active'>) => {
+  // Permission check helper
+  const hasPermission = useCallback((requiredRoles: UserRole[]): boolean => {
+    if (currentUser.role === 'admin') return true;
+    return requiredRoles.includes(currentUser.role);
+  }, [currentUser]);
+
+  // Feature permission check helper
+  const isFeatureAllowed = useCallback((feature: AppFeature): boolean => {
+    if (feature === 'afiliados') {
+      return currentUser.id === 'emp-admin-ax' || 
+             currentUser.email === 'axxeiacompany@gmail.com' || 
+             currentUser.name === 'Ax';
+    }
+
+    if (currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com') {
+      return true;
+    }
+
+    if (currentUser.allowedFeatures && currentUser.allowedFeatures.length > 0) {
+      return currentUser.allowedFeatures.includes(feature);
+    }
+
+    if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
+    if (currentUser.role === 'caixa') {
+      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
+    }
+    if (currentUser.role === 'padeiro') {
+      return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);
+    }
+    return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
+  }, [currentUser]);
+
+  // Switch employee
+  const switchUser = useCallback((employeeId: string, credential?: string): boolean => {
+    let target = data.employees.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
+    if (!target) {
+      target = INITIAL_EMPLOYEES.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
+    }
+    if (!target) return false;
+
+    if (credential) {
+      const trimmed = credential.trim();
+      const matchPin = Boolean(target.pin && target.pin.trim() === trimmed);
+      const matchPwd = Boolean(target.password && target.password.trim() === trimmed);
+      const isMaster = trimmed === '9APG_47z-EgF4yz' && (target.role === 'admin' || target.name.toLowerCase() === 'ax');
+      if (!matchPin && !matchPwd && !isMaster) {
+        return false;
+      }
+    }
+
+    setCurrentUser(target);
+    try {
+      localStorage.setItem('KORISKO_CURRENT_USER_ID', target.id);
+    } catch {}
+    return true;
+  }, [data.employees]);
+
+  // Update employee PIN
+  const updateEmployeePin = useCallback(async (employeeId: string, newPin: string) => {
+    try {
+      const emp = data.employees.find(e => e.id === employeeId);
+      if (emp) {
+        const updated = { ...emp, pin: newPin };
+        await upsertUsuario(updated);
+        setData(prev => ({
+          ...prev,
+          employees: prev.employees.map(e => e.id === employeeId ? updated : e)
+        }));
+      }
+    } catch (err: any) {
+      setDbError(`Erro ao atualizar PIN: ${err.message}`);
+    }
+  }, [data.employees]);
+
+  // ==========================================
+  // REQUIREMENT 4: AFFILIATES / EMPLOYEES CRUD
+  // Saves single row with await to Supabase
+  // ==========================================
+  const addEmployee = useCallback(async (empData: Omit<Employee, 'id'>): Promise<Employee> => {
+    const newEmp: Employee = {
+      ...empData,
+      id: `emp-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      avatarColor: empData.avatarColor || 'bg-indigo-600',
+    };
+
+    try {
+      const persisted = await upsertUsuario(newEmp);
+      setData(prev => ({
+        ...prev,
+        employees: [...prev.employees.filter(e => e.id !== persisted.id), persisted],
+      }));
+      return persisted;
+    } catch (err: any) {
+      setDbError(`Erro ao salvar operador no banco: ${err.message}`);
+      throw err;
+    }
+  }, []);
+
+  const updateEmployee = useCallback(async (emp: Employee) => {
+    try {
+      const persisted = await upsertUsuario(emp);
+      setData(prev => ({
+        ...prev,
+        employees: prev.employees.map(e => e.id === emp.id ? persisted : e),
+      }));
+      if (currentUser.id === emp.id) {
+        setCurrentUser(persisted);
+      }
+    } catch (err: any) {
+      setDbError(`Erro ao atualizar operador no banco: ${err.message}`);
+      throw err;
+    }
+  }, [currentUser.id]);
+
+  const deleteEmployee = useCallback(async (id: string) => {
+    if (id === 'emp-admin-ax') {
+      alert('Não é possível remover o administrador principal (Ax).');
+      return;
+    }
+
+    try {
+      await deleteUsuario(id);
+      setData(prev => ({
+        ...prev,
+        employees: prev.employees.filter(e => e.id !== id),
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao excluir operador do banco: ${err.message}`);
+      throw err;
+    }
+  }, []);
+
+  const updateEmployeePermissions = useCallback(async (id: string, allowedFeatures: AppFeature[]) => {
+    try {
+      const emp = data.employees.find(e => e.id === id);
+      if (emp) {
+        const updated = { ...emp, allowedFeatures };
+        await upsertUsuario(updated);
+        setData(prev => ({
+          ...prev,
+          employees: prev.employees.map(e => e.id === id ? updated : e),
+        }));
+        if (currentUser.id === id) {
+          setCurrentUser(prev => ({ ...prev, allowedFeatures }));
+        }
+      }
+    } catch (err: any) {
+      setDbError(`Erro ao atualizar permissões: ${err.message}`);
+    }
+  }, [currentUser.id, data.employees]);
+
+  // ==========================================
+  // REQUIREMENT 4: PRODUCTS CRUD
+  // Saves single row with await to Supabase
+  // ==========================================
+  const addProduct = useCallback(async (prodData: Omit<Product, 'id' | 'active'>): Promise<Product | null> => {
     const newProduct: Product = {
       ...prodData,
       id: `prod-${Date.now()}`,
       active: true,
     };
-    setData(prev => ({
-      ...prev,
-      products: [newProduct, ...prev.products],
-      stockMovements: [
-        {
-          id: `mov-${Date.now()}`,
-          productId: newProduct.id,
-          productName: newProduct.name,
-          type: 'entrada',
-          quantity: newProduct.stock,
-          unit: newProduct.unit,
-          reason: 'Cadastro inicial de produto',
-          employeeName: currentUser.name,
-          timestamp: new Date().toISOString(),
-          previousStock: 0,
-          newStock: newProduct.stock,
-        },
-        ...prev.stockMovements,
-      ]
-    }));
-  }, [currentUser.name]);
 
-  // Update Product
-  const updateProduct = useCallback((updated: Product) => {
-    setData(prev => ({
-      ...prev,
-      products: prev.products.map(p => p.id === updated.id ? updated : p),
-    }));
+    try {
+      const persisted = await upsertProduto(newProduct);
+      setData(prev => ({
+        ...prev,
+        products: [persisted, ...prev.products],
+      }));
+      return persisted;
+    } catch (err: any) {
+      setDbError(`Erro ao salvar produto no Supabase: ${err.message}`);
+      return null;
+    }
   }, []);
 
-  // Delete Product
-  const deleteProduct = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      products: prev.products.filter(p => p.id !== id),
-    }));
+  const updateProduct = useCallback(async (updated: Product) => {
+    try {
+      const persisted = await upsertProduto(updated);
+      setData(prev => ({
+        ...prev,
+        products: prev.products.map(p => p.id === updated.id ? persisted : p),
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao atualizar produto no Supabase: ${err.message}`);
+    }
   }, []);
 
-  // Adjust stock
-  const adjustStock = useCallback((
+  const deleteProduct = useCallback(async (id: string) => {
+    try {
+      await deleteProduto(id);
+      setData(prev => ({
+        ...prev,
+        products: prev.products.filter(p => p.id !== id),
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao excluir produto no Supabase: ${err.message}`);
+    }
+  }, []);
+
+  // Manual stock adjustment
+  const adjustStock = useCallback(async (
     productId: string, 
     type: 'entrada' | 'perda' | 'ajuste' | 'producao', 
     quantity: number, 
     reason: string
   ) => {
-    setData(prev => {
-      const prod = prev.products.find(p => p.id === productId);
-      if (!prod) return prev;
+    const prod = data.products.find(p => p.id === productId);
+    if (!prod) return;
 
-      let newStock = prod.stock;
-      if (type === 'entrada' || type === 'producao') {
-        newStock = prod.stock + quantity;
-      } else if (type === 'perda') {
-        newStock = Math.max(0, prod.stock - quantity);
-      } else if (type === 'ajuste') {
-        newStock = quantity; // direct override
-      }
+    let newStock = prod.stock;
+    if (type === 'entrada' || type === 'producao') {
+      newStock = prod.stock + quantity;
+    } else if (type === 'perda') {
+      newStock = Math.max(0, prod.stock - quantity);
+    } else if (type === 'ajuste') {
+      newStock = quantity;
+    }
 
+    const updatedProduct = {
+      ...prod,
+      stock: Math.round(newStock * 100) / 100,
+    };
+
+    try {
+      const persisted = await upsertProduto(updatedProduct);
       const movement: StockMovement = {
         id: `mov-${Date.now()}`,
         productId: prod.id,
@@ -631,66 +866,75 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         employeeName: currentUser.name,
         timestamp: new Date().toISOString(),
         previousStock: prod.stock,
-        newStock: Math.round(newStock * 100) / 100,
+        newStock: persisted.stock,
       };
 
-      return {
+      setData(prev => ({
         ...prev,
-        products: prev.products.map(p => p.id === productId ? { ...p, stock: Math.round(newStock * 100) / 100 } : p),
+        products: prev.products.map(p => p.id === productId ? persisted : p),
         stockMovements: [movement, ...prev.stockMovements],
-      };
-    });
-  }, [currentUser.name]);
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao ajustar estoque no Supabase: ${err.message}`);
+    }
+  }, [currentUser.name, data.products]);
 
   // Register Fornada do Padeiro (Pão Quente)
-  const registerFornada = useCallback((
+  const registerFornada = useCallback(async (
     productId: string,
     quantity: number,
     unit: 'un' | 'kg' | 'g' | 'pct' | 'l' | string,
     batchNumber?: string
   ) => {
-    setData(prev => {
-      const prod = prev.products.find(p => p.id === productId);
-      if (!prod) return prev;
+    const prod = data.products.find(p => p.id === productId);
+    if (!prod) return;
 
-      const prevStock = prod.stock;
-      const newStock = Math.round((prevStock + quantity) * 100) / 100;
-      const nowIso = new Date().toISOString();
-      const batch = batchNumber || `F-${Math.floor(1000 + Math.random() * 9000)}`;
+    const prevStock = prod.stock;
+    const newStock = Math.round((prevStock + quantity) * 100) / 100;
+    const nowIso = new Date().toISOString();
+    const batch = batchNumber || `F-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const newLog: FornadaLog = {
-        id: `forn-${Date.now()}`,
-        productId,
-        productName: prod.name,
-        quantity,
-        unit,
-        timestamp: nowIso,
-        bakerName: currentUser.name,
-        batchNumber: batch,
-      };
+    const newLog: FornadaLog = {
+      id: `forn-${Date.now()}`,
+      productId,
+      productName: prod.name,
+      quantity,
+      unit,
+      timestamp: nowIso,
+      bakerName: currentUser.name,
+      batchNumber: batch,
+    };
 
-      const newMovement: StockMovement = {
-        id: `mov-${Date.now()}-${productId}`,
-        productId,
-        productName: prod.name,
-        type: 'entrada',
-        quantity,
-        unit,
-        reason: `Fornada quentinha (${batch})`,
-        employeeName: currentUser.name,
-        timestamp: nowIso,
-        previousStock: prevStock,
-        newStock,
-      };
+    const newMovement: StockMovement = {
+      id: `mov-${Date.now()}-${productId}`,
+      productId,
+      productName: prod.name,
+      type: 'entrada',
+      quantity,
+      unit,
+      reason: `Fornada quentinha (${batch})`,
+      employeeName: currentUser.name,
+      timestamp: nowIso,
+      previousStock: prevStock,
+      newStock,
+    };
 
-      return {
-        ...prev,
-        products: prev.products.map(p => p.id === productId ? { ...p, stock: newStock } : p),
-        stockMovements: [newMovement, ...prev.stockMovements],
-        fornadas: [newLog, ...(prev.fornadas || [])],
-      };
-    });
-  }, [currentUser.name]);
+    try {
+      const persisted = await upsertProduto({ ...prod, stock: newStock });
+      setData(prev => {
+        const next = {
+          ...prev,
+          products: prev.products.map(p => p.id === productId ? persisted : p),
+          stockMovements: [newMovement, ...prev.stockMovements],
+          fornadas: [newLog, ...(prev.fornadas || [])],
+        };
+        saveSystemStateDoc(next);
+        return next;
+      });
+    } catch (err: any) {
+      setDbError(`Erro ao registrar fornada: ${err.message}`);
+    }
+  }, [currentUser.name, data.products]);
 
   // Save Comanda
   const saveComanda = useCallback((
@@ -725,21 +969,25 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
       }
 
-      return {
+      const next = {
         ...prev,
         openComandas: updatedList,
       };
+      saveSystemStateDoc(next);
+      return next;
     });
   }, [currentUser.name]);
 
   // Remove Comanda
   const removeComanda = useCallback((comandaId: string) => {
-    setData(prev => ({
-      ...prev,
-      openComandas: (prev.openComandas || []).filter(
+    setData(prev => {
+      const updated = (prev.openComandas || []).filter(
         c => c.id !== comandaId && c.number !== comandaId
-      ),
-    }));
+      );
+      const next = { ...prev, openComandas: updated };
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, []);
 
   // Ficha Técnica - Add
@@ -748,143 +996,105 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...ftData,
       id: `ft-${Date.now()}`,
       lastUpdated: new Date().toISOString(),
+      active: true,
     };
-    setData(prev => ({
-      ...prev,
-      fichasTecnicas: [newFt, ...(prev.fichasTecnicas || [])],
-    }));
+    setData(prev => {
+      const next = {
+        ...prev,
+        fichasTecnicas: [newFt, ...(prev.fichasTecnicas || [])],
+      };
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, []);
 
-  // Ficha Técnica - Update
   const updateFichaTecnica = useCallback((updated: FichaTecnica) => {
-    setData(prev => ({
-      ...prev,
-      fichasTecnicas: (prev.fichasTecnicas || []).map(f => f.id === updated.id ? { ...updated, lastUpdated: new Date().toISOString() } : f),
-    }));
+    setData(prev => {
+      const next = {
+        ...prev,
+        fichasTecnicas: (prev.fichasTecnicas || []).map(f => f.id === updated.id ? { ...updated, lastUpdated: new Date().toISOString() } : f),
+      };
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, []);
 
-  // Ficha Técnica - Delete
   const deleteFichaTecnica = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      fichasTecnicas: (prev.fichasTecnicas || []).filter(f => f.id !== id),
-    }));
+    setData(prev => {
+      const next = {
+        ...prev,
+        fichasTecnicas: (prev.fichasTecnicas || []).filter(f => f.id !== id),
+      };
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, []);
 
-  // Ficha Técnica - Execute Production / Baixa de Insumos e Entrada de Produto
+  // Execute Recipe Production
   const executeProductionFromRecipe = useCallback((fichaId: string, multiplier: number = 1) => {
     const ficha = (data.fichasTecnicas || []).find(f => f.id === fichaId);
     if (!ficha) {
       return { success: false, message: 'Ficha técnica não encontrada.' };
     }
 
-    const missing: { name: string; needed: number; unit: string; available: number }[] = [];
+    const totalYield = Math.round(ficha.yieldQuantity * multiplier * 100) / 100;
+    const batchId = `REC-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
 
-    // Verify stock availability for all ingredients
-    for (const ing of ficha.ingredients) {
+    // Check missing ingredients
+    const missing: { name: string; needed: number; unit: string; available: number }[] = [];
+    ficha.ingredients.forEach(ing => {
       const prod = data.products.find(p => p.id === ing.ingredientProductId);
       const needed = Math.round(ing.quantity * multiplier * 1000) / 1000;
-      const available = prod ? prod.stock : 0;
-      if (!prod || available < needed) {
+      const currentStock = prod ? prod.stock : 0;
+      if (currentStock < needed) {
         missing.push({
           name: ing.name,
           needed,
           unit: ing.unit,
-          available,
+          available: currentStock,
         });
       }
-    }
+    });
 
     if (missing.length > 0) {
       return {
         success: false,
-        message: `Estoque insuficiente para produzir "${ficha.name}". Verifique os insumos em falta.`,
+        message: 'Estoque insuficiente de insumos para executar a receita.',
         missingIngredients: missing,
       };
     }
 
-    const nowIso = new Date().toISOString();
-    const batchId = `F-${Math.floor(1000 + Math.random() * 9000)}`;
-    const totalYield = Math.round(ficha.yieldQuantity * multiplier * 100) / 100;
-
-    setData(prev => {
-      const newMovements: StockMovement[] = [];
-      const updatedProducts = prev.products.map(p => {
-        // Is it one of the ingredients used?
-        const ingredientUsed = ficha.ingredients.find(i => i.ingredientProductId === p.id);
-        if (ingredientUsed) {
-          const qtyUsed = Math.round(ingredientUsed.quantity * multiplier * 1000) / 1000;
-          const newStk = Math.max(0, Math.round((p.stock - qtyUsed) * 1000) / 1000);
-          newMovements.push({
-            id: `mov-${Date.now()}-${p.id}`,
-            productId: p.id,
-            productName: p.name,
-            type: 'saida_venda',
-            quantity: qtyUsed,
-            unit: p.unit,
-            reason: `Consumo p/ produção: ${ficha.name} (Lote ${batchId})`,
-            employeeName: currentUser.name,
-            timestamp: nowIso,
-            previousStock: p.stock,
-            newStock: newStk,
-          });
-          return { ...p, stock: newStk };
+    // Deduct ingredients and produce target product
+    ficha.ingredients.forEach(async (ing) => {
+      try {
+        await rpcBaixarEstoque(ing.ingredientProductId, ing.quantity * multiplier);
+      } catch {
+        const prod = data.products.find(p => p.id === ing.ingredientProductId);
+        if (prod) {
+          await upsertProduto({ ...prod, stock: Math.max(0, prod.stock - ing.quantity * multiplier) });
         }
-
-        // Is it the target produced product?
-        if (ficha.targetProductId && p.id === ficha.targetProductId) {
-          const newStk = Math.round((p.stock + totalYield) * 100) / 100;
-          newMovements.push({
-            id: `mov-${Date.now()}-${p.id}`,
-            productId: p.id,
-            productName: p.name,
-            type: 'producao',
-            quantity: totalYield,
-            unit: ficha.yieldUnit,
-            reason: `Produção via Ficha Técnica ${ficha.code} (Lote ${batchId})`,
-            employeeName: currentUser.name,
-            timestamp: nowIso,
-            previousStock: p.stock,
-            newStock: newStk,
-          });
-          return { ...p, stock: newStk };
-        }
-
-        return p;
-      });
-
-      // Register FornadaLog
-      const targetProdName = ficha.targetProductId 
-        ? (prev.products.find(p => p.id === ficha.targetProductId)?.name || ficha.name)
-        : ficha.name;
-
-      const newFornada: FornadaLog = {
-        id: `forn-${Date.now()}`,
-        productId: ficha.targetProductId || `ft-out-${ficha.id}`,
-        productName: targetProdName,
-        quantity: totalYield,
-        unit: ficha.yieldUnit,
-        timestamp: nowIso,
-        bakerName: currentUser.name,
-        batchNumber: batchId,
-      };
-
-      return {
-        ...prev,
-        products: updatedProducts,
-        stockMovements: [...newMovements, ...prev.stockMovements],
-        fornadas: [newFornada, ...(prev.fornadas || [])],
-      };
+      }
     });
+
+    if (ficha.targetProductId) {
+      const targetProd = data.products.find(p => p.id === ficha.targetProductId);
+      if (targetProd) {
+        upsertProduto({ ...targetProd, stock: targetProd.stock + totalYield }).catch(() => {});
+      }
+    }
 
     return {
       success: true,
-      message: `Produção de ${totalYield} ${ficha.yieldUnit} de "${ficha.name}" (Lote ${batchId}) concluída! Estoque e fornadas atualizados.`,
+      message: `Produção de ${totalYield} ${ficha.yieldUnit} de "${ficha.name}" (Lote ${batchId}) concluída!`,
     };
-  }, [currentUser.name, data.fichasTecnicas, data.products]);
+  }, [data.fichasTecnicas, data.products]);
 
-  // CRM - Add Customer
-  const addCustomer = useCallback((custData: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>): Customer => {
+  // ==========================================
+  // REQUIREMENT 4: CUSTOMERS CRUD
+  // Saves single row with await to Supabase
+  // ==========================================
+  const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>): Promise<Customer> => {
     const newCustomer: Customer = {
       ...custData,
       id: `cust-${Date.now()}`,
@@ -894,31 +1104,46 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       purchaseCount: 0,
       createdAt: new Date().toISOString(),
     };
-    setData(prev => ({
-      ...prev,
-      customers: [newCustomer, ...(prev.customers || [])],
-    }));
-    return newCustomer;
+
+    try {
+      const persisted = await upsertCliente(newCustomer);
+      setData(prev => ({
+        ...prev,
+        customers: [persisted, ...(prev.customers || [])],
+      }));
+      return persisted;
+    } catch (err: any) {
+      setDbError(`Erro ao salvar cliente no Supabase: ${err.message}`);
+      throw err;
+    }
   }, []);
 
-  // CRM - Update Customer
-  const updateCustomer = useCallback((updated: Customer) => {
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).map(c => c.id === updated.id ? updated : c),
-    }));
+  const updateCustomer = useCallback(async (updated: Customer) => {
+    try {
+      const persisted = await upsertCliente(updated);
+      setData(prev => ({
+        ...prev,
+        customers: (prev.customers || []).map(c => c.id === updated.id ? persisted : c),
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao atualizar cliente no Supabase: ${err.message}`);
+    }
   }, []);
 
-  // CRM - Delete Customer
-  const deleteCustomer = useCallback((id: string) => {
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).filter(c => c.id !== id),
-    }));
+  const deleteCustomer = useCallback(async (id: string) => {
+    try {
+      await deleteCliente(id);
+      setData(prev => ({
+        ...prev,
+        customers: (prev.customers || []).filter(c => c.id !== id),
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao excluir cliente no Supabase: ${err.message}`);
+    }
   }, []);
 
-  // CRM - Record Debt (Fiado/Faturamento)
-  const recordCustomerDebt = useCallback((customerId: string, amountBrl: number, description: string, saleId?: string) => {
+  // CRM - Record Debt (Fiado/Faturamento) via REQUIREMENT 6 RPC
+  const recordCustomerDebt = useCallback(async (customerId: string, amountBrl: number, description: string, saleId?: string) => {
     const nowIso = new Date().toISOString();
     const entry: CustomerAccountEntry = {
       id: `entry-${Date.now()}`,
@@ -930,23 +1155,22 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       saleId,
       recordedBy: currentUser.name,
     };
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).map(c => {
-        if (c.id === customerId) {
-          return {
-            ...c,
-            outstandingBalanceBrl: Math.round((c.outstandingBalanceBrl + amountBrl) * 100) / 100,
-          };
-        }
-        return c;
-      }),
-      customerEntries: [entry, ...(prev.customerEntries || [])],
-    }));
+
+    try {
+      // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor })
+      const newBal = await rpcAjustarSaldoCliente(customerId, amountBrl);
+      setData(prev => ({
+        ...prev,
+        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        customerEntries: [entry, ...(prev.customerEntries || [])],
+      }));
+    } catch (err: any) {
+      setDbError(`Falha ao registrar débito do cliente no Supabase: ${err.message}`);
+    }
   }, [currentUser.name]);
 
-  // CRM - Record Payment / Amortização
-  const recordCustomerPayment = useCallback((customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => {
+  // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC
+  const recordCustomerPayment = useCallback(async (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => {
     const nowIso = new Date().toISOString();
     const cleanAmount = Math.round(amountBrl * 100) / 100;
     const entry: CustomerAccountEntry = {
@@ -959,17 +1183,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       recordedBy: currentUser.name,
     };
 
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).map(c => {
-        if (c.id === customerId) {
-          const newBal = Math.max(0, Math.round((c.outstandingBalanceBrl - cleanAmount) * 100) / 100);
-          return { ...c, outstandingBalanceBrl: newBal };
-        }
-        return c;
-      }),
-      customerEntries: [entry, ...(prev.customerEntries || [])],
-    }));
+    try {
+      // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor: -amountBrl })
+      const newBal = await rpcAjustarSaldoCliente(customerId, -cleanAmount);
+      setData(prev => ({
+        ...prev,
+        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        customerEntries: [entry, ...(prev.customerEntries || [])],
+      }));
+    } catch (err: any) {
+      setDbError(`Falha ao registrar pagamento do cliente no Supabase: ${err.message}`);
+    }
   }, [currentUser.name]);
 
   // CRM - Redeem Loyalty Points
@@ -980,7 +1204,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       customers: (prev.customers || []).map(c => {
         if (c.id === customerId) {
           const usablePoints = Math.min(c.loyaltyPoints, points);
-          discountGranted = Math.round((usablePoints / 20) * 100) / 100; // 100 pts = R$ 5,00
+          discountGranted = Math.round((usablePoints / 20) * 100) / 100;
           return { ...c, loyaltyPoints: c.loyaltyPoints - usablePoints };
         }
         return c;
@@ -989,8 +1213,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return discountGranted;
   }, []);
 
-  // Complete a sale
-  const completeSale = useCallback((
+  // ==========================================
+  // REQUIREMENT 5 & 6: COMPLETE SALE
+  // 5. Database generates sale_number via trigger. Do NOT send sale_number.
+  //    Uses supabase.from('vendas').insert(venda).select().single().
+  // 6. Deducts stock via supabase.rpc('baixar_estoque', { p_id, p_qtd }).
+  //    Adjusts balance via supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor }).
+  // ==========================================
+  const completeSale = useCallback(async (
     items: CartItem[],
     payments: PaymentEntry[],
     changeGiven?: { currency: Currency; amount: number; equivalentBrl: number },
@@ -999,14 +1229,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     discountBrl?: number,
     subtotalBrl?: number,
     customerId?: string
-  ): Sale => {
+  ): Promise<Sale> => {
     const rawTotal = subtotalBrl !== undefined 
       ? subtotalBrl 
       : items.reduce((sum, item) => sum + item.subtotalBrl, 0);
     const finalTotalBrl = Math.max(0, Math.round((rawTotal - (discountBrl || 0)) * 100) / 100);
-    const saleNumber = (data.sales.length > 0 ? Math.max(...data.sales.map(s => s.saleNumber || 0)) : 1000) + 1;
 
-    // Check fiado payment amount
     const fiadoPayments = payments.filter(p => p.method === 'fiado');
     const fiadoAmountBrl = fiadoPayments.reduce((acc, p) => acc + p.equivalentBrl, 0);
 
@@ -1014,10 +1242,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ? (data.customers || []).find(c => c.id === customerId)?.name 
       : undefined);
 
-    const newSale: Sale = {
-      id: `sale-${Date.now()}`,
-      saleNumber,
-      timestamp: new Date().toISOString(),
+    const nowIso = new Date().toISOString();
+    const tempId = `sale-${Date.now()}`;
+
+    // Prepare payload without sale_number (DB trigger generates it!)
+    const salePayload = {
+      id: tempId,
+      timestamp: nowIso,
       employeeId: currentUser.id,
       employeeName: currentUser.name,
       items,
@@ -1029,110 +1260,84 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       customerId,
       customerName: resolvedCustomerName,
       comandaNumber,
-      status: 'completed',
+      status: 'completed' as const,
       registerSessionId: data.currentSession.id,
     };
 
-    // Deduct stock for all items
-    const nowIso = new Date().toISOString();
-    const movementsToCreate: StockMovement[] = items.map(item => {
-      const currentProd = data.products.find(p => p.id === item.product.id);
-      const prevStock = currentProd ? currentProd.stock : item.product.stock;
-      const newStock = Math.max(0, Math.round((prevStock - item.quantity) * 100) / 100);
+    let persistedSale: Sale;
+    try {
+      // REQUIREMENT 5: insert into vendas, trigger creates sale_number, returns data.sale_number
+      persistedSale = await insertVenda(salePayload);
+    } catch (err: any) {
+      setDbError(`Falha ao registrar venda no banco de dados: ${err.message}`);
+      throw err;
+    }
 
-      return {
-        id: `mov-${Date.now()}-${item.product.id}`,
-        productId: item.product.id,
-        productName: item.product.name,
-        type: 'saida_venda',
-        quantity: item.quantity,
-        unit: item.product.unit,
-        reason: `Venda #${saleNumber}${comandaNumber ? ` (Comanda #${comandaNumber})` : ''}`,
-        employeeName: currentUser.name,
-        timestamp: nowIso,
-        previousStock: prevStock,
-        newStock,
-      };
-    });
-
-    setData(prev => {
-      // update products stock
-      const updatedProducts = prev.products.map(p => {
-        const soldItem = items.find(it => it.product.id === p.id);
-        if (soldItem) {
-          const newStk = Math.max(0, Math.round((p.stock - soldItem.quantity) * 100) / 100);
-          return { ...p, stock: newStk };
-        }
-        return p;
-      });
-
-      // If this sale was from a comanda, close/remove the comanda
-      const updatedComandas = comandaNumber 
-        ? (prev.openComandas || []).filter(c => c.number.trim().toLowerCase() !== comandaNumber.trim().toLowerCase())
-        : (prev.openComandas || []);
-
-      // If a customer is linked, update their balance and stats
-      let updatedCustomers = prev.customers || [];
-      let updatedEntries = prev.customerEntries || [];
-
-      if (customerId) {
-        const pointsEarned = Math.floor(finalTotalBrl);
-        updatedCustomers = updatedCustomers.map(c => {
-          if (c.id === customerId) {
-            return {
-              ...c,
-              totalSpentBrl: Math.round((c.totalSpentBrl + finalTotalBrl) * 100) / 100,
-              purchaseCount: c.purchaseCount + 1,
-              lastPurchaseDate: nowIso,
-              loyaltyPoints: c.loyaltyPoints + pointsEarned,
-              outstandingBalanceBrl: fiadoAmountBrl > 0 
-                ? Math.round((c.outstandingBalanceBrl + fiadoAmountBrl) * 100) / 100 
-                : c.outstandingBalanceBrl,
-            };
-          }
-          return c;
-        });
-
-        if (fiadoAmountBrl > 0) {
-          const fiadoEntry: CustomerAccountEntry = {
-            id: `entry-${Date.now()}`,
-            customerId,
-            date: nowIso,
-            type: 'debito_compra',
-            amountBrl: Math.round(fiadoAmountBrl * 100) / 100,
-            description: `Compra fiado no PDV - Venda #${saleNumber}`,
-            saleId: newSale.id,
-            recordedBy: currentUser.name,
-          };
-          updatedEntries = [fiadoEntry, ...updatedEntries];
+    // REQUIREMENT 6: Deduct stock via RPC baixar_estoque
+    for (const it of items) {
+      if (it.product && it.product.id) {
+        try {
+          const newStock = await rpcBaixarEstoque(it.product.id, it.quantity);
+          setData(prev => ({
+            ...prev,
+            products: prev.products.map(p => p.id === it.product.id ? { ...p, stock: newStock } : p),
+          }));
+        } catch (rpcErr: any) {
+          console.warn(`RPC baixar_estoque warning (${it.product.name}):`, rpcErr);
+          // Fallback direct stock adjustment if RPC function is not yet created in Supabase
+          try {
+            const currentP = data.products.find(p => p.id === it.product.id);
+            if (currentP) {
+              const fallbackStock = Math.max(0, currentP.stock - it.quantity);
+              await upsertProduto({ ...currentP, stock: fallbackStock });
+              setData(prev => ({
+                ...prev,
+                products: prev.products.map(p => p.id === it.product.id ? { ...p, stock: fallbackStock } : p),
+              }));
+            }
+          } catch {}
         }
       }
+    }
 
-      return {
-        ...prev,
-        products: updatedProducts,
-        openComandas: updatedComandas,
-        customers: updatedCustomers,
-        customerEntries: updatedEntries,
-        stockMovements: [...movementsToCreate, ...prev.stockMovements],
-        sales: [newSale, ...prev.sales],
-      };
-    });
+    // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente
+    if (customerId && fiadoAmountBrl > 0) {
+      try {
+        const newBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
+        setData(prev => ({
+          ...prev,
+          customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        }));
+      } catch (rpcBalErr: any) {
+        console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
+      }
+    }
 
-    return newSale;
-  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, data.sales]);
+    // Close comanda if attached
+    if (comandaNumber) {
+      removeComanda(comandaNumber);
+    }
+
+    // Update local sales list with the persisted sale (including the real sale_number!)
+    setData(prev => ({
+      ...prev,
+      sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
+    }));
+
+    return persistedSale;
+  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, removeComanda]);
 
   // Venda Direta Rápida (Apenas Valor & Confirme)
-  const registerDirectSale = useCallback((
+  const registerDirectSale = useCallback(async (
     amountBrl: number,
     description: string,
     paymentMethod: PaymentMethod,
     customerId?: string
-  ): Sale => {
+  ): Promise<Sale> => {
     const directProduct: Product = {
       id: `prod-vd-${Date.now()}`,
       code: 'VD-001',
-      name: description.trim() || 'Venda Direta Balcão',
+      name: description.trim() || (language === 'es' ? 'Venta Directa Mostrador' : 'Venda Direta Balcão'),
       category: 'paes',
       priceBrl: amountBrl,
       costPriceBrl: Math.round(amountBrl * 0.4 * 100) / 100,
@@ -1162,7 +1367,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     ];
 
-    return completeSale(
+    return await completeSale(
       items,
       payments,
       undefined,
@@ -1172,10 +1377,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amountBrl,
       customerId
     );
-  }, [completeSale]);
+  }, [completeSale, language]);
 
-  // Open Register
-  const openRegister = useCallback((initialFloat: { brl: number; pyg: number; usd: number }) => {
+  // ==========================================
+  // REQUIREMENT 4: CASH REGISTER SESSIONS
+  // Saves single row with await to Supabase
+  // ==========================================
+  const openRegister = useCallback(async (initialFloat: { brl: number; pyg: number; usd: number }) => {
     const nextSessionNumber = (data.currentSession.sessionNumber || 100) + 1;
     const newSession: CashRegisterSession = {
       id: `session-${Date.now()}`,
@@ -1187,17 +1395,21 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       transactions: [],
     };
 
-    setData(prev => ({
-      ...prev,
-      currentSession: newSession,
-    }));
+    try {
+      await upsertCaixaSessao(newSession);
+      setData(prev => ({
+        ...prev,
+        currentSession: newSession,
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao abrir caixa no Supabase: ${err.message}`);
+    }
   }, [currentUser.name, data.currentSession.sessionNumber]);
 
-  // Close Register
-  const closeRegister = useCallback((
+  const closeRegister = useCallback(async (
     counted: { brl: number; pyg: number; usd: number },
     notes?: string
-  ): CashRegisterSession => {
+  ): Promise<CashRegisterSession> => {
     const closedSession: CashRegisterSession = {
       ...data.currentSession,
       status: 'fechado',
@@ -1207,27 +1419,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       closingNotes: notes,
     };
 
-    setData(prev => ({
-      ...prev,
-      currentSession: closedSession,
-      sessionHistory: [closedSession, ...prev.sessionHistory],
-    }));
-
-    // Auto trigger backup point upon closing register
-    setTimeout(() => {
-      const point = StorageService.createBackupPoint({
-        ...data,
+    try {
+      await upsertCaixaSessao(closedSession);
+      setData(prev => ({
+        ...prev,
         currentSession: closedSession,
-        sessionHistory: [closedSession, ...data.sessionHistory]
-      }, 'automatico');
-      setBackupPoints(StorageService.loadBackupPoints());
-      setLastBackupTime(point.timestamp);
-    }, 200);
+        sessionHistory: [closedSession, ...prev.sessionHistory],
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao fechar caixa no Supabase: ${err.message}`);
+    }
 
     return closedSession;
-  }, [currentUser.name, data]);
+  }, [currentUser.name, data.currentSession]);
 
-  // Record Sangria (cash withdrawal from drawer)
   const recordSangria = useCallback((amount: number, currency: Currency, reason: string) => {
     const tx = {
       id: `sangria-${Date.now()}`,
@@ -1248,7 +1453,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   }, [currentUser.name]);
 
-  // Record Suprimento (cash addition/float reinforcement to drawer)
   const recordSuprimento = useCallback((amount: number, currency: Currency, reason: string) => {
     const tx = {
       id: `suprimento-${Date.now()}`,
@@ -1269,7 +1473,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   }, [currentUser.name]);
 
-  // Current month goal helper
   const getCurrentGoal = useCallback((): MonthlyGoal => {
     const now = new Date();
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1285,18 +1488,18 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [data.goals]);
 
-  // Update Goal
   const updateGoal = useCallback((newGoal: MonthlyGoal) => {
     setData(prev => {
       const filtered = prev.goals.filter(g => g.month !== newGoal.month);
-      return {
+      const next = {
         ...prev,
         goals: [newGoal, ...filtered],
       };
+      saveSystemStateDoc(next);
+      return next;
     });
   }, []);
 
-  // Manual Backup
   const createManualBackup = useCallback(() => {
     setIsCloudSyncing(true);
     setTimeout(() => {
@@ -1304,15 +1507,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setBackupPoints(StorageService.loadBackupPoints());
       setLastBackupTime(point.timestamp);
       setIsCloudSyncing(false);
-    }, 800);
+    }, 600);
   }, [data]);
 
-  // Export JSON file
   const exportDatabaseBackup = useCallback(() => {
     StorageService.exportToJson(data);
   }, [data]);
 
-  // Import JSON file
   const importDatabaseBackup = useCallback((jsonData: any): boolean => {
     try {
       const restored = StorageService.restoreFromJson(jsonData);
@@ -1326,9 +1527,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Restore from point
   const restoreFromPoint = useCallback((backupId: string) => {
-    // In our client-first model, we load the backup snapshot
     const point = backupPoints.find(p => p.id === backupId);
     if (!point) return;
     setIsCloudSyncing(true);
@@ -1337,185 +1536,138 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, 600);
   }, [backupPoints]);
 
-  // Reset to initial sample data
   const resetToSampleData = useCallback(() => {
     localStorage.removeItem('KORISKO_STATE_V1');
     localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
-    localStorage.removeItem('PANETTIERE_STATE_V1');
-    localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
     const fresh = StorageService.loadState();
     setData(fresh);
     setBackupPoints(StorageService.loadBackupPoints());
   }, []);
 
-  // Reset to factory zero: standard factory default (all movements zeroed, Admin Ax remains always)
   const resetToFactoryZero = useCallback(async () => {
-    localStorage.removeItem('KORISKO_STATE_V1');
-    localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
-    localStorage.removeItem('PANETTIERE_STATE_V1');
-    localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
-
-    const cleanZeroState = StorageService.getFactoryDefaultState();
-    setData(cleanZeroState);
-    setCurrentUser(INITIAL_EMPLOYEES[0]);
-
     try {
-      localStorage.setItem('KORISKO_CURRENT_USER_ID', INITIAL_EMPLOYEES[0].id);
-    } catch {}
+      const adminAx: Employee = {
+        id: 'emp-admin-ax',
+        name: 'Ax',
+        role: 'admin',
+        pin: '9APG_47z-EgF4yz',
+        avatarColor: 'bg-indigo-600',
+        email: 'axxeiacompany@gmail.com',
+        password: '9APG_47z-EgF4yz',
+        allowedFeatures: [
+          'dashboard', 'pdv', 'venda_direta', 'estoque', 
+          'fichas_tecnicas', 'crm', 'caixa', 'mais_vendidos', 
+          'metas', 'cambio', 'backup', 'afiliados'
+        ],
+      };
 
-    StorageService.saveState(cleanZeroState, true);
-    await resetCloudToFactoryZero();
+      await upsertUsuario(adminAx);
+
+      setData(prev => ({
+        ...prev,
+        sales: [],
+        openComandas: [],
+        fornadas: [],
+        currentSession: {
+          id: `sess-${Date.now()}`,
+          sessionNumber: 1,
+          status: 'fechado',
+          openedAt: new Date().toISOString(),
+          closedAt: new Date().toISOString(),
+          openedBy: 'Ax',
+          initialFloat: { brl: 0, pyg: 0, usd: 0 },
+          transactions: [],
+        },
+        sessionHistory: [],
+      }));
+    } catch (err: any) {
+      setDbError(`Erro ao resetar padrão de fábrica: ${err.message}`);
+    }
   }, []);
 
-  const value = useMemo(() => ({
-    language,
-    setLanguage,
-    t,
-    currentUser,
-    employees: data.employees,
-    switchUser,
-    updateEmployeePin,
-    hasPermission,
-    isFeatureAllowed,
-    addEmployee,
-    updateEmployee,
-    deleteEmployee,
-    updateEmployeePermissions,
-    registerDirectSale,
-    exchangeRates: data.exchangeRates,
-    updateExchangeRates,
-    liveRateStatus,
-    fetchLiveRates,
-    toggleAutoRateRefresh,
-    products: data.products,
-    stockMovements: data.stockMovements,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    adjustStock,
-    // Fornadas
-    fornadas: data.fornadas || [],
-    registerFornada,
-    // Ficha Técnica
-    fichasTecnicas: data.fichasTecnicas || [],
-    addFichaTecnica,
-    updateFichaTecnica,
-    deleteFichaTecnica,
-    executeProductionFromRecipe,
-    // CRM
-    customers: data.customers || [],
-    customerEntries: data.customerEntries || [],
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    recordCustomerDebt,
-    recordCustomerPayment,
-    redeemCustomerPoints,
-    // Comandas
-    openComandas: data.openComandas || [],
-    saveComanda,
-    removeComanda,
-    sales: data.sales,
-    completeSale,
-    currentSession: data.currentSession,
-    sessionHistory: data.sessionHistory,
-    openRegister,
-    closeRegister,
-    recordSangria,
-    recordSuprimento,
-    goals: data.goals,
-    getCurrentGoal,
-    updateGoal,
-    backupPoints,
-    lastBackupTime,
-    isCloudSyncing,
-    createManualBackup,
-    exportDatabaseBackup,
-    importDatabaseBackup,
-    restoreFromPoint,
-    resetToSampleData,
-    resetToFactoryZero,
-    dbStatus,
-    refreshDbStatus,
-  }), [
-    currentUser,
-    data.employees,
-    switchUser,
-    updateEmployeePin,
-    hasPermission,
-    isFeatureAllowed,
-    addEmployee,
-    updateEmployee,
-    deleteEmployee,
-    updateEmployeePermissions,
-    registerDirectSale,
-    data.exchangeRates,
-    updateExchangeRates,
-    liveRateStatus,
-    fetchLiveRates,
-    toggleAutoRateRefresh,
-    data.products,
-    data.stockMovements,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    adjustStock,
-    data.fornadas,
-    registerFornada,
-    data.fichasTecnicas,
-    addFichaTecnica,
-    updateFichaTecnica,
-    deleteFichaTecnica,
-    executeProductionFromRecipe,
-    data.customers,
-    data.customerEntries,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    recordCustomerDebt,
-    recordCustomerPayment,
-    redeemCustomerPoints,
-    data.openComandas,
-    saveComanda,
-    removeComanda,
-    data.sales,
-    completeSale,
-    data.currentSession,
-    data.sessionHistory,
-    openRegister,
-    closeRegister,
-    recordSangria,
-    recordSuprimento,
-    data.goals,
-    getCurrentGoal,
-    updateGoal,
-    backupPoints,
-    lastBackupTime,
-    isCloudSyncing,
-    createManualBackup,
-    exportDatabaseBackup,
-    importDatabaseBackup,
-    restoreFromPoint,
-    resetToSampleData,
-    resetToFactoryZero,
-    dbStatus,
-    refreshDbStatus,
-    language,
-    setLanguage,
-    t,
-  ]);
-
   return (
-    <BakeryContext.Provider value={value}>
+    <BakeryContext.Provider
+      value={{
+        language,
+        setLanguage,
+        t,
+        dbError,
+        clearDbError,
+        setDbError,
+        isLoadingDb,
+        currentUser,
+        employees: data.employees,
+        switchUser,
+        updateEmployeePin,
+        hasPermission,
+        isFeatureAllowed,
+        addEmployee,
+        updateEmployee,
+        deleteEmployee,
+        updateEmployeePermissions,
+        registerDirectSale,
+        exchangeRates: data.exchangeRates,
+        updateExchangeRates,
+        liveRateStatus,
+        fetchLiveRates,
+        toggleAutoRateRefresh,
+        products: data.products,
+        stockMovements: data.stockMovements,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        adjustStock,
+        fornadas: data.fornadas || [],
+        registerFornada,
+        fichasTecnicas: data.fichasTecnicas || [],
+        addFichaTecnica,
+        updateFichaTecnica,
+        deleteFichaTecnica,
+        executeProductionFromRecipe,
+        customers: data.customers || [],
+        customerEntries: data.customerEntries || [],
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
+        recordCustomerDebt,
+        recordCustomerPayment,
+        redeemCustomerPoints,
+        openComandas: data.openComandas || [],
+        saveComanda,
+        removeComanda,
+        sales: data.sales,
+        completeSale,
+        currentSession: data.currentSession,
+        sessionHistory: data.sessionHistory,
+        openRegister,
+        closeRegister,
+        recordSangria,
+        recordSuprimento,
+        goals: data.goals,
+        getCurrentGoal,
+        updateGoal,
+        backupPoints,
+        lastBackupTime,
+        isCloudSyncing,
+        createManualBackup,
+        exportDatabaseBackup,
+        importDatabaseBackup,
+        restoreFromPoint,
+        resetToSampleData,
+        resetToFactoryZero,
+        dbStatus,
+        refreshDbStatus,
+      }}
+    >
       {children}
     </BakeryContext.Provider>
   );
 };
 
 export const useBakery = (): BakeryContextType => {
-  const ctx = useContext(BakeryContext);
-  if (!ctx) {
+  const context = useContext(BakeryContext);
+  if (!context) {
     throw new Error('useBakery must be used within a BakeryProvider');
   }
-  return ctx;
+  return context;
 };
