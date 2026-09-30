@@ -86,7 +86,7 @@ export const TopNav: React.FC<Props> = ({
     afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
   };
 
-  const currentTabInfo = tabTitles[activeTab] || { title: t.appName, subtitle: t.appSlogan };
+  const currentTabInfo = tabTitles[activeTab] || { title: t.appName, subtitle: t.appSlogan || 'Gestão Inteligente' };
 
   // Search Results
   const searchResults = React.useMemo(() => {

@@ -209,9 +209,11 @@ export const Sidebar: React.FC<Props> = ({
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               </div>
-              <p className="text-[10px] text-neutral-400 truncate">
-                {t.appSlogan}
-              </p>
+              {t.appSlogan ? (
+                <p className="text-[10px] text-neutral-400 truncate">
+                  {t.appSlogan}
+                </p>
+              ) : null}
             </div>
           </div>
 

@@ -79,7 +79,9 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
             <div className="text-base font-bold tracking-tight text-neutral-100 group-hover:text-amber-400 transition-colors leading-none">
               {t.appName}
             </div>
-            <span className="text-[10px] text-neutral-500 font-medium">{t.appSlogan}</span>
+            {t.appSlogan ? (
+              <span className="text-[10px] text-neutral-500 font-medium">{t.appSlogan}</span>
+            ) : null}
           </div>
         </a>
 

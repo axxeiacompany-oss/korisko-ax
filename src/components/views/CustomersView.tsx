@@ -353,7 +353,7 @@ export const CustomersView: React.FC = () => {
       : `55${cleanPhone}`;
 
     const text = encodeURIComponent(
-      `Olá ${c.name}, tudo bem? Aqui é da Padaria, Confeitaria & Salão Korizko!\n\n` +
+      `Olá ${c.name}, tudo bem? Aqui é da equipe do Korizko!\n\n` +
       `Passando para informar o seu saldo atual da conta/fiado: ${formatCurrency(c.outstandingBalanceBrl, 'BRL')} (aprox. ₲ ${Math.round(c.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}).\n\n` +
       `Seus pontos de fidelidade acumulados: ${c.loyaltyPoints} pontos.\n` +
       `Se precisar de entrega ou encomendar pão quente, avise a gente por aqui! Tenha um ótimo dia!`

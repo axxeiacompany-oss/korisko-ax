@@ -197,8 +197,8 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
   es: {
     // Brand & Slogan
     appName: 'Korizko',
-    appSlogan: 'Panadería, Confitería & Salón',
-    systemDescription: 'Sistema Integrado de Gestión de Panadería, Pastelería & Salón',
+    appSlogan: '',
+    systemDescription: 'Sistema Integrado de Gestión & PDV',
 
     // Language selector
     language: 'Idioma',
@@ -390,8 +390,8 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
   pt: {
     // Brand & Slogan
     appName: 'Korizko',
-    appSlogan: 'Padaria, Confeitaria & Salão',
-    systemDescription: 'Sistema Integrado de Gestão de Padaria, Confeitaria & Salão',
+    appSlogan: '',
+    systemDescription: 'Sistema Integrado de Gestão & PDV',
 
     // Language selector
     language: 'Idioma',

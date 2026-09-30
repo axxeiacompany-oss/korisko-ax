@@ -100,7 +100,7 @@ export const ComandasModal: React.FC<Props> = ({
                 </span>
               </div>
               <p className="text-xs text-neutral-400">
-                Atendimento no balcão e salão da Padaria, Confeitaria & Salão Korizko
+                Atendimento no balcão e mesas do Korizko
               </p>
             </div>
           </div>

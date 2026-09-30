@@ -170,7 +170,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             <span className="font-bold text-base tracking-tight text-white">
               {t.appName}
             </span>
-            <span className="text-[11px] text-neutral-400">{t.appSlogan}</span>
+            {t.appSlogan ? (
+              <span className="text-[11px] text-neutral-400">{t.appSlogan}</span>
+            ) : null}
           </div>
         </div>
 
