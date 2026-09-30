@@ -133,6 +133,25 @@ CREATE TABLE IF NOT EXISTS public.vendas (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Gerador automático sequencial de número de venda
+CREATE SEQUENCE IF NOT EXISTS public.vendas_sale_number_seq START 1;
+
+CREATE OR REPLACE FUNCTION public.set_sale_number()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.sale_number IS NULL OR NEW.sale_number = '' THEN
+    NEW.sale_number := nextval('public.vendas_sale_number_seq')::text;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_sale_number ON public.vendas;
+CREATE TRIGGER trg_set_sale_number
+BEFORE INSERT ON public.vendas
+FOR EACH ROW
+EXECUTE FUNCTION public.set_sale_number();
+
 -- 5. TABELA FUNCIONAL DE SESSÕES DE CAIXA (Table Editor -> caixa_sessoes)
 CREATE TABLE IF NOT EXISTS public.caixa_sessoes (
   id TEXT PRIMARY KEY,
@@ -244,7 +263,41 @@ ALTER TABLE public.vendas REPLICA IDENTITY FULL;
 ALTER TABLE public.clientes REPLICA IDENTITY FULL;
 ALTER TABLE public.caixa_sessoes REPLICA IDENTITY FULL;
 
--- 11. INICIALIZAÇÃO / RESET PADRÃO DE FÁBRICA ZERADO (ADMIN AX PERMANECE SEMPRE)
+-- 11. FUNÇÕES RPC (BAIXA DE ESTOQUE E AJUSTE DE SALDO DE CLIENTE)
+CREATE OR REPLACE FUNCTION public.baixar_estoque(p_id text, p_qtd numeric)
+RETURNS numeric AS $$
+DECLARE
+  v_novo_estoque numeric;
+BEGIN
+  UPDATE public.produtos
+  SET stock = GREATEST(0, stock - p_qtd),
+      updated_at = NOW()
+  WHERE id = p_id
+  RETURNING stock INTO v_novo_estoque;
+  
+  RETURN COALESCE(v_novo_estoque, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.ajustar_saldo_cliente(p_id text, p_valor numeric)
+RETURNS numeric AS $$
+DECLARE
+  v_novo_saldo numeric;
+BEGIN
+  UPDATE public.clientes
+  SET outstanding_balance_brl = GREATEST(0, outstanding_balance_brl + p_valor),
+      updated_at = NOW()
+  WHERE id = p_id
+  RETURNING outstanding_balance_brl INTO v_novo_saldo;
+  
+  RETURN COALESCE(v_novo_saldo, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.baixar_estoque(text, numeric) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.ajustar_saldo_cliente(text, numeric) TO anon, authenticated, service_role;
+
+-- 12. INICIALIZAÇÃO / RESET PADRÃO DE FÁBRICA ZERADO (ADMIN AX PERMANECE SEMPRE)
 -- Deixa o sistema pronto para produção real com vendas e caixa zerados,
 -- garantindo que o Administrador Ax nunca seja apagado.
 CREATE OR REPLACE FUNCTION public.korisko_reset_factory_zero()
