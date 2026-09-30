@@ -21,7 +21,8 @@ import {
   LiveRateStatus,
   PaymentMethod,
   AppFeature,
-  AppLanguage
+  AppLanguage,
+  CashTransaction
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
@@ -157,8 +158,10 @@ interface BakeryContextType {
     counted: { brl: number; pyg: number; usd: number },
     notes?: string
   ) => Promise<CashRegisterSession>;
-  recordSangria: (amount: number, currency: Currency, reason: string) => void;
-  recordSuprimento: (amount: number, currency: Currency, reason: string) => void;
+  recordSaidaCaixa: (amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => void;
+  recordEntradaCaixa: (amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => void;
+  recordSangria: (amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => void;
+  recordSuprimento: (amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => void;
 
   // Goals
   goals: MonthlyGoal[];
@@ -1541,13 +1544,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return closedSession;
   }, [currentUser.name, data.currentSession]);
 
-  const recordSangria = useCallback((amount: number, currency: Currency, reason: string) => {
-    const tx = {
-      id: `sangria-${Date.now()}`,
-      type: 'sangria' as const,
+  const recordSaidaCaixa = useCallback((amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => {
+    const tx: CashTransaction = {
+      id: `saida-${Date.now()}`,
+      type: 'saida',
       amount,
       currency,
       reason,
+      category: category || 'Outra Saída Justificada',
+      documentNumber: documentNumber?.trim() || undefined,
       timestamp: new Date().toISOString(),
       employeeName: currentUser.name,
     };
@@ -1561,13 +1566,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   }, [currentUser.name]);
 
-  const recordSuprimento = useCallback((amount: number, currency: Currency, reason: string) => {
-    const tx = {
-      id: `suprimento-${Date.now()}`,
-      type: 'suprimento' as const,
+  const recordEntradaCaixa = useCallback((amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => {
+    const tx: CashTransaction = {
+      id: `entrada-${Date.now()}`,
+      type: 'entrada',
       amount,
       currency,
       reason,
+      category: category || 'Outra Entrada Justificada',
+      documentNumber: documentNumber?.trim() || undefined,
       timestamp: new Date().toISOString(),
       employeeName: currentUser.name,
     };
@@ -1580,6 +1587,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }));
   }, [currentUser.name]);
+
+  const recordSangria = recordSaidaCaixa;
+  const recordSuprimento = recordEntradaCaixa;
 
   const getCurrentGoal = useCallback((): MonthlyGoal => {
     const now = new Date();
@@ -1773,6 +1783,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         sessionHistory: data.sessionHistory,
         openRegister,
         closeRegister,
+        recordSaidaCaixa,
+        recordEntradaCaixa,
         recordSangria,
         recordSuprimento,
         goals: data.goals,

@@ -97,7 +97,7 @@ const AVAILABLE_FEATURES: Array<{
     id: 'caixa',
     label: 'Fechamento de Caixa',
     category: 'Financeiro',
-    description: 'Conferência cega de caixa, sangrias e suprimentos',
+    description: 'Conferência cega de caixa, entradas e saídas de valores',
     icon: Vault,
     color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
   },

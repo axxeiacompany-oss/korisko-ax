@@ -219,10 +219,12 @@ export interface Sale {
 
 export interface CashTransaction {
   id: string;
-  type: 'sangria' | 'suprimento';
+  type: 'sangria' | 'suprimento' | 'saida' | 'entrada';
   amount: number;
   currency: Currency;
   reason: string;
+  category?: string;
+  documentNumber?: string;
   timestamp: string;
   employeeName: string;
 }

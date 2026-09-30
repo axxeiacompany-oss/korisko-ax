@@ -28,8 +28,8 @@ export const CashRegisterView: React.FC = () => {
   const { currentSession, sessionHistory, sales, hasPermission, t, language, currentUser, exchangeRates } = useBakery();
   const isAdmin = currentUser.role === 'admin';
 
-  const [isSangriaOpen, setIsSangriaOpen] = useState(false);
-  const [isSuprimentoOpen, setIsSuprimentoOpen] = useState(false);
+  const [isSaidaOpen, setIsSaidaOpen] = useState(false);
+  const [isEntradaOpen, setIsEntradaOpen] = useState(false);
   const [isCloseRegisterOpen, setIsCloseRegisterOpen] = useState(false);
   const [isOpenRegisterOpen, setIsOpenRegisterOpen] = useState(false);
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
@@ -75,7 +75,8 @@ export const CashRegisterView: React.FC = () => {
     });
 
     currentSession.transactions.forEach(t => {
-      const mult = t.type === 'suprimento' ? 1 : -1;
+      const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
+      const mult = isEntrada ? 1 : -1;
       if (t.currency === 'BRL') brlCash += mult * t.amount;
       if (t.currency === 'PYG') pygCash += mult * t.amount;
       if (t.currency === 'USD') usdCash += mult * t.amount;
@@ -90,6 +91,29 @@ export const CashRegisterView: React.FC = () => {
       totalCredito,
     };
   }, [currentSession, currentSessionSales]);
+
+  // Compute total entradas and saidas in current session
+  const transactionTotals = useMemo(() => {
+    let entradasBrl = 0;
+    let saidasBrl = 0;
+    currentSession.transactions.forEach(t => {
+      const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
+      const valBrl = t.currency === 'USD' 
+        ? t.amount * (exchangeRates.USD_TO_BRL || 5.62) 
+        : t.currency === 'PYG' 
+        ? (exchangeRates.BRL_TO_PYG ? t.amount / exchangeRates.BRL_TO_PYG : t.amount / 1400) 
+        : t.amount;
+      if (isEntrada) {
+        entradasBrl += valBrl;
+      } else {
+        saidasBrl += valBrl;
+      }
+    });
+    return {
+      entradasBrl,
+      saidasBrl,
+    };
+  }, [currentSession.transactions, exchangeRates]);
 
   const isRegisterOpen = currentSession.status === 'aberto';
 
@@ -135,19 +159,19 @@ export const CashRegisterView: React.FC = () => {
             <>
               <button
                 type="button"
-                onClick={() => setIsSuprimentoOpen(true)}
-                className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                onClick={() => setIsEntradaOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/25 hover:bg-emerald-900/35 active:scale-95 text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
               >
-                <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-                <span>{language === 'es' ? 'Ingreso' : 'Suprimento'}</span>
+                <ArrowUpRight className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
+                <span>{language === 'es' ? '+ Entrada' : '+ Entrada'}</span>
               </button>
               <button
                 type="button"
-                onClick={() => setIsSangriaOpen(true)}
-                className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                onClick={() => setIsSaidaOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl border border-rose-500/30 bg-rose-950/25 hover:bg-rose-900/35 active:scale-95 text-rose-300 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
               >
-                <ArrowDownRight className="w-4 h-4 text-rose-400" />
-                <span>{language === 'es' ? 'Sangría' : 'Sangria'}</span>
+                <ArrowDownRight className="w-4 h-4 text-rose-400 stroke-[2.5]" />
+                <span>{language === 'es' ? '- Salida' : '- Saída'}</span>
               </button>
               {canManageRegister && (
                 <button
@@ -257,52 +281,76 @@ export const CashRegisterView: React.FC = () => {
       {/* 2-Column: Current Session Sangrias/Suprimentos & Historical Closures */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Sangrias & Suprimentos Table */}
+        {/* Entradas & Saídas Table */}
         <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
               <ArrowDownRight className="w-4 h-4 text-amber-400" />
-              {language === 'es' ? 'Movimientos de la Caja Actual' : 'Movimentações do Caixa Atual'} ({currentSession.transactions.length})
+              {language === 'es' ? 'Movimientos de Caja: Entradas & Salidas' : 'Movimentações de Caixa: Entradas & Saídas'} ({currentSession.transactions.length})
             </h3>
-            <span className="text-xs text-neutral-500">
-              {language === 'es' ? 'Retiros & Ingresos' : 'Sangrias & Suprimentos'}
+            <span className="text-xs text-neutral-400 font-medium">
+              {language === 'es' ? 'Auditoría del Turno' : 'Auditoria do Turno'}
             </span>
+          </div>
+
+          {/* Quick totals bar */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-900/30 flex items-center justify-between">
+              <span className="text-emerald-400/80 font-medium">{language === 'es' ? 'Total Entradas:' : 'Total Entradas:'}</span>
+              <span className="font-bold text-emerald-300 font-mono-nums">+{formatCurrency(transactionTotals.entradasBrl, 'BRL')}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-900/30 flex items-center justify-between">
+              <span className="text-rose-400/80 font-medium">{language === 'es' ? 'Total Salidas:' : 'Total Saídas:'}</span>
+              <span className="font-bold text-rose-300 font-mono-nums">-{formatCurrency(transactionTotals.saidasBrl, 'BRL')}</span>
+            </div>
           </div>
 
           <div className="space-y-2">
             {currentSession.transactions.length === 0 ? (
               <p className="text-xs text-neutral-500 py-6 text-center">
-                {language === 'es' ? 'Ningún retiro o ingreso registrado en este turno.' : 'Nenhuma sangria ou suprimento registrado neste turno.'}
+                {language === 'es' ? 'Ninguna entrada o salida registrada en este turno.' : 'Nenhuma entrada ou saída registrada neste turno.'}
               </p>
             ) : (
               currentSession.transactions.map(t => {
-                const isSup = t.type === 'suprimento';
+                const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
                 const timeStr = new Date(t.timestamp).toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                 return (
                   <div
                     key={t.id}
-                    className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between text-xs"
+                    className="p-3 rounded-xl bg-[#0A0E18] border border-[#1F273A] hover:border-neutral-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          isSup ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                          isEntrada ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25' : 'bg-rose-500/15 text-rose-300 border border-rose-500/25'
                         }`}>
-                          {isSup ? (language === 'es' ? 'Ingreso' : 'Suprimento') : (language === 'es' ? 'Retiro' : 'Sangria')}
+                          {isEntrada ? (language === 'es' ? '+ Entrada' : '+ Entrada') : (language === 'es' ? '- Salida' : '- Saída')}
                         </span>
+                        {t.category && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#161D2E] text-neutral-300 border border-[#242F47]">
+                            {t.category}
+                          </span>
+                        )}
                         <span className="font-semibold text-neutral-200">{t.reason}</span>
                       </div>
-                      <div className="text-[11px] text-neutral-500 mt-1">
-                        {language === 'es' ? 'Por:' : 'Por:'} {t.employeeName} · {timeStr}
+                      
+                      <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-500">
+                        <span>{language === 'es' ? 'Responsable:' : 'Responsável:'} <strong className="text-neutral-300 font-medium">{t.employeeName}</strong> · {timeStr}</span>
+                        {t.documentNumber && (
+                          <>
+                            <span>·</span>
+                            <span className="text-neutral-400 font-mono">Doc: {t.documentNumber}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className={`text-sm font-bold font-mono-nums ${
-                        isSup ? 'text-emerald-400' : 'text-rose-400'
+                        isEntrada ? 'text-emerald-400' : 'text-rose-400'
                       }`}>
-                        {isSup ? '+' : '-'}{formatCurrency(t.amount, t.currency)}
+                        {isEntrada ? '+' : '-'}{formatCurrency(t.amount, t.currency)}
                       </span>
                     </div>
                   </div>
@@ -472,15 +520,15 @@ export const CashRegisterView: React.FC = () => {
 
       {/* Modals */}
       <SangriaSuprimentoModal
-        isOpen={isSangriaOpen}
-        onClose={() => setIsSangriaOpen(false)}
-        type="sangria"
+        isOpen={isSaidaOpen}
+        onClose={() => setIsSaidaOpen(false)}
+        type="saida"
       />
 
       <SangriaSuprimentoModal
-        isOpen={isSuprimentoOpen}
-        onClose={() => setIsSuprimentoOpen(false)}
-        type="suprimento"
+        isOpen={isEntradaOpen}
+        onClose={() => setIsEntradaOpen(false)}
+        type="entrada"
       />
 
       <CloseRegisterModal

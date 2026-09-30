@@ -42,13 +42,14 @@ export const CloseRegisterModal: React.FC<Props> = ({
       }
     });
 
-    // Add suprimentos / deduct sangrias
+    // Add entradas / deduct saidas
     currentSession.transactions.forEach(t => {
-      if (t.type === 'suprimento') {
+      const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
+      if (isEntrada) {
         if (t.currency === 'BRL') brlCash += t.amount;
         if (t.currency === 'PYG') pygCash += t.amount;
         if (t.currency === 'USD') usdCash += t.amount;
-      } else if (t.type === 'sangria') {
+      } else {
         if (t.currency === 'BRL') brlCash -= t.amount;
         if (t.currency === 'PYG') pygCash -= t.amount;
         if (t.currency === 'USD') usdCash -= t.amount;
