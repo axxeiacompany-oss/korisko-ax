@@ -35,6 +35,7 @@ export const BackupView: React.FC = () => {
     exportDatabaseBackup, 
     importDatabaseBackup, 
     resetToSampleData,
+    resetToFactoryZero,
     backupPoints,
     products,
     sales,
@@ -179,6 +180,20 @@ export const BackupView: React.FC = () => {
         language === 'es'
           ? '¡Catálogo demostrativo restaurado con éxito!'
           : 'Dados demonstrativos restaurados com sucesso!'
+      );
+    }
+  };
+
+  const handleFactoryZero = async () => {
+    const confirmMsg = language === 'es'
+      ? '¿Desea restaurar al PADRÓN DE FÁBRICA ZERADO? Todas las ventas, sesiones de caja y créditos serán zerados para producción. El Administrador Ax permanece siempre con acceso total.'
+      : 'Atenção: Deseja redefinir para o PADRÃO DE FÁBRICA ZERADO? Todas as vendas, caixas e fiados serão zerados para início de produção real. O Administrador Ax permanece ativo com acesso total.';
+    if (confirm(confirmMsg)) {
+      await resetToFactoryZero();
+      showNotification(
+        language === 'es'
+          ? '¡Padrón de fábrica activado! Ventas y caja zerados. Administrador Ax permanece activo y la nube fue sincronizada en tiempo real.'
+          : 'Padrão de fábrica ativado! Vendas e caixa zerados. O Administrador Ax permanece sempre e a nuvem foi sincronizada em tempo real.'
       );
     }
   };
@@ -654,6 +669,29 @@ export const BackupView: React.FC = () => {
                   {language === 'es' ? 'Importar' : 'Importar JSON'}
                 </button>
               </div>
+            </div>
+
+            {/* Factory Zero */}
+            <div className="p-4 rounded-xl bg-neutral-950 border border-amber-900/30 flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-semibold text-amber-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{language === 'es' ? 'Padrón de Fábrica Zerado (Producción Real)' : 'Padrão de Fábrica Zerado (Produção Real)'}</span>
+                </h4>
+                <p className="text-[11px] text-neutral-400">
+                  {language === 'es' 
+                    ? 'Zera ventas, comandas y caja para producción. El Administrador Ax permanece siempre y la nube sincroniza en tiempo real.' 
+                    : 'Zera vendas, caixas e comandas para iniciar produção real. O Administrador Ax permanece sempre ativo e a nuvem sincroniza em tempo real.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleFactoryZero}
+                className="px-3 py-1.5 rounded-lg border border-amber-800/40 bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'es' ? 'Zerar Sistema' : 'Zerar Sistema'}</span>
+              </button>
             </div>
 
             {/* Factory Preset */}

@@ -167,3 +167,138 @@ BEGIN
     CREATE POLICY "Allow public access korisko_backup_points" ON public.korisko_backup_points FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- 9. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
+-- Qualquer alteração de venda, caixa, estoque ou usuário é transmitida instantaneamente
+-- via WebSockets para todos os celulares, tablets e computadores conectados.
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_system_state;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.usuarios;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.produtos;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.vendas;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.clientes;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.caixa_sessoes;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_backup_points;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
+-- 10. REPLICA IDENTITY FULL (Permite receber os dados completos no payload de tempo real)
+ALTER TABLE public.korisko_system_state REPLICA IDENTITY FULL;
+ALTER TABLE public.usuarios REPLICA IDENTITY FULL;
+ALTER TABLE public.produtos REPLICA IDENTITY FULL;
+ALTER TABLE public.vendas REPLICA IDENTITY FULL;
+ALTER TABLE public.clientes REPLICA IDENTITY FULL;
+ALTER TABLE public.caixa_sessoes REPLICA IDENTITY FULL;
+
+-- 11. INICIALIZAÇÃO / RESET PADRÃO DE FÁBRICA ZERADO (ADMIN AX PERMANECE SEMPRE)
+-- Deixa o sistema pronto para produção real com vendas e caixa zerados,
+-- garantindo que o Administrador Ax nunca seja apagado.
+CREATE OR REPLACE FUNCTION public.korisko_reset_factory_zero()
+RETURNS void AS $$
+BEGIN
+  -- 1. Limpar vendas, sessões de caixa e movimentações transacionais
+  TRUNCATE TABLE public.vendas;
+  TRUNCATE TABLE public.caixa_sessoes;
+
+  -- 2. Garantir que o Administrador Geral Ax permaneça ativo e intocado
+  INSERT INTO public.usuarios (id, name, email, role, password, pin, avatar_color, allowed_features, active)
+  VALUES (
+    'emp-admin-ax',
+    'Ax',
+    'axxeiacompany@gmail.com',
+    'admin',
+    '9APG_47z-EgF4yz',
+    '9APG_47z-EgF4yz',
+    'bg-indigo-600',
+    '["dashboard","pdv","venda_direta","estoque","fichas_tecnicas","crm","caixa","mais_vendidos","metas","cambio","backup","afiliados"]'::jsonb,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    name = 'Ax',
+    email = 'axxeiacompany@gmail.com',
+    role = 'admin',
+    password = '9APG_47z-EgF4yz',
+    pin = '9APG_47z-EgF4yz',
+    active = true;
+
+  -- 3. Atualizar o estado consolidado em tempo real padrão de fábrica zerado
+  INSERT INTO public.korisko_system_state (id, data, updated_at)
+  VALUES (
+    'active_state',
+    jsonb_build_object(
+      'version', '2.0.0',
+      'timestamp', NOW(),
+      'employees', (
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', id,
+            'name', name,
+            'email', email,
+            'role', role,
+            'password', password,
+            'pin', pin,
+            'avatarColor', avatar_color,
+            'allowedFeatures', allowed_features,
+            'active', active
+          )
+        ) FROM public.usuarios WHERE active = true
+      ),
+      'products', (SELECT COALESCE(jsonb_agg(row_to_json(p)), '[]'::jsonb) FROM public.produtos p),
+      'stockMovements', '[]'::jsonb,
+      'sales', '[]'::jsonb,
+      'currentSession', jsonb_build_object(
+        'id', 'sess-zerada',
+        'openedAt', NOW(),
+        'closedAt', NOW(),
+        'openedById', 'emp-admin-ax',
+        'openedByName', 'Ax',
+        'initialCashBrl', 0,
+        'status', 'fechado',
+        'movements', '[]'::jsonb,
+        'totalSalesBrl', 0,
+        'differenceBrl', 0
+      ),
+      'sessionHistory', '[]'::jsonb,
+      'openComandas', '[]'::jsonb,
+      'fornadas', '[]'::jsonb,
+      'customers', '[]'::jsonb,
+      'customerEntries', '[]'::jsonb
+    ),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    data = EXCLUDED.data,
+    updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Executar a sincronização padrão de fábrica inicial
+SELECT public.korisko_reset_factory_zero();
+

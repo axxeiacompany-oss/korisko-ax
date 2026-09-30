@@ -389,6 +389,75 @@ app.post('/api/reset', async (_req, res) => {
   }
 });
 
+// Reset State to Factory Zero (Admin Ax Permanently Preserved)
+app.post('/api/factory-zero', async (_req, res) => {
+  try {
+    const adminUser = {
+      id: 'emp-admin-ax',
+      name: 'Ax',
+      email: 'axxeiacompany@gmail.com',
+      role: 'admin',
+      password: '9APG_47z-EgF4yz',
+      pin: '9APG_47z-EgF4yz',
+      avatarColor: 'bg-indigo-600',
+      allowedFeatures: [
+        'dashboard', 'pdv', 'venda_direta', 'estoque', 
+        'fichas_tecnicas', 'crm', 'caixa', 'mais_vendidos', 
+        'metas', 'cambio', 'backup', 'afiliados'
+      ],
+      active: true,
+    };
+
+    const zeroState = {
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      employees: [adminUser],
+      products: [],
+      stockMovements: [],
+      sales: [],
+      currentSession: {
+        id: `sess-${Date.now()}`,
+        openedAt: new Date().toISOString(),
+        closedAt: new Date().toISOString(),
+        openedById: 'emp-admin-ax',
+        openedByName: 'Ax',
+        initialCashBrl: 0,
+        status: 'fechado',
+        movements: [],
+        totalSalesBrl: 0,
+        differenceBrl: 0,
+      },
+      sessionHistory: [],
+      openComandas: [],
+      fornadas: [],
+      customers: [],
+      customerEntries: [],
+    };
+
+    safeWriteJsonFile(LOCAL_STATE_FILE, zeroState);
+
+    if (isPgConnected && pool) {
+      pool.query(`TRUNCATE TABLE vendas; TRUNCATE TABLE caixa_sessoes;`).catch(() => {});
+      pool.query(
+        `INSERT INTO korisko_system_state (id, data, updated_at) 
+         VALUES ('active_state', $1, NOW()) 
+         ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
+        [JSON.stringify(zeroState)]
+      ).catch(() => {});
+    }
+
+    safeSupabaseUpsert('korisko_system_state', {
+      id: 'active_state',
+      data: zeroState,
+      updated_at: new Date().toISOString(),
+    }, 'id');
+
+    return res.json({ success: true, message: 'Sistema zerado para padrão de fábrica com Admin Ax preservado.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // VS CODE PROJECT EXPORT (.ZIP)
 // ==========================================

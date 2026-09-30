@@ -193,10 +193,139 @@ BEGIN
     CREATE POLICY "Allow public access korisko_system_state" ON public.korisko_system_state FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'korisko_backup_points' AND policyname = 'Allow public access korisko_backup_points') THEN
-    CREATE POLICY "Allow public access korisko_backup_points" ON public.korisko_backup_points FOR ALL USING (true) WITH CHECK (true);
-  END IF;
+-- 9. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
+-- Qualquer alteração de venda, caixa, estoque ou usuário é transmitida instantaneamente
+-- via WebSockets para todos os celulares, tablets e computadores conectados.
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_system_state;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.usuarios;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.produtos;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.vendas;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.clientes;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.caixa_sessoes;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_backup_points;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
 END $$;
+
+-- 10. REPLICA IDENTITY FULL (Permite receber os dados completos no payload de tempo real)
+ALTER TABLE public.korisko_system_state REPLICA IDENTITY FULL;
+ALTER TABLE public.usuarios REPLICA IDENTITY FULL;
+ALTER TABLE public.produtos REPLICA IDENTITY FULL;
+ALTER TABLE public.vendas REPLICA IDENTITY FULL;
+ALTER TABLE public.clientes REPLICA IDENTITY FULL;
+ALTER TABLE public.caixa_sessoes REPLICA IDENTITY FULL;
+
+-- 11. INICIALIZAÇÃO / RESET PADRÃO DE FÁBRICA ZERADO (ADMIN AX PERMANECE SEMPRE)
+-- Deixa o sistema pronto para produção real com vendas e caixa zerados,
+-- garantindo que o Administrador Ax nunca seja apagado.
+CREATE OR REPLACE FUNCTION public.korisko_reset_factory_zero()
+RETURNS void AS $$
+BEGIN
+  -- 1. Limpar vendas, sessões de caixa e movimentações transacionais
+  TRUNCATE TABLE public.vendas;
+  TRUNCATE TABLE public.caixa_sessoes;
+
+  -- 2. Garantir que o Administrador Geral Ax permaneça ativo e intocado
+  INSERT INTO public.usuarios (id, name, email, role, password, pin, avatar_color, allowed_features, active)
+  VALUES (
+    'emp-admin-ax',
+    'Ax',
+    'axxeiacompany@gmail.com',
+    'admin',
+    '9APG_47z-EgF4yz',
+    '9APG_47z-EgF4yz',
+    'bg-indigo-600',
+    '["dashboard","pdv","venda_direta","estoque","fichas_tecnicas","crm","caixa","mais_vendidos","metas","cambio","backup","afiliados"]'::jsonb,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    name = 'Ax',
+    email = 'axxeiacompany@gmail.com',
+    role = 'admin',
+    password = '9APG_47z-EgF4yz',
+    pin = '9APG_47z-EgF4yz',
+    active = true;
+
+  -- 3. Atualizar o estado consolidado em tempo real padrão de fábrica zerado
+  INSERT INTO public.korisko_system_state (id, data, updated_at)
+  VALUES (
+    'active_state',
+    jsonb_build_object(
+      'version', '2.0.0',
+      'timestamp', NOW(),
+      'employees', (
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', id,
+            'name', name,
+            'email', email,
+            'role', role,
+            'password', password,
+            'pin', pin,
+            'avatarColor', avatar_color,
+            'allowedFeatures', allowed_features,
+            'active', active
+          )
+        ) FROM public.usuarios WHERE active = true
+      ),
+      'products', (SELECT COALESCE(jsonb_agg(row_to_json(p)), '[]'::jsonb) FROM public.produtos p),
+      'stockMovements', '[]'::jsonb,
+      'sales', '[]'::jsonb,
+      'currentSession', jsonb_build_object(
+        'id', 'sess-zerada',
+        'openedAt', NOW(),
+        'closedAt', NOW(),
+        'openedById', 'emp-admin-ax',
+        'openedByName', 'Ax',
+        'initialCashBrl', 0,
+        'status', 'fechado',
+        'movements', '[]'::jsonb,
+        'totalSalesBrl', 0,
+        'differenceBrl', 0
+      ),
+      'sessionHistory', '[]'::jsonb,
+      'openComandas', '[]'::jsonb,
+      'fornadas', '[]'::jsonb,
+      'customers', '[]'::jsonb,
+      'customerEntries', '[]'::jsonb
+    ),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    data = EXCLUDED.data,
+    updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Executar a sincronização padrão de fábrica inicial
+SELECT public.korisko_reset_factory_zero();
 `;
 
 /**
@@ -357,9 +486,163 @@ export async function saveStateToSupabase(stateData: any): Promise<boolean> {
       }
     }
 
+    // Sync latest vendas to functional 'vendas' table for Table Editor
+    if (Array.isArray(stateData.sales) && stateData.sales.length > 0) {
+      try {
+        const recentSales = stateData.sales.slice(-25).map((s: any) => ({
+          id: s.id,
+          sale_number: s.saleNumber || s.id,
+          subtotal_brl: s.subtotalBrl || s.totalBrl || 0,
+          discount_brl: s.discountBrl || 0,
+          total_brl: s.totalBrl || 0,
+          employee_id: s.employeeId || null,
+          employee_name: s.employeeName || null,
+          customer_id: s.customerId || null,
+          customer_name: s.customerName || null,
+          items: s.items || [],
+          payments: s.payments || [],
+          change_given: s.changeGiven || null,
+          created_at: s.timestamp || new Date().toISOString()
+        }));
+
+        await supabase.from('vendas').upsert(recentSales, { onConflict: 'id' });
+      } catch {}
+    }
+
+    // Sync currentSession to functional 'caixa_sessoes' table
+    if (stateData.currentSession) {
+      try {
+        const sess = stateData.currentSession;
+        await supabase.from('caixa_sessoes').upsert({
+          id: sess.id,
+          opened_at: sess.openedAt || new Date().toISOString(),
+          closed_at: sess.closedAt || null,
+          opened_by_id: sess.openedById || null,
+          opened_by_name: sess.openedByName || null,
+          initial_cash_brl: sess.initialCashBrl || 0,
+          status: sess.status || 'aberto',
+          total_sales_brl: sess.totalSalesBrl || 0,
+          created_at: sess.openedAt || new Date().toISOString()
+        }, { onConflict: 'id' });
+      } catch {}
+    }
+
     return true;
   } catch (err) {
     console.warn('[Supabase Sync Exception]:', err);
+    return false;
+  }
+}
+
+/**
+ * Subscribes to real-time database changes across all connected devices (mobile, tablet, desktop).
+ * Whenever any movement (venda, caixa, estoque, usuário) occurs on one device, 
+ * all other devices receive the update instantly via WebSockets without page reload.
+ */
+export function subscribeToRealtimeState(onRemoteChange: (newState: any) => void): () => void {
+  try {
+    const channel = supabase
+      .channel('korisko-realtime-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'korisko_system_state',
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).data) {
+            console.log('[Korisko Realtime] Recebida atualização em tempo real de outro dispositivo.');
+            onRemoteChange((payload.new as any).data);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'usuarios',
+        },
+        async () => {
+          console.log('[Korisko Realtime] Tabela usuarios alterada no Supabase. Sincronizando credenciais.');
+          const fresh = await fetchStateFromSupabase();
+          if (fresh) onRemoteChange(fresh);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Korisko Realtime] Conectado e ativo para sincronização instantânea multi-dispositivo.');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('[Korisko Realtime] Falha ao inicializar listener em tempo real:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Executa o reset para Padrão de Fábrica Zerado na nuvem e entrega a atualização
+ * em tempo real para todos os dispositivos conectados. Admin Ax permanece SEMPRE.
+ */
+export async function resetCloudToFactoryZero(): Promise<boolean> {
+  try {
+    // 1. Tentar executar a função SQL no Supabase se existir
+    try {
+      const { error: rpcError } = await supabase.rpc('korisko_reset_factory_zero');
+      if (!rpcError) return true;
+    } catch {}
+
+    // 2. Fallback: aplicar estado zerado diretamente via upsert com Admin Ax garantido
+    const now = new Date().toISOString();
+    const factoryZeroState = {
+      version: '2.0.0',
+      timestamp: now,
+      employees: [
+        {
+          id: 'emp-admin-ax',
+          name: 'Ax',
+          email: 'axxeiacompany@gmail.com',
+          role: 'admin',
+          password: '9APG_47z-EgF4yz',
+          pin: '9APG_47z-EgF4yz',
+          avatarColor: 'bg-indigo-600',
+          allowedFeatures: [
+            'dashboard', 'pdv', 'venda_direta', 'estoque', 
+            'fichas_tecnicas', 'crm', 'caixa', 'mais_vendidos', 
+            'metas', 'cambio', 'backup', 'afiliados'
+          ],
+          active: true
+        }
+      ],
+      products: [],
+      stockMovements: [],
+      sales: [],
+      currentSession: {
+        id: `sess-${Date.now()}`,
+        openedAt: now,
+        closedAt: now,
+        openedById: 'emp-admin-ax',
+        openedByName: 'Ax',
+        initialCashBrl: 0,
+        status: 'fechado',
+        movements: [],
+        totalSalesBrl: 0,
+        differenceBrl: 0
+      },
+      sessionHistory: [],
+      openComandas: [],
+      fornadas: [],
+      customers: [],
+      customerEntries: []
+    };
+
+    return await saveStateToSupabase(factoryZeroState);
+  } catch {
     return false;
   }
 }

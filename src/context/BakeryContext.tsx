@@ -25,7 +25,7 @@ import {
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES } from '../services/storageService';
-import { SupabaseHealthResult } from '../services/supabaseClient';
+import { SupabaseHealthResult, subscribeToRealtimeState, resetCloudToFactoryZero } from '../services/supabaseClient';
 import { toBrl } from '../utils/currency';
 import { fetchLiveExchangeRates } from '../services/exchangeRateService';
 
@@ -140,6 +140,7 @@ interface BakeryContextType {
   importDatabaseBackup: (jsonData: any) => boolean;
   restoreFromPoint: (backupId: string) => void;
   resetToSampleData: () => void;
+  resetToFactoryZero: () => Promise<void>;
   dbStatus: {
     connected: boolean;
     mode: string;
@@ -267,6 +268,35 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     initSync();
 
+    // Sincronização em tempo real multi-dispositivos (Supabase Realtime WebSockets)
+    // Atualiza instantaneamente todos os celulares, tablets e PCs conectados a cada movimento
+    const unsubscribeRealtime = subscribeToRealtimeState((remoteState) => {
+      if (remoteState && typeof remoteState === 'object') {
+        setData(prev => {
+          const remoteTime = new Date(remoteState.timestamp || 0).getTime();
+          const localTime = new Date(prev.timestamp || 0).getTime();
+          if (
+            remoteTime > localTime || 
+            (remoteState.sales && remoteState.sales.length !== prev.sales?.length) ||
+            (remoteState.products && remoteState.products.length !== prev.products?.length) ||
+            (remoteState.openComandas && remoteState.openComandas.length !== prev.openComandas?.length)
+          ) {
+            return remoteState;
+          }
+          return prev;
+        });
+
+        // Garantir que o usuário atual (especialmente Admin Ax) permaneça sincronizado
+        if (Array.isArray(remoteState.employees) && remoteState.employees.length > 0) {
+          const savedId = localStorage.getItem('KORISKO_CURRENT_USER_ID') || 'emp-admin-ax';
+          const updatedUser = remoteState.employees.find((e: any) => e.id === savedId) || remoteState.employees[0];
+          if (updatedUser) {
+            setCurrentUser(updatedUser);
+          }
+        }
+      }
+    });
+
     // Auto-refresh when tab gains focus (e.g. returning from Supabase dashboard)
     const handleFocus = () => {
       refreshDbStatus();
@@ -280,6 +310,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => { 
       isMounted = false; 
+      unsubscribeRealtime();
       window.removeEventListener('focus', handleFocus);
       clearInterval(interval);
     };
@@ -1317,6 +1348,25 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setBackupPoints(StorageService.loadBackupPoints());
   }, []);
 
+  // Reset to factory zero: standard factory default (all movements zeroed, Admin Ax remains always)
+  const resetToFactoryZero = useCallback(async () => {
+    localStorage.removeItem('KORISKO_STATE_V1');
+    localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
+    localStorage.removeItem('PANETTIERE_STATE_V1');
+    localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
+
+    const cleanZeroState = StorageService.getFactoryDefaultState();
+    setData(cleanZeroState);
+    setCurrentUser(INITIAL_EMPLOYEES[0]);
+
+    try {
+      localStorage.setItem('KORISKO_CURRENT_USER_ID', INITIAL_EMPLOYEES[0].id);
+    } catch {}
+
+    StorageService.saveState(cleanZeroState, true);
+    await resetCloudToFactoryZero();
+  }, []);
+
   const value = useMemo(() => ({
     language,
     setLanguage,
@@ -1384,6 +1434,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     importDatabaseBackup,
     restoreFromPoint,
     resetToSampleData,
+    resetToFactoryZero,
     dbStatus,
     refreshDbStatus,
   }), [
@@ -1446,6 +1497,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     importDatabaseBackup,
     restoreFromPoint,
     resetToSampleData,
+    resetToFactoryZero,
     dbStatus,
     refreshDbStatus,
     language,
