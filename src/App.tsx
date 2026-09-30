@@ -72,7 +72,7 @@ function MainAppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-neutral-100 font-sans flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen max-w-full overflow-x-hidden bg-[#0A0D14] text-neutral-100 font-sans flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       
       {/* UTMify-Style Left Sidebar */}
       <Sidebar
@@ -105,11 +105,11 @@ function MainAppShell() {
 
       {/* Main Content Area with adaptive left padding based on sidebar */}
       <main 
-        className={`flex-1 w-full mx-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-all duration-300 ${
+        className={`flex-1 w-full max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-all duration-300 ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full max-w-7xl mx-auto">
           {/* REQUIREMENT 4: Real Database Error Banner - Never silent */}
           {dbError && (
             <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 flex items-start justify-between shadow-xl gap-3 animate-in fade-in zoom-in-95">

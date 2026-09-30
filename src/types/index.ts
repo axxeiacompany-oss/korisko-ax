@@ -181,6 +181,8 @@ export interface CustomerAccountEntry {
   type: 'debito_compra' | 'pagamento_amortizacao';
   amountBrl: number;
   description: string;
+  paymentMethod?: string;
+  resultingBalanceBrl?: number;
   saleId?: string;
   recordedBy: string;
 }
