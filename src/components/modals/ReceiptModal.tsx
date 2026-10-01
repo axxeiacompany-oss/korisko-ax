@@ -11,12 +11,12 @@ interface Props {
 }
 
 export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
-  if (!sale) return null;
-
   const { currentUser, language } = useBakery();
   const isAdmin = currentUser.role === 'admin';
   const [copied, setCopied] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  if (!sale) return null;
 
   const handlePrint = () => {
     window.print();
@@ -64,7 +64,11 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
     }
     // Fallback WhatsApp Web/App link
     const encoded = encodeURIComponent(text);
-    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+    try {
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+    } catch {
+      handleCopy();
+    }
   };
 
   const handleCopy = () => {

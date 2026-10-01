@@ -305,6 +305,18 @@ export async function listVendas(): Promise<Sale[]> {
   return rows.map(rowToSale);
 }
 
+async function withDbTimeout<T>(promise: Promise<T>, ms = 1500, errorMsg = 'Timeout'): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errorMsg)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * REQUIREMENT 5:
  * The database generates sale_number via trigger.
@@ -314,17 +326,21 @@ export async function listVendas(): Promise<Sale[]> {
  */
 export async function insertVenda(saleData: Omit<Sale, 'saleNumber'>): Promise<Sale> {
   const row = saleToRow(saleData);
-  const { data, error } = await supabase
-    .from('vendas')
-    .insert(row)
-    .select()
-    .single();
+  const doInsert = (async () => {
+    const { data, error } = await supabase
+      .from('vendas')
+      .insert(row)
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`[Erro ao registrar venda no Supabase]: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`[Erro ao registrar venda no Supabase]: ${error.message}`);
+    }
 
-  return rowToSale(data);
+    return rowToSale(data);
+  })();
+
+  return await withDbTimeout(doInsert, 1500, 'Tempo limite ao registrar venda no Supabase');
 }
 
 export async function deleteVenda(id: string): Promise<void> {
@@ -405,25 +421,29 @@ export async function deleteUsuario(id: string): Promise<void> {
  * Retorna o novo estoque retornado pelo banco.
  */
 export async function rpcBaixarEstoque(p_id: string, p_qtd: number): Promise<number> {
-  const { data, error } = await supabase.rpc('baixar_estoque', {
-    p_id,
-    p_qtd: Number(p_qtd),
-  });
+  const doRpc = (async () => {
+    const { data, error } = await supabase.rpc('baixar_estoque', {
+      p_id,
+      p_qtd: Number(p_qtd),
+    });
 
-  if (error) {
-    throw new Error(`[RPC baixar_estoque falhou]: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`[RPC baixar_estoque falhou]: ${error.message}`);
+    }
 
-  if (typeof data === 'number') {
-    return data;
-  }
-  if (data && typeof data.stock === 'number') {
-    return data.stock;
-  }
-  if (data && typeof data.novo_estoque === 'number') {
-    return data.novo_estoque;
-  }
-  return Number(data) || 0;
+    if (typeof data === 'number') {
+      return data;
+    }
+    if (data && typeof data.stock === 'number') {
+      return data.stock;
+    }
+    if (data && typeof data.novo_estoque === 'number') {
+      return data.novo_estoque;
+    }
+    return Number(data) || 0;
+  })();
+
+  return await withDbTimeout(doRpc, 1500, 'Tempo limite no RPC baixar_estoque');
 }
 
 /**
@@ -432,25 +452,29 @@ export async function rpcBaixarEstoque(p_id: string, p_qtd: number): Promise<num
  * Retorna o novo saldo retornado pelo banco.
  */
 export async function rpcAjustarSaldoCliente(p_id: string, p_valor: number): Promise<number> {
-  const { data, error } = await supabase.rpc('ajustar_saldo_cliente', {
-    p_id,
-    p_valor: Number(p_valor),
-  });
+  const doRpc = (async () => {
+    const { data, error } = await supabase.rpc('ajustar_saldo_cliente', {
+      p_id,
+      p_valor: Number(p_valor),
+    });
 
-  if (error) {
-    throw new Error(`[RPC ajustar_saldo_cliente falhou]: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`[RPC ajustar_saldo_cliente falhou]: ${error.message}`);
+    }
 
-  if (typeof data === 'number') {
-    return data;
-  }
-  if (data && typeof data.outstanding_balance_brl === 'number') {
-    return data.outstanding_balance_brl;
-  }
-  if (data && typeof data.novo_saldo === 'number') {
-    return data.novo_saldo;
-  }
-  return Number(data) || 0;
+    if (typeof data === 'number') {
+      return data;
+    }
+    if (data && typeof data.outstanding_balance_brl === 'number') {
+      return data.outstanding_balance_brl;
+    }
+    if (data && typeof data.novo_saldo === 'number') {
+      return data.novo_saldo;
+    }
+    return Number(data) || 0;
+  })();
+
+  return await withDbTimeout(doRpc, 1500, 'Tempo limite no RPC ajustar_saldo_cliente');
 }
 
 // ==========================================

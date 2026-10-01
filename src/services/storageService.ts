@@ -193,8 +193,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     code: 'FRIO-001',
     name: 'Queijo Mussarela Fatiado',
     category: 'frios',
-    priceBrl: 58.00,
-    costPriceBrl: 34.00,
+    priceBrl: 58000,
+    costPriceBrl: 34000,
     stock: 8.5,
     minStock: 5.0,
     unit: 'kg',
@@ -206,8 +206,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     code: 'FRIO-002',
     name: 'Presunto Cozido Especial Fatiado',
     category: 'frios',
-    priceBrl: 46.00,
-    costPriceBrl: 26.00,
+    priceBrl: 46000,
+    costPriceBrl: 26000,
     stock: 6.2,
     minStock: 4.0,
     unit: 'kg',
@@ -1324,7 +1324,16 @@ export class StorageService {
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(async () => {
-      // Direct Supabase Cloud sync
+      // 1. Sync with local server API /api/state
+      try {
+        fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data }),
+        }).catch(() => {});
+      } catch {}
+
+      // 2. Direct Supabase Cloud sync if online
       try {
         await saveStateToSupabase(data);
       } catch (err) {
@@ -1337,7 +1346,7 @@ export class StorageService {
    * Fetch current state from Supabase cloud or initialize
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
-    // Try fetching from Supabase cloud directly
+    // 1. Try fetching from Supabase cloud directly
     try {
       const supabaseData = await fetchStateFromSupabase();
       if (supabaseData && supabaseData.products && supabaseData.products.length > 0) {
@@ -1361,6 +1370,18 @@ export class StorageService {
     } catch (err) {
       console.warn('[Korisko DB] Supabase state fetch notice:', err);
     }
+
+    // 2. Fallback to Express backend server /api/state
+    try {
+      const res = await fetch('/api/state');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && json.data.products && json.data.products.length > 0) {
+          StorageService.saveState(json.data, false);
+          return json.data;
+        }
+      }
+    } catch {}
 
     return null;
   }

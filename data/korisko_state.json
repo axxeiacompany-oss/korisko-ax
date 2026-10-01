@@ -17,6 +17,47 @@
   ],
   "sales": [
     {
+      "id": "sale-1790825631211",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790825631211",
+            "code": "VD-001",
+            "name": "Bolo pudim gourmet",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 70,
+            "costPriceBrl": 28
+          },
+          "quantity": 1,
+          "subtotalBrl": 70,
+          "unitPriceBrl": 70
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790825631211",
+          "method": "dinheiro",
+          "currency": "BRL",
+          "equivalentBrl": 70,
+          "amountReceived": 70,
+          "exchangeRateUsed": 1
+        }
+      ],
+      "totalBrl": 70,
+      "timestamp": "2026-10-01T03:33:51.211+00:00",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 122,
+      "discountBrl": 0,
+      "subtotalBrl": 70,
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
       "id": "sale-1790807727148",
       "items": [
         {
@@ -52,7 +93,7 @@
       "timestamp": "2026-09-30T22:35:27.148+00:00",
       "customerId": "cust-1790807588048",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 107,
+      "saleNumber": 115,
       "discountBrl": 0,
       "subtotalBrl": 137.11,
       "customerName": "Isaías",
@@ -95,7 +136,7 @@
       "timestamp": "2026-09-30T22:40:20.249+00:00",
       "customerId": "cust-1790807588048",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 108,
+      "saleNumber": 116,
       "discountBrl": 0,
       "subtotalBrl": 22.85,
       "customerName": "Isaías",
@@ -138,7 +179,7 @@
       "timestamp": "2026-09-30T23:28:22.046+00:00",
       "customerId": "cust-1790807588048",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 109,
+      "saleNumber": 117,
       "discountBrl": 0,
       "subtotalBrl": 101.45,
       "customerName": "Isaías",
@@ -180,7 +221,7 @@
       "totalBrl": 100,
       "timestamp": "2026-10-01T02:08:40.38+00:00",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 110,
+      "saleNumber": 118,
       "discountBrl": 0,
       "subtotalBrl": 100,
       "employeeName": "Marijuaneiro",
@@ -221,7 +262,7 @@
       "totalBrl": 10,
       "timestamp": "2026-10-01T02:09:03.052+00:00",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 111,
+      "saleNumber": 119,
       "discountBrl": 0,
       "subtotalBrl": 10,
       "employeeName": "Marijuaneiro",
@@ -262,7 +303,7 @@
       "totalBrl": 225,
       "timestamp": "2026-10-01T02:09:32.243+00:00",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 112,
+      "saleNumber": 120,
       "discountBrl": 0,
       "subtotalBrl": 225,
       "employeeName": "Marijuaneiro",
@@ -304,51 +345,10 @@
       "timestamp": "2026-10-01T03:30:37.348+00:00",
       "customerId": "cust-1790825309183",
       "employeeId": "emp-1790807328423",
-      "saleNumber": 113,
+      "saleNumber": 121,
       "discountBrl": 0,
       "subtotalBrl": 37.04,
       "customerName": "Carlos",
-      "employeeName": "Marijuaneiro",
-      "registerSessionId": ""
-    },
-    {
-      "id": "sale-1790825631211",
-      "items": [
-        {
-          "product": {
-            "id": "prod-vd-1790825631211",
-            "code": "VD-001",
-            "name": "Bolo pudim gourmet",
-            "unit": "un",
-            "stock": 9999,
-            "active": true,
-            "category": "paes",
-            "minStock": 0,
-            "priceBrl": 70,
-            "costPriceBrl": 28
-          },
-          "quantity": 1,
-          "subtotalBrl": 70,
-          "unitPriceBrl": 70
-        }
-      ],
-      "status": "completed",
-      "payments": [
-        {
-          "id": "pay-1790825631211",
-          "method": "dinheiro",
-          "currency": "BRL",
-          "equivalentBrl": 70,
-          "amountReceived": 70,
-          "exchangeRateUsed": 1
-        }
-      ],
-      "totalBrl": 70,
-      "timestamp": "2026-10-01T03:33:51.211+00:00",
-      "employeeId": "emp-1790807328423",
-      "saleNumber": 114,
-      "discountBrl": 0,
-      "subtotalBrl": 70,
       "employeeName": "Marijuaneiro",
       "registerSessionId": ""
     }
@@ -432,7 +432,7 @@
       "loyaltyPoints": 0,
       "purchaseCount": 0,
       "totalSpentBrl": 0,
-      "creditLimitBrl": 200,
+      "creditLimitBrl": 200000,
       "outstandingBalanceBrl": 37.04
     }
   ],
@@ -503,7 +503,7 @@
       ]
     }
   ],
-  "timestamp": "2026-10-01T13:44:40.822Z",
+  "timestamp": "2026-10-01T13:55:04.876Z",
   "openComandas": [],
   "exchangeRates": {
     "updatedAt": "2026-10-01T13:43:39.912Z",
@@ -526,19 +526,6 @@
   },
   "fichasTecnicas": [],
   "sessionHistory": [
-    {
-      "id": "session-1790819405424",
-      "status": "aberto",
-      "openedAt": "2026-10-01T01:50:05.424+00:00",
-      "openedBy": "Operador",
-      "initialFloat": {
-        "brl": 0,
-        "pyg": 0,
-        "usd": 0
-      },
-      "transactions": [],
-      "sessionNumber": 1
-    },
     {
       "id": "sess-1790862134490",
       "status": "fechado",

@@ -60,7 +60,22 @@ export const PaymentModal: React.FC<Props> = ({
   const selectedCurrency: Currency = 'PYG';
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('dinheiro');
   const [inputAmount, setInputAmount] = useState<string>('');
+  const [isFinishing, setIsFinishing] = useState<boolean>(false);
   
+  // Reset modal state whenever opened
+  React.useEffect(() => {
+    if (isOpen) {
+      setPayments([]);
+      setInputAmount('');
+      setDiscountType('none');
+      setDiscountValue('');
+      setLoyaltyDiscountBrl(0);
+      setSelectedCustomerId('');
+      setCustomerName(initialCustomerName || '');
+      setIsFinishing(false);
+    }
+  }, [isOpen, initialCustomerName]);
+
   // Preferred currency for change (Guaraní ₲)
   const changeCurrency: Currency = 'PYG';
 
@@ -78,8 +93,6 @@ export const PaymentModal: React.FC<Props> = ({
 
   // Suggested amount in Guaraní
   const suggestedAmountForSelectedCur = remainingBrl;
-
-  if (!isOpen) return null;
 
   const handleSelectCustomer = (cid: string) => {
     setSelectedCustomerId(cid);
@@ -156,8 +169,6 @@ export const PaymentModal: React.FC<Props> = ({
     setInputAmount(val.toString());
   };
 
-  const [isFinishing, setIsFinishing] = useState(false);
-
   const handleFinishSale = async () => {
     let finalPayments = [...payments];
 
@@ -220,6 +231,8 @@ export const PaymentModal: React.FC<Props> = ({
 
   // Quick bills in Guaraní (₲)
   const quickBills = [5000, 10000, 20000, 50000, 100000, 200000];
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm sm:p-4 overflow-y-auto">

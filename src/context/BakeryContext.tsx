@@ -350,21 +350,36 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (!isMounted) return;
 
+        let serverFallback: SystemBackupData | null = null;
+        if (dbProducts.length === 0 && (!dbExtra || !dbExtra.products || dbExtra.products.length === 0)) {
+          try {
+            serverFallback = await StorageService.fetchServerState();
+          } catch {}
+        }
+
+        if (!isMounted) return;
+
         setData(prev => {
-          // Merge products (if dbProducts table has rows use them, else if dbExtra has products use them, else preserve local prev.products)
+          // Merge products
           const products = dbProducts.length > 0 
             ? dbProducts 
-            : (dbExtra?.products && dbExtra.products.length > 0 ? dbExtra.products : prev.products);
+            : (dbExtra?.products && dbExtra.products.length > 0 
+              ? dbExtra.products 
+              : (serverFallback?.products && serverFallback.products.length > 0 ? serverFallback.products : prev.products));
 
           // Merge customers
           const customers = dbCustomers.length > 0 
             ? dbCustomers 
-            : (dbExtra?.customers && dbExtra.customers.length > 0 ? dbExtra.customers : prev.customers);
+            : (dbExtra?.customers && dbExtra.customers.length > 0 
+              ? dbExtra.customers 
+              : (serverFallback?.customers && serverFallback.customers.length > 0 ? serverFallback.customers : prev.customers));
 
           // Merge sales
           const sales = dbSales.length > 0 
             ? dbSales 
-            : (dbExtra?.sales && dbExtra.sales.length > 0 ? dbExtra.sales : prev.sales);
+            : (dbExtra?.sales && dbExtra.sales.length > 0 
+              ? dbExtra.sales 
+              : (serverFallback?.sales && serverFallback.sales.length > 0 ? serverFallback.sales : prev.sales));
           // Merge employees: ensure Admin Ax always preserved
           let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
@@ -1410,22 +1425,24 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
     }
 
-    // REQUIREMENT 6: Deduct stock concurrently via RPC baixar_estoque
+    // Deduct stock concurrently
     const stockUpdates = new Map<string, number>();
     await Promise.all(
       items.map(async (it) => {
         if (!it.product || !it.product.id) return;
+        const currentP = data.products.find(p => p.id === it.product.id);
+        const fallbackStock = currentP ? Math.max(0, currentP.stock - it.quantity) : 0;
+        
+        // Immediate guaranteed local stock deduction
+        stockUpdates.set(it.product.id, fallbackStock);
+
         try {
           const newStock = await rpcBaixarEstoque(it.product.id, it.quantity);
           stockUpdates.set(it.product.id, newStock);
         } catch (rpcErr: any) {
-          console.warn(`RPC baixar_estoque warning (${it.product.name}):`, rpcErr);
           try {
-            const currentP = data.products.find(p => p.id === it.product.id);
             if (currentP) {
-              const fallbackStock = Math.max(0, currentP.stock - it.quantity);
               await upsertProduto({ ...currentP, stock: fallbackStock });
-              stockUpdates.set(it.product.id, fallbackStock);
             }
           } catch {}
         }
