@@ -253,7 +253,16 @@ export const InventoryView: React.FC = () => {
                     key={`m-${p.id}`}
                     className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800/90 space-y-2.5 shadow-sm"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2.5">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.name}
+                          className="w-11 h-11 rounded-xl object-cover border border-neutral-800 bg-neutral-900 shrink-0"
+                          loading="lazy"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                      ) : null}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-mono-nums mb-0.5">
                           <span>{p.code}</span>
@@ -380,12 +389,25 @@ export const InventoryView: React.FC = () => {
                           {p.code}
                         </td>
                         <td className="py-3 px-4 font-semibold text-neutral-200">
-                          {p.name}
-                          {p.isIngredient && (
-                            <span className="ml-1.5 text-[10px] text-amber-400/80 font-normal">
-                              (Insumo)
+                          <div className="flex items-center gap-2.5">
+                            {p.imageUrl ? (
+                              <img
+                                src={p.imageUrl}
+                                alt={p.name}
+                                className="w-8 h-8 rounded-lg object-cover border border-neutral-750 bg-neutral-950 shrink-0"
+                                loading="lazy"
+                                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                              />
+                            ) : null}
+                            <span className="truncate">
+                              {p.name}
+                              {p.isIngredient && (
+                                <span className="ml-1.5 text-[10px] text-amber-400/80 font-normal">
+                                  (Insumo)
+                                </span>
+                              )}
                             </span>
-                          )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-neutral-400 capitalize">
                           {p.category}

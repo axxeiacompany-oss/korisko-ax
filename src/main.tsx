@@ -26,7 +26,7 @@ window.addEventListener(
       return false;
     }
   },
-  { capture: true, passive: false }
+  { capture: false, passive: true }
 );
 
 window.addEventListener(
@@ -41,12 +41,10 @@ window.addEventListener(
       msg.includes('aborted')
     ) {
       event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
       return false;
     }
   },
-  { capture: true, passive: false }
+  { capture: false, passive: true }
 );
 
 createRoot(document.getElementById('root')!).render(

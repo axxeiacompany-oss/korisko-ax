@@ -474,9 +474,29 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
             return (
               <div
                 key={p.id}
-                className="p-3 sm:p-4 rounded-2xl bg-[#0D121D] border border-[#1E273A] hover:border-amber-500/50 hover:shadow-xl hover:shadow-black/40 transition-all flex flex-col justify-between group relative"
+                className="p-3 sm:p-4 rounded-2xl bg-[#0D121D] border border-[#1E273A] hover:border-amber-500/50 hover:shadow-xl hover:shadow-black/40 transition-all flex flex-col justify-between group relative overflow-hidden"
               >
                 <div>
+                  {/* Product Image Banner */}
+                  {p.imageUrl ? (
+                    <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-neutral-950 mb-3 border border-neutral-800/80">
+                      <img
+                        src={p.imageUrl}
+                        alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      {p.featured && (
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-500 text-neutral-950 shadow-md">
+                          Destaque
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+
                   {/* Category & Code Tag */}
                   <div className="flex items-center justify-between text-[10px] text-neutral-500 font-mono mb-2">
                     <span className="uppercase">{p.category}</span>

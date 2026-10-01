@@ -25,6 +25,11 @@ export function productToRow(p: Product) {
     min_stock: Number(p.minStock) || 0,
     unit: p.unit || 'un',
     active: p.active !== false,
+    image_url: p.imageUrl || null,
+    description: p.description || null,
+    slug: p.slug || null,
+    compare_at_price: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+    featured: Boolean(p.featured),
   };
 }
 
@@ -40,6 +45,11 @@ export function rowToProduct(r: any): Product {
     minStock: Number(r.min_stock) || 0,
     unit: r.unit || 'un',
     active: r.active !== false,
+    imageUrl: r.image_url || undefined,
+    description: r.description || undefined,
+    slug: r.slug || undefined,
+    compareAtPrice: r.compare_at_price != null ? Number(r.compare_at_price) : undefined,
+    featured: Boolean(r.featured),
   };
 }
 
@@ -195,33 +205,38 @@ export async function fetchAllRowsPaged<T>(table: string): Promise<T[]> {
 
   while (hasMore) {
     const to = from + PAGE_SIZE - 1;
+    let timer: any;
     
-    // Protection against slow network or cold start hanging
-    const queryPromise = supabase
-      .from(table)
-      .select('*')
-      .range(from, to);
+    try {
+      const queryPromise = supabase
+        .from(table)
+        .select('*')
+        .range(from, to);
 
-    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: { message: 'Tempo limite esgotado' } }), 4000)
-    );
+      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
+        timer = setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 4000);
+      });
 
-    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      clearTimeout(timer);
 
-    if (error) {
-      if (allRows.length > 0) return allRows;
-      throw new Error(`[Supabase ${table}] Falha ao carregar registros: ${error.message}`);
-    }
-
-    if (data && data.length > 0) {
-      allRows = allRows.concat(data as T[]);
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      } else {
-        from += PAGE_SIZE;
+      if (error) {
+        return allRows;
       }
-    } else {
-      hasMore = false;
+
+      if (data && data.length > 0) {
+        allRows = allRows.concat(data as T[]);
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          from += PAGE_SIZE;
+        }
+      } else {
+        hasMore = false;
+      }
+    } catch {
+      clearTimeout(timer);
+      return allRows;
     }
   }
 

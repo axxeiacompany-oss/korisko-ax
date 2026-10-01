@@ -328,6 +328,19 @@ export const PdvView: React.FC = () => {
                   }`}
                 >
                   <div>
+                    {p.imageUrl && (
+                      <div className="w-full h-24 rounded-xl overflow-hidden mb-2 bg-neutral-950 border border-neutral-800/80">
+                        <img
+                          src={p.imageUrl}
+                          alt={p.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-1 text-[10px] text-neutral-500 font-mono-nums mb-1">
                       <span>{p.code}</span>
                       <div className="flex items-center gap-1">

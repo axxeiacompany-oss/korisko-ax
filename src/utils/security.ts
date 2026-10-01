@@ -111,96 +111,21 @@ export function initSecurityShield() {
   if (typeof window === 'undefined' || isShieldInitialized) return;
   isShieldInitialized = true;
 
-  // 1. Silenciar e limpar Console para que nada apareça ao inspecionar
-  try {
-    const noop = () => {};
-    window.console.log = noop;
-    window.console.info = noop;
-    window.console.warn = noop;
-    window.console.debug = noop;
-    window.console.table = noop;
-    window.console.dir = noop;
-    window.console.trace = noop;
-    // Deixar apenas error silenciado após clear
-    window.console.error = noop;
-    window.console.clear();
-  } catch {}
-
-  // 2. Interceptar Teclas de Inspeção (F12, Ctrl+Shift+I, etc.)
+  // On desktop only: Block F12 shortcut without interfering with mobile touch events
   window.addEventListener(
     'keydown',
     (e: KeyboardEvent) => {
-      // Tecla F12
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        try { window.console.clear(); } catch {}
         return false;
       }
-
-      // Atalhos comuns de Developer Tools (Windows / Mac)
       const isCtrlOrMeta = e.ctrlKey || e.metaKey;
-      const isShift = e.shiftKey;
-      const isAlt = e.altKey;
       const key = (e.key || '').toUpperCase();
-
-      // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (Inspecionar / Console)
-      if (isCtrlOrMeta && isShift && (key === 'I' || key === 'J' || key === 'C' || key === 'K')) {
+      if (isCtrlOrMeta && e.shiftKey && (key === 'I' || key === 'J' || key === 'C')) {
         e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        try { window.console.clear(); } catch {}
-        return false;
-      }
-
-      // Mac Cmd+Option+I, Cmd+Option+J, Cmd+Option+C
-      if (isCtrlOrMeta && isAlt && (key === 'I' || key === 'J' || key === 'C')) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        try { window.console.clear(); } catch {}
-        return false;
-      }
-
-      // Ctrl+U (Ver código-fonte)
-      if (isCtrlOrMeta && key === 'U') {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        return false;
-      }
-
-      // Ctrl+S (Salvar página completa)
-      if (isCtrlOrMeta && key === 'S') {
-        e.preventDefault();
-        e.stopPropagation();
         return false;
       }
     },
-    { capture: true, passive: false }
+    { passive: false }
   );
-
-  // 3. Desativar Botão Direito do Mouse (Inspecionar Elemento)
-  window.addEventListener(
-    'contextmenu',
-    (e: MouseEvent) => {
-      // Se não for em um input/textarea onde o usuário precisa colar texto
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        return; // Permite colar em campos de texto normais
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    },
-    { capture: true, passive: false }
-  );
-
-  // 4. Limpeza contínua do console a cada intervalo
-  setInterval(() => {
-    try {
-      window.console.clear();
-    } catch {}
-  }, 2000);
 }

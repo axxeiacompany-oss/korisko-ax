@@ -15,50 +15,82 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      vite-error-overlay,
+      [data-vite-dev-overlay],
+      #vite-error-overlay {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+      }
+    </style>
     <script>
       (function() {
-        // Bloqueio imediato de F12 e atalhos de desenvolvedor
-        window.addEventListener('keydown', function(e) {
-          if (e.key === 'F12' || e.keyCode === 123) {
-            e.preventDefault(); e.stopPropagation();
-            try { console.clear(); } catch(err) {}
-            return false;
-          }
-          var c = e.ctrlKey || e.metaKey;
-          var k = (e.key || '').toUpperCase();
-          if (c && e.shiftKey && (k === 'I' || k === 'J' || k === 'C' || k === 'K')) {
-            e.preventDefault(); e.stopPropagation();
-            try { console.clear(); } catch(err) {}
-            return false;
-          }
-          if (c && e.altKey && (k === 'I' || k === 'J' || k === 'C')) {
-            e.preventDefault(); e.stopPropagation();
-            try { console.clear(); } catch(err) {}
-            return false;
-          }
-          if (c && (k === 'U' || k === 'S')) {
-            e.preventDefault(); e.stopPropagation();
-            return false;
-          }
-        }, { capture: true, passive: false });
+        // 1. Stub Vite HMR WebSocket so it never fails with "WebSocket closed without opened"
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var RealWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var urlStr = String(url || '');
+            // Real WebSockets (e.g. Supabase Realtime) pass straight through
+            if (urlStr.indexOf('supabase.co') !== -1) {
+              return new RealWebSocket(url, protocols);
+            }
 
-        // Bloqueio de botão direito do mouse (inspecionar elemento)
-        window.addEventListener('contextmenu', function(e) {
-          var t = e.target;
-          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-          e.preventDefault(); e.stopPropagation();
-          return false;
-        }, { capture: true, passive: false });
+            // Vite dev server HMR dummy socket
+            var listeners = {};
+            var dummy = {
+              url: urlStr,
+              readyState: 1, // WebSocket.OPEN
+              send: function() {},
+              close: function() {},
+              addEventListener: function(type, fn) {
+                if (!listeners[type]) listeners[type] = [];
+                listeners[type].push(fn);
+                if (type === 'open') {
+                  setTimeout(function() {
+                    try { fn({ type: 'open' }); } catch(e) {}
+                  }, 10);
+                }
+              },
+              removeEventListener: function(type, fn) {
+                if (listeners[type]) {
+                  listeners[type] = listeners[type].filter(function(f) { return f !== fn; });
+                }
+              },
+              dispatchEvent: function() { return true; },
+              onopen: null,
+              onclose: null,
+              onerror: null,
+              onmessage: null,
+            };
 
-        // Silenciamento rigoroso de rejeições não tratadas de WebSocket e conexões
+            setTimeout(function() {
+              try {
+                if (typeof dummy.onopen === 'function') dummy.onopen({ type: 'open' });
+              } catch(e) {}
+            }, 10);
+
+            return dummy;
+          };
+
+          window.WebSocket.prototype = RealWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+
         function isIgnorableNetworkError(errOrMsg) {
           if (!errOrMsg) return false;
           var text = '';
           try {
             if (typeof errOrMsg === 'string') {
               text = errOrMsg;
-            } else if (errOrMsg.message || errOrMsg.stack) {
-              text = (errOrMsg.message || '') + ' ' + (errOrMsg.stack || '');
+            } else if (errOrMsg.message || errOrMsg.stack || errOrMsg.reason) {
+              text = (errOrMsg.message || '') + ' ' + (errOrMsg.stack || '') + ' ' + (errOrMsg.reason || '');
             } else {
               text = String(errOrMsg);
             }
@@ -69,6 +101,7 @@
           return (
             text.indexOf('websocket') !== -1 ||
             text.indexOf('closed without opened') !== -1 ||
+            text.indexOf('failed to connect to websocket') !== -1 ||
             text.indexOf('failed to fetch') !== -1 ||
             text.indexOf('networkerror') !== -1 ||
             text.indexOf('aborted') !== -1 ||
@@ -76,40 +109,45 @@
           );
         }
 
+        // Intercept unhandled rejections at the very highest capture level
         window.addEventListener('unhandledrejection', function(event) {
           try {
             var reason = event && event.reason;
             if (isIgnorableNetworkError(reason)) {
               if (event.preventDefault) event.preventDefault();
-              if (event.stopPropagation) event.stopPropagation();
               if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+              if (event.stopPropagation) event.stopPropagation();
               return false;
             }
           } catch(err) {}
-        }, { capture: true, passive: false });
+        }, true);
 
+        // Intercept global errors
         window.addEventListener('error', function(event) {
           try {
             var target = event && (event.message || event.error);
             if (isIgnorableNetworkError(target)) {
               if (event.preventDefault) event.preventDefault();
-              if (event.stopPropagation) event.stopPropagation();
               if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+              if (event.stopPropagation) event.stopPropagation();
               return false;
             }
           } catch(err) {}
-        }, { capture: true, passive: false });
+        }, true);
 
-        // Limpeza de logs
-        try {
-          var noop = function() {};
-          window.console.log = noop;
-          window.console.info = noop;
-          window.console.warn = noop;
-          window.console.debug = noop;
-          window.console.table = noop;
-          window.console.clear();
-        } catch(e) {}
+        // Clean up any vite-error-overlay dynamically
+        if (typeof MutationObserver !== 'undefined') {
+          var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+              mutation.addedNodes.forEach(function(node) {
+                if (node && node.nodeName && node.nodeName.toLowerCase() === 'vite-error-overlay') {
+                  node.remove();
+                }
+              });
+            });
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+        }
       })();
     </script>
   </head>
