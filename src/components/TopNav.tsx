@@ -103,7 +103,7 @@ export const TopNav: React.FC<Props> = ({
   return (
     <>
       <header 
-        className={`sticky top-0 z-30 h-16 bg-[#090D15]/90 backdrop-blur-md border-b border-[#182030] px-4 sm:px-6 flex items-center justify-between transition-all duration-300 ${
+        className={`sticky top-0 z-30 h-16 bg-[#090D15] border-b border-[#182030] px-4 sm:px-6 flex items-center justify-between transition-all duration-300 ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >

@@ -40,7 +40,6 @@ function MainAppShell() {
   });
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(() => new Set(['dashboard']));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
@@ -63,15 +62,9 @@ function MainAppShell() {
     } catch {}
   };
 
-  // Instant scroll & tab switch with tab cache
+  // Instant scroll & tab switch optimized for mobile
   const handleSelectTab = (tab: TabType) => {
     setActiveTab(tab);
-    setVisitedTabs(prev => {
-      if (prev.has(tab)) return prev;
-      const next = new Set(prev);
-      next.add(tab);
-      return next;
-    });
     setIsMobileMenuOpen(false);
     try {
       window.scrollTo({ top: 0, behavior: 'instant' as any });
@@ -192,65 +185,19 @@ function MainAppShell() {
               </button>
             </div>
           ) : (
-            <div className="w-full">
-              <div className={activeTab === 'dashboard' ? 'block' : 'hidden'} role="tabpanel">
-                <DashboardView onNavigate={handleSelectTab} />
-              </div>
-              {visitedTabs.has('pdv') && (
-                <div className={activeTab === 'pdv' ? 'block' : 'hidden'} role="tabpanel">
-                  <PdvView />
-                </div>
-              )}
-              {visitedTabs.has('venda_direta') && (
-                <div className={activeTab === 'venda_direta' ? 'block' : 'hidden'} role="tabpanel">
-                  <DirectSaleView />
-                </div>
-              )}
-              {visitedTabs.has('estoque') && (
-                <div className={activeTab === 'estoque' ? 'block' : 'hidden'} role="tabpanel">
-                  <InventoryView />
-                </div>
-              )}
-              {visitedTabs.has('fichas_tecnicas') && (
-                <div className={activeTab === 'fichas_tecnicas' ? 'block' : 'hidden'} role="tabpanel">
-                  <FichaTecnicaView />
-                </div>
-              )}
-              {visitedTabs.has('crm') && (
-                <div className={activeTab === 'crm' ? 'block' : 'hidden'} role="tabpanel">
-                  <CustomersView />
-                </div>
-              )}
-              {visitedTabs.has('caixa') && (
-                <div className={activeTab === 'caixa' ? 'block' : 'hidden'} role="tabpanel">
-                  <CashRegisterView />
-                </div>
-              )}
-              {visitedTabs.has('mais_vendidos') && (
-                <div className={activeTab === 'mais_vendidos' ? 'block' : 'hidden'} role="tabpanel">
-                  <MonthlyTopProductsView />
-                </div>
-              )}
-              {visitedTabs.has('metas') && (
-                <div className={activeTab === 'metas' ? 'block' : 'hidden'} role="tabpanel">
-                  <GoalsView />
-                </div>
-              )}
-              {visitedTabs.has('cambio') && (
-                <div className={activeTab === 'cambio' ? 'block' : 'hidden'} role="tabpanel">
-                  <CurrencyReportsView />
-                </div>
-              )}
-              {visitedTabs.has('backup') && (
-                <div className={activeTab === 'backup' ? 'block' : 'hidden'} role="tabpanel">
-                  <BackupView />
-                </div>
-              )}
-              {visitedTabs.has('afiliados') && (
-                <div className={activeTab === 'afiliados' ? 'block' : 'hidden'} role="tabpanel">
-                  <AfiliadosView onNavigate={handleSelectTab} />
-                </div>
-              )}
+            <div className="w-full min-h-[60vh]">
+              {activeTab === 'dashboard' && <DashboardView onNavigate={handleSelectTab} />}
+              {activeTab === 'pdv' && <PdvView />}
+              {activeTab === 'venda_direta' && <DirectSaleView />}
+              {activeTab === 'estoque' && <InventoryView />}
+              {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
+              {activeTab === 'crm' && <CustomersView />}
+              {activeTab === 'caixa' && <CashRegisterView />}
+              {activeTab === 'mais_vendidos' && <MonthlyTopProductsView />}
+              {activeTab === 'metas' && <GoalsView />}
+              {activeTab === 'cambio' && <CurrencyReportsView />}
+              {activeTab === 'backup' && <BackupView />}
+              {activeTab === 'afiliados' && <AfiliadosView onNavigate={handleSelectTab} />}
             </div>
           )}
         </div>

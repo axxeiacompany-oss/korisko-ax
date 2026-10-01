@@ -36,7 +36,7 @@ export const MobileBottomNav: React.FC<Props> = ({
   return (
     <nav 
       aria-label="Navegação Rápida Mobile"
-      className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[#0A0D15]/95 backdrop-blur-2xl border-t border-[#1C2538] px-2 pt-1 safe-area-pb shadow-2xl select-none"
+      className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[#0A0D15] border-t border-[#1C2538] px-2 pt-1 safe-area-pb shadow-2xl select-none"
     >
       <div className="grid grid-cols-5 items-center justify-around max-w-md mx-auto h-14">
         

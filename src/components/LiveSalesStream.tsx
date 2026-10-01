@@ -49,11 +49,13 @@ export const LiveSalesStream: React.FC<Props> = ({
   const [nowTime, setNowTime] = useState<number>(Date.now());
   const prevSalesLengthRef = useRef<number>(sales.length);
 
-  // Auto-refresh relative time display every 3 seconds
+  // Auto-refresh relative time display every 20 seconds when visible
   useEffect(() => {
     const timer = setInterval(() => {
-      setNowTime(Date.now());
-    }, 3000);
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        setNowTime(Date.now());
+      }
+    }, 20000);
     return () => clearInterval(timer);
   }, []);
 

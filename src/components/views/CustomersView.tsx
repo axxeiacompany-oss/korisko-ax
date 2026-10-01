@@ -383,7 +383,43 @@ export const CustomersView: React.FC = () => {
   // Generate statement plain text for WhatsApp, TXT or Clipboard
   const getStatementPlainText = (customer: Customer) => {
     const rawEntries = customerEntries.filter(e => e.customerId === customer.id);
-    const sorted = [...rawEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const existingSaleIds = new Set(rawEntries.filter(e => e.saleId).map(e => e.saleId));
+    const missingFiadoSales = sales.filter(s => 
+      s.customerId === customer.id && 
+      !existingSaleIds.has(s.id) &&
+      s.payments.some(p => p.method === 'fiado')
+    );
+
+    const mergedEntries = [...rawEntries];
+    missingFiadoSales.forEach(s => {
+      const fiadoPay = s.payments.find(p => p.method === 'fiado');
+      const amount = fiadoPay ? fiadoPay.amountReceived : s.totalBrl;
+      const itemsSummary = s.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+      mergedEntries.push({
+        id: `auto-${s.id}`,
+        customerId: customer.id,
+        date: s.timestamp,
+        type: 'debito_compra',
+        amountBrl: amount,
+        description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
+        saleId: s.id,
+        recordedBy: s.employeeName,
+      });
+    });
+
+    if (mergedEntries.length === 0 && customer.outstandingBalanceBrl > 0) {
+      mergedEntries.push({
+        id: `initial-${customer.id}`,
+        customerId: customer.id,
+        date: customer.createdAt || new Date().toISOString(),
+        type: 'debito_compra',
+        amountBrl: customer.outstandingBalanceBrl,
+        description: 'Saldo devedor anterior acumulado',
+        recordedBy: 'Sistema',
+      });
+    }
+
+    const sorted = [...mergedEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     let text = `🥖 *PADARIA & CONFEITARIA KORISKO*\n`;
     text += `📄 *EXTRATO DE CONTA & FIADO*\n`;
@@ -398,17 +434,23 @@ export const CustomersView: React.FC = () => {
     text += `≈ 🇺🇸 $ ${(customer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}\n`;
     text += `💳 *Limite de Crédito:* ${formatCurrency(customer.creditLimitBrl, 'BRL')} | *Fidelidade:* ${customer.loyaltyPoints} pts\n`;
     text += `--------------------------------\n`;
-    text += `📝 *ÚLTIMOS LANÇAMENTOS NO EXTRATO:*\n`;
+    text += `📝 *LANÇAMENTOS NO EXTRATO:*\n`;
     
     if (sorted.length === 0) {
       text += `Nenhum lançamento registrado até o momento.\n`;
     } else {
-      sorted.slice(0, 10).forEach(entry => {
+      sorted.forEach(entry => {
         const isDebit = entry.type === 'debito_compra';
         const d = new Date(entry.date).toLocaleDateString('pt-BR');
         const sign = isDebit ? '[+] Débito' : '[-] Amortização';
-        text += `${sign} (${d}): ${formatCurrency(entry.amountBrl, 'BRL')}\n`;
+        const saleRef = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
+        text += `${sign} (${d}): ${isDebit ? '' : '-'}${formatCurrency(entry.amountBrl, 'BRL')}\n`;
         text += `   ↳ ${entry.description}\n`;
+        if (saleRef && saleRef.items && saleRef.items.length > 0) {
+          saleRef.items.forEach(it => {
+            text += `     • ${it.quantity} ${it.product.unit} × ${it.product.name} = ${formatCurrency(it.subtotalBrl, 'BRL')}\n`;
+          });
+        }
       });
     }
     
@@ -471,6 +513,41 @@ export const CustomersView: React.FC = () => {
     }
 
     const rawEntries = customerEntries.filter(e => e.customerId === statementCustomer.id);
+    const existingSaleIds = new Set(rawEntries.filter(e => e.saleId).map(e => e.saleId));
+    const missingFiadoSales = sales.filter(s => 
+      s.customerId === statementCustomer.id && 
+      !existingSaleIds.has(s.id) &&
+      s.payments.some(p => p.method === 'fiado')
+    );
+
+    const mergedEntries = [...rawEntries];
+    missingFiadoSales.forEach(s => {
+      const fiadoPay = s.payments.find(p => p.method === 'fiado');
+      const amount = fiadoPay ? fiadoPay.amountReceived : s.totalBrl;
+      const itemsSummary = s.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+      mergedEntries.push({
+        id: `auto-${s.id}`,
+        customerId: statementCustomer.id,
+        date: s.timestamp,
+        type: 'debito_compra',
+        amountBrl: amount,
+        description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
+        saleId: s.id,
+        recordedBy: s.employeeName,
+      });
+    });
+
+    if (mergedEntries.length === 0 && statementCustomer.outstandingBalanceBrl > 0) {
+      mergedEntries.push({
+        id: `initial-${statementCustomer.id}`,
+        customerId: statementCustomer.id,
+        date: statementCustomer.createdAt || new Date().toISOString(),
+        type: 'debito_compra',
+        amountBrl: statementCustomer.outstandingBalanceBrl,
+        description: 'Saldo devedor anterior acumulado',
+        recordedBy: 'Sistema',
+      });
+    }
 
     // Calculate totals across ALL entries
     let totalDebits = 0;
@@ -478,7 +555,7 @@ export const CustomersView: React.FC = () => {
     let debitCount = 0;
     let amortizedCount = 0;
 
-    rawEntries.forEach(e => {
+    mergedEntries.forEach(e => {
       if (e.type === 'debito_compra') {
         totalDebits += e.amountBrl;
         debitCount++;
@@ -488,11 +565,11 @@ export const CustomersView: React.FC = () => {
       }
     });
 
-    const sortedByDateDesc = [...rawEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedByDateDesc = [...mergedEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const lastMovement = sortedByDateDesc[0] || null;
 
     // Calculate running balance by sorting ascending first
-    const sortedAsc = [...rawEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedAsc = [...mergedEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let running = 0;
     const withRunning = sortedAsc.map(entry => {
       const isDebit = entry.type === 'debito_compra';
@@ -1414,39 +1491,61 @@ export const CustomersView: React.FC = () => {
                         filteredStatementEntries.map((entry) => {
                           const isDebit = entry.type === 'debito_compra';
                           const entrySale = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
+                          const entryDate = new Date(entry.date).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          });
 
                           return (
-                            <div key={entry.id} className="space-y-0.5 border-b border-dotted border-neutral-200 pb-1.5 last:border-0 last:pb-0">
-                              <div className="font-semibold text-neutral-900 leading-tight">
-                                {isDebit ? entry.description : `Amortização de fiado: ${entry.description}`}
+                            <div key={entry.id} className="space-y-1 border-b border-dotted border-neutral-300 pb-2 last:border-0 last:pb-0">
+                              {/* Date and Operator info */}
+                              <div className="flex items-center justify-between text-[10px] text-neutral-500 font-mono">
+                                <span>{entryDate}</span>
+                                {entry.recordedBy && <span>Op: {entry.recordedBy}</span>}
                               </div>
 
-                              {entrySale && entrySale.items && entrySale.items.length > 0 && (
-                                <div className="pl-1 text-[10px] text-neutral-600 space-y-0.5">
+                              {/* Title / Description */}
+                              <div className="font-bold text-neutral-900 leading-tight">
+                                {isDebit ? entry.description : (
+                                  entry.description.toLowerCase().startsWith('amortização')
+                                    ? entry.description
+                                    : `Amortização: ${entry.description}`
+                                )}
+                              </div>
+
+                              {/* If sale items exist, list each item with quantity, unit and price */}
+                              {entrySale && entrySale.items && entrySale.items.length > 0 ? (
+                                <div className="pl-1 text-[10px] text-neutral-700 space-y-0.5 my-1">
                                   {entrySale.items.map((it, idx) => (
                                     <div key={idx} className="flex justify-between">
-                                      <span>{it.quantity} {it.product.unit} × {formatCurrency(it.unitPriceBrl, 'BRL')}</span>
-                                      <span>{formatCurrency(it.subtotalBrl, 'BRL')}</span>
+                                      <span className="truncate pr-1">{it.quantity} {it.product.unit} × {it.product.name}</span>
+                                      <span className="font-mono shrink-0">{formatCurrency(it.subtotalBrl, 'BRL')}</span>
                                     </div>
                                   ))}
+                                  <div className="flex justify-between text-[11px] font-bold text-neutral-900 pt-0.5 border-t border-dotted border-neutral-300">
+                                    <span>SUBTOTAL:</span>
+                                    <span className="font-mono">{formatCurrency(entry.amountBrl, 'BRL')}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-[11px] pt-0.5">
+                                  <span className="text-neutral-600">
+                                    {isDebit ? 'Valor do débito:' : `Valor amortizado (${entry.paymentMethod ? entry.paymentMethod.toUpperCase() : 'PAGO'}):`}
+                                  </span>
+                                  <span className={`font-bold font-mono ${isDebit ? 'text-neutral-900' : 'text-emerald-700'}`}>
+                                    {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
+                                  </span>
                                 </div>
                               )}
 
-                              <div className="flex justify-between text-[11px] text-neutral-600 pt-0.5">
-                                <span>
-                                  1 un × {formatCurrency(entry.amountBrl, 'BRL')}
-                                </span>
-                                <span className={`font-bold ${isDebit ? 'text-neutral-900' : 'text-emerald-700'}`}>
-                                  {isDebit ? '' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
-                                </span>
-                              </div>
-
                               {entrySale && (
-                                <div className="text-right">
+                                <div className="text-right pt-0.5">
                                   <button
                                     type="button"
                                     onClick={() => setSelectedSaleForReceipt(entrySale)}
-                                    className="text-[10px] text-indigo-600 hover:underline font-semibold"
+                                    className="text-[10px] text-indigo-600 hover:underline font-semibold cursor-pointer"
                                   >
                                     Ver Cupom da Venda #{entrySale.saleNumber} →
                                   </button>
@@ -1810,6 +1909,22 @@ export const CustomersView: React.FC = () => {
                             <div className="font-semibold text-neutral-100 text-xs mt-1 leading-snug break-words">
                               {entry.description}
                             </div>
+
+                            {/* Itemized breakdown if from sale */}
+                            {entrySale && entrySale.items && entrySale.items.length > 0 && (
+                              <div className="mt-1 pl-2 border-l-2 border-neutral-700/60 space-y-0.5 text-[11px] text-neutral-400">
+                                {entrySale.items.map((it, idx) => (
+                                  <div key={idx} className="flex items-center gap-1.5">
+                                    <span className="text-neutral-300 font-medium">
+                                      {it.quantity} {it.product.unit} × {it.product.name}
+                                    </span>
+                                    <span className="font-mono text-neutral-400">
+                                      ({formatCurrency(it.subtotalBrl, 'BRL')})
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-neutral-400 mt-1">
                               <span className="font-mono text-neutral-400">

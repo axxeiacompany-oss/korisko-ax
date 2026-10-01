@@ -25,6 +25,15 @@
     font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
+
+  /* Momentum smooth scrolling on iOS and Android */
+  .overflow-y-auto, .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  button, a, input, select {
+    touch-action: manipulation;
+  }
 }
 
 /* Hide scrollbar for clean mobile swiping */
