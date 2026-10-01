@@ -1182,6 +1182,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor })
       const newBal = await rpcAjustarSaldoCliente(customerId, amountBrl);
+      entry.resultingBalanceBrl = newBal;
       setData(prev => ({
         ...prev,
         customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
@@ -1203,12 +1204,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       type: 'pagamento_amortizacao',
       amountBrl: cleanAmount,
       description: `Amortização de fiado via ${method.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
+      paymentMethod: method,
       recordedBy: currentUser.name,
     };
 
     try {
       // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor: -amountBrl })
       const newBal = await rpcAjustarSaldoCliente(customerId, -cleanAmount);
+      entry.resultingBalanceBrl = newBal;
       setData(prev => ({
         ...prev,
         customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
@@ -1320,12 +1323,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente
     let newCustomerBal: number | undefined;
+    let fiadoAccountEntry: CustomerAccountEntry | undefined;
     if (customerId && fiadoAmountBrl > 0) {
       try {
         newCustomerBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
       } catch (rpcBalErr: any) {
         console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
       }
+
+      const itemsSummary = items.map(i => `${i.quantity}x ${i.product.name}`).slice(0, 3).join(', ');
+      fiadoAccountEntry = {
+        id: `entry-${Date.now()}`,
+        customerId,
+        date: new Date().toISOString(),
+        type: 'debito_compra',
+        amountBrl: fiadoAmountBrl,
+        description: `Venda #${persistedSale.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
+        saleId: persistedSale.id,
+        resultingBalanceBrl: newCustomerBal,
+        recordedBy: currentUser.name,
+      };
     }
 
     // Close comanda if attached
@@ -1342,6 +1359,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       customers: newCustomerBal !== undefined
         ? (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newCustomerBal! } : c)
         : prev.customers,
+      customerEntries: fiadoAccountEntry
+        ? [fiadoAccountEntry, ...(prev.customerEntries || [])]
+        : prev.customerEntries,
       sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
     }));
 

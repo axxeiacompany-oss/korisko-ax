@@ -804,6 +804,7 @@ export const BackupView: React.FC = () => {
             </span>
           </div>
         </div>
+      </div>
 
       {/* Confirm Action Modal */}
       <ConfirmModal

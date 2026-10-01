@@ -857,6 +857,8 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
 
           </div>
         </div>
+      )}
+
       {/* Confirm Delete Affiliate Modal */}
       <ConfirmModal
         isOpen={Boolean(employeeToDelete)}

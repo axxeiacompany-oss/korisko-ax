@@ -183,6 +183,7 @@ export interface CustomerAccountEntry {
   description: string;
   paymentMethod?: string;
   resultingBalanceBrl?: number;
+  runningBalanceBrl?: number;
   saleId?: string;
   recordedBy: string;
 }

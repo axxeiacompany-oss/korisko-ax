@@ -1184,6 +1184,8 @@ export const FichaTecnicaView: React.FC = () => {
 
           </div>
         </div>
+      )}
+
       {/* Confirm Delete Ficha Técnica Modal */}
       <ConfirmModal
         isOpen={Boolean(fichaToDelete)}
