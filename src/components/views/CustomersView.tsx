@@ -108,9 +108,31 @@ export const CustomersView: React.FC = () => {
   const [formDocumentCpf, setFormDocumentCpf] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formCategory, setFormCategory] = useState<CustomerCategory>('varejo');
-  const [formCreditLimit, setFormCreditLimit] = useState('200');
+  const [formCreditLimit, setFormCreditLimit] = useState('500000');
   const [formBirthday, setFormBirthday] = useState('');
   const [formNotes, setFormNotes] = useState('');
+
+  // Keep open modals synchronized in real-time when customer balances change
+  React.useEffect(() => {
+    if (statementCustomer) {
+      const fresh = customers.find(c => c.id === statementCustomer.id);
+      if (fresh && (fresh.outstandingBalanceBrl !== statementCustomer.outstandingBalanceBrl || fresh.loyaltyPoints !== statementCustomer.loyaltyPoints || fresh.creditLimitBrl !== statementCustomer.creditLimitBrl)) {
+        setStatementCustomer(fresh);
+      }
+    }
+    if (paymentCustomer) {
+      const fresh = customers.find(c => c.id === paymentCustomer.id);
+      if (fresh && fresh.outstandingBalanceBrl !== paymentCustomer.outstandingBalanceBrl) {
+        setPaymentCustomer(fresh);
+      }
+    }
+    if (debtCustomer) {
+      const fresh = customers.find(c => c.id === debtCustomer.id);
+      if (fresh && fresh.outstandingBalanceBrl !== debtCustomer.outstandingBalanceBrl) {
+        setDebtCustomer(fresh);
+      }
+    }
+  }, [customers, statementCustomer, paymentCustomer, debtCustomer]);
 
   const canManage = hasPermission(['admin', 'gerente', 'caixa']);
 
@@ -136,7 +158,7 @@ export const CustomersView: React.FC = () => {
   const stats = useMemo(() => {
     const total = customers.length;
     const totalDebtBrl = customers.reduce((acc, c) => acc + c.outstandingBalanceBrl, 0);
-    const totalDebtPyg = Math.round(totalDebtBrl * (exchangeRates.BRL_TO_PYG || 1400));
+    const totalDebtPyg = Math.round(totalDebtBrl);
     const debtorsCount = customers.filter(c => c.outstandingBalanceBrl > 0).length;
     const totalLoyaltyPoints = customers.reduce((acc, c) => acc + c.loyaltyPoints, 0);
 
@@ -147,7 +169,7 @@ export const CustomersView: React.FC = () => {
       debtorsCount,
       totalLoyaltyPoints,
     };
-  }, [customers, exchangeRates]);
+  }, [customers]);
 
   // Live conversion for Amortization modal
   const computedAmortizedBrl = useMemo(() => {
@@ -177,7 +199,7 @@ export const CustomersView: React.FC = () => {
     setFormDocumentCpf('');
     setFormAddress('');
     setFormCategory('varejo');
-    setFormCreditLimit('200');
+    setFormCreditLimit('500000');
     setFormBirthday('');
     setFormNotes('');
     setIsFormOpen(true);
@@ -746,14 +768,14 @@ export const CustomersView: React.FC = () => {
 
         <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Total Fiado (A Cobrar)' : 'Total Fiado'}</span>
+            <span className="truncate">{language === 'es' ? 'Total Fiado (A Cobrar)' : 'Total Fiado (A Receber)'}</span>
             <DollarSign className="w-4 h-4 text-rose-400 shrink-0" />
           </div>
           <div className="text-lg sm:text-2xl font-bold text-rose-400 font-mono-nums">
-            {formatCurrency(stats.totalDebtBrl, 'BRL')}
+            {formatCurrency(stats.totalDebtBrl, 'PYG')}
           </div>
           <p className="text-[10px] text-neutral-500 mt-0.5 truncate">
-            ≈ ₲ {stats.totalDebtPyg.toLocaleString('pt-BR')}
+            🇵🇾 Sincronizado em Tempo Real (₲ PYG)
           </p>
         </div>
 
@@ -1646,20 +1668,14 @@ export const CustomersView: React.FC = () => {
                         <span className={`w-2 h-2 rounded-full ${statementCustomer.outstandingBalanceBrl > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
                       </div>
                       <div className={`text-xl font-black font-mono-nums mt-1 ${statementCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}
+                        {formatCurrency(statementCustomer.outstandingBalanceBrl, 'PYG')}
                       </div>
                     </div>
                     <div className="text-[10px] text-neutral-400 font-mono space-y-0.5 pt-2 border-t border-[#161E30] mt-2">
                       <div className="flex items-center justify-between">
-                        <span>🇵🇾 PYG:</span>
-                        <span className="font-bold text-neutral-300">
-                          ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>🇺🇸 USD:</span>
-                        <span className="font-bold text-neutral-300">
-                          $ {(statementCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}
+                        <span>🇵🇾 Moeda Oficial:</span>
+                        <span className="font-bold text-amber-300">
+                          {formatCurrency(statementCustomer.outstandingBalanceBrl, 'PYG')}
                         </span>
                       </div>
                     </div>

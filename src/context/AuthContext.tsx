@@ -2,6 +2,18 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { UserProfile, ProfileRole } from '../types';
+import { listUsuarios } from '../lib/db';
+import {
+  checkLoginLockout,
+  recordFailedLoginAttempt,
+  clearLoginAttempts,
+  hashPasswordSha256,
+  verifyStoredPassword,
+  createSecureSessionMeta,
+  isSessionMetaValid,
+  clearSecureSessionMeta,
+  recordLoginAuditEvent,
+} from '../utils/loginSecurity';
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +22,7 @@ interface AuthContextType {
   role: ProfileRole;
   isLoading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
+  signIn: (email: string, password: string, rememberDevice?: boolean) => Promise<{ error: AuthError | Error | null }>;
   signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: AuthError | Error | null; user: User | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | Error | null }>;
@@ -110,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Initial Auth Check and listener
+  // Initial Auth Check and listener with Session Expiration Validation
   useEffect(() => {
     let isMounted = true;
 
@@ -127,24 +139,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(data.session.user);
             await fetchUserProfile(data.session.user);
           } else {
-            // Check if there was a saved session in local storage
-            try {
-              const savedProfileStr = localStorage.getItem('KORISKO_SAVED_PROFILE');
-              const savedUserStr = localStorage.getItem('KORISKO_SAVED_USER');
-              if (savedProfileStr && savedUserStr) {
-                const parsedProfile = JSON.parse(savedProfileStr);
-                const parsedUser = JSON.parse(savedUserStr);
-                setProfile(parsedProfile);
-                setUser(parsedUser);
-                setSession({
-                  access_token: 'local-session-token',
-                  refresh_token: 'local-refresh-token',
-                  expires_in: 360000,
-                  token_type: 'bearer',
-                  user: parsedUser,
-                } as any);
+            // Validate local session integrity and expiration before restoring
+            const sessionCheck = isSessionMetaValid();
+            if (sessionCheck.valid) {
+              try {
+                const savedProfileStr = localStorage.getItem('KORISKO_SAVED_PROFILE');
+                const savedUserStr = localStorage.getItem('KORISKO_SAVED_USER');
+                if (savedProfileStr && savedUserStr) {
+                  const parsedProfile = JSON.parse(savedProfileStr);
+                  const parsedUser = JSON.parse(savedUserStr);
+                  if (parsedProfile?.userId && parsedUser?.id && parsedProfile.userId === parsedUser.id) {
+                    setProfile(parsedProfile);
+                    setUser(parsedUser);
+                    setSession({
+                      access_token: 'local-session-token',
+                      refresh_token: 'local-refresh-token',
+                      expires_in: 360000,
+                      token_type: 'bearer',
+                      user: parsedUser,
+                    } as any);
+                  }
+                }
+              } catch {
+                clearSecureSessionMeta();
               }
-            } catch {}
+            } else {
+              clearSecureSessionMeta();
+            }
           }
         }
       } catch (err) {
@@ -175,72 +196,132 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchUserProfile]);
 
-  // Sign In with email and password (with local admin & employee fallback)
-  const signIn = async (email: string, password: string) => {
+  // Sign In with email and password (with strict credential verification & brute-force protection)
+  const signIn = async (email: string, password: string, rememberDevice = true) => {
     try {
       setIsLoading(true);
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
 
-      // 1. Try Supabase Auth
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: cleanPassword,
+      // 0. Check brute-force rate limit lockout
+      const lockout = checkLoginLockout(cleanEmail);
+      if (lockout.isLocked) {
+        await recordLoginAuditEvent({
+          eventType: 'bloqueio_forca_bruta',
+          identifier: cleanEmail,
+          success: false,
+          details: `Acesso bloqueado temporariamente (${lockout.remainingSeconds}s restantes) após múltiplas tentativas inválidas.`,
         });
-
-        if (!error && data.user) {
-          setUser(data.user);
-          setSession(data.session);
-          const p = await fetchUserProfile(data.user);
-          if (p) {
-            try {
-              localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(p));
-              localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(data.user));
-              localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-            } catch {}
-          }
-          return { error: null };
-        }
-      } catch (authErr) {
-        console.warn('[AuthContext] Supabase sign in notice, checking fallback:', authErr);
+        return {
+          error: new Error(
+            `Muitas tentativas incorretas. Por segurança, aguarde ${lockout.remainingSeconds} segundos antes de tentar novamente.`
+          ),
+        };
       }
 
-      // 2. Fallback: Check Admin Ax and employees
-      const isMasterAx = 
-        (cleanEmail === 'axxeiacompany@gmail.com' || cleanEmail === 'ax') && 
-        (cleanPassword === '9APG_47z-EgF4yz' || cleanPassword === 'admin');
+      // 1. Try Supabase Auth (only if identifier is a valid email format)
+      if (cleanEmail.includes('@')) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: cleanPassword,
+          });
 
-      // Check registered users in localStorage or local DB
+          if (!error && data.user) {
+            setUser(data.user);
+            setSession(data.session);
+            const p = await fetchUserProfile(data.user);
+            clearLoginAttempts(cleanEmail);
+            createSecureSessionMeta({
+              userId: data.user.id,
+              email: data.user.email || cleanEmail,
+              role: p?.role || 'customer',
+              rememberDevice,
+            });
+            if (p) {
+              try {
+                localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(p));
+                localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(data.user));
+                localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+                if (rememberDevice) {
+                  localStorage.setItem('KORISKO_REMEMBER_DEVICE', 'true');
+                }
+              } catch {}
+            }
+            await recordLoginAuditEvent({
+              eventType: 'login_sucesso',
+              identifier: cleanEmail,
+              userId: data.user.id,
+              userName: p?.fullName || data.user.email,
+              userRole: p?.role || 'customer',
+              success: true,
+              details: 'Autenticação realizada via Supabase Auth.',
+            });
+            return { error: null };
+          }
+        } catch (authErr) {
+          console.warn('[AuthContext] Supabase sign in notice, checking fallback:', authErr);
+        }
+      }
+
+      // 2. Check Admin Ax & Employees (from Supabase `usuarios` table + local state)
       let localEmployees: any[] = [];
       try {
-        const rawState = localStorage.getItem('KORISKO_STATE_V2');
-        if (rawState) {
-          const parsed = JSON.parse(rawState);
-          if (Array.isArray(parsed.employees)) {
-            localEmployees = parsed.employees;
-          }
+        const dbUsers = await listUsuarios();
+        if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+          localEmployees = dbUsers;
         }
       } catch {}
+
+      if (localEmployees.length === 0) {
+        try {
+          const rawState = localStorage.getItem('KORISKO_STATE_V2');
+          if (rawState) {
+            const parsed = JSON.parse(rawState);
+            if (Array.isArray(parsed.employees)) {
+              localEmployees = parsed.employees;
+            }
+          }
+        } catch {}
+      }
 
       const matchedEmp = localEmployees.find((e: any) => {
         const eEmail = (e.email || '').toLowerCase().trim();
         const eName = (e.name || '').toLowerCase().trim();
+        if (cleanEmail.includes('@')) {
+          return eEmail === cleanEmail;
+        }
+        const eUserPrefix = eEmail.includes('@') ? eEmail.split('@')[0] : eEmail;
         return (
-          eEmail === cleanEmail ||
           eName === cleanEmail ||
+          eUserPrefix === cleanEmail ||
           e.id === cleanEmail
         );
       });
 
-      const isEmpValid = matchedEmp && (
-        (matchedEmp.password && matchedEmp.password.trim() === cleanPassword) ||
-        (matchedEmp.pin && matchedEmp.pin.trim() === cleanPassword)
-      );
+      // Strict Master Admin verification (NO weak 'admin' password allowed!)
+      const isMasterAx =
+        (cleanEmail === 'axxeiacompany@gmail.com' || cleanEmail === 'ax') &&
+        cleanPassword === '9APG_47z-EgF4yz';
+
+      let isEmpValid = false;
+      if (matchedEmp) {
+        const pwdMatch = await verifyStoredPassword(cleanPassword, matchedEmp.password);
+        const pinMatch = await verifyStoredPassword(cleanPassword, matchedEmp.pin);
+        isEmpValid = pwdMatch || pinMatch;
+      }
 
       if (isMasterAx || isEmpValid) {
-        const roleToAssign: ProfileRole = isMasterAx ? 'admin' : (matchedEmp?.role || 'employee');
-        const empName = isMasterAx ? 'Ax' : (matchedEmp?.name || 'Administrador');
+        const rawEmpRole = isMasterAx ? 'admin' : (matchedEmp?.role || 'employee');
+        const roleToAssign: ProfileRole =
+          rawEmpRole === 'admin'
+            ? 'admin'
+            : rawEmpRole === 'gerente'
+            ? 'manager'
+            : rawEmpRole === 'afiliado'
+            ? 'affiliate'
+            : 'employee';
+        const empName = isMasterAx ? 'Ax' : (matchedEmp?.name || 'Colaborador');
         const empEmail = isMasterAx ? 'axxeiacompany@gmail.com' : (matchedEmp?.email || cleanEmail);
         const empId = isMasterAx ? 'emp-admin-ax' : (matchedEmp?.id || `emp-${Date.now()}`);
 
@@ -275,17 +356,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           user: localUser,
         } as any);
 
+        clearLoginAttempts(cleanEmail);
+        createSecureSessionMeta({
+          userId: empId,
+          email: empEmail,
+          role: roleToAssign,
+          rememberDevice,
+        });
+
         try {
           localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(localProfile));
           localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(localUser));
           localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
           localStorage.setItem('KORISKO_CURRENT_USER_ID', empId);
+          if (rememberDevice) {
+            localStorage.setItem('KORISKO_REMEMBER_DEVICE', 'true');
+          }
         } catch {}
+
+        await recordLoginAuditEvent({
+          eventType: 'login_sucesso',
+          identifier: cleanEmail,
+          userId: empId,
+          userName: empName,
+          userRole: rawEmpRole,
+          success: true,
+          details: `Login de equipe autenticado (${empName} · ${rawEmpRole}).`,
+        });
 
         return { error: null };
       }
 
-      // Check registered customer in localStorage
+      // 3. Check registered customer in localStorage — STRICTLY require verified passwordHash or password
       let localCustomers: any[] = [];
       try {
         const rawState = localStorage.getItem('KORISKO_STATE_V2');
@@ -297,53 +399,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch {}
 
-      const matchedCustomer = localCustomers.find((c: any) => 
+      const matchedCustomer = localCustomers.find((c: any) =>
         (c.email && c.email.toLowerCase().trim() === cleanEmail) ||
         (c.phone && c.phone.trim() === cleanEmail)
       );
 
       if (matchedCustomer) {
-        const custUser: User = {
-          id: matchedCustomer.id,
-          app_metadata: {},
-          user_metadata: { full_name: matchedCustomer.name, role: 'customer' },
-          aud: 'authenticated',
-          created_at: matchedCustomer.createdAt || new Date().toISOString(),
-          email: matchedCustomer.email || cleanEmail,
-        } as any;
+        const storedCustomerSecret = matchedCustomer.passwordHash || matchedCustomer.password;
+        const isCustomerPasswordValid = await verifyStoredPassword(cleanPassword, storedCustomerSecret);
 
-        const custProfile: UserProfile = {
-          id: `prof-${matchedCustomer.id}`,
-          userId: matchedCustomer.id,
-          fullName: matchedCustomer.name,
-          email: matchedCustomer.email || cleanEmail,
-          phone: matchedCustomer.phone || '',
-          role: 'customer',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        if (isCustomerPasswordValid) {
+          const custUser: User = {
+            id: matchedCustomer.id,
+            app_metadata: {},
+            user_metadata: { full_name: matchedCustomer.name, role: 'customer' },
+            aud: 'authenticated',
+            created_at: matchedCustomer.createdAt || new Date().toISOString(),
+            email: matchedCustomer.email || cleanEmail,
+          } as any;
 
-        setUser(custUser);
-        setProfile(custProfile);
-        setSession({
-          access_token: 'local-token-cust',
-          refresh_token: 'local-refresh-cust',
-          expires_in: 360000,
-          token_type: 'bearer',
-          user: custUser,
-        } as any);
+          const custProfile: UserProfile = {
+            id: `prof-${matchedCustomer.id}`,
+            userId: matchedCustomer.id,
+            fullName: matchedCustomer.name,
+            email: matchedCustomer.email || cleanEmail,
+            phone: matchedCustomer.phone || '',
+            role: 'customer',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
-        try {
-          localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(custProfile));
-          localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(custUser));
-          localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-        } catch {}
+          setUser(custUser);
+          setProfile(custProfile);
+          setSession({
+            access_token: 'local-token-cust',
+            refresh_token: 'local-refresh-cust',
+            expires_in: 360000,
+            token_type: 'bearer',
+            user: custUser,
+          } as any);
 
-        return { error: null };
+          clearLoginAttempts(cleanEmail);
+          createSecureSessionMeta({
+            userId: matchedCustomer.id,
+            email: matchedCustomer.email || cleanEmail,
+            role: 'customer',
+            rememberDevice,
+          });
+
+          try {
+            localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(custProfile));
+            localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(custUser));
+            localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+            if (rememberDevice) {
+              localStorage.setItem('KORISKO_REMEMBER_DEVICE', 'true');
+            }
+          } catch {}
+
+          await recordLoginAuditEvent({
+            eventType: 'login_sucesso',
+            identifier: cleanEmail,
+            userId: matchedCustomer.id,
+            userName: matchedCustomer.name,
+            userRole: 'customer',
+            success: true,
+            details: `Login de cliente verificado com senha criptografada (${matchedCustomer.name}).`,
+          });
+
+          return { error: null };
+        }
       }
 
-      return { error: new Error('E-mail ou senha incorretos.') };
+      // 4. Record failed attempt and trigger brute-force protection if threshold reached
+      const updatedLockout = recordFailedLoginAttempt(cleanEmail);
+      await recordLoginAuditEvent({
+        eventType: updatedLockout.isLocked ? 'bloqueio_forca_bruta' : 'login_falha',
+        identifier: cleanEmail,
+        success: false,
+        details: updatedLockout.isLocked
+          ? `Conta/dispositivo bloqueado por ${updatedLockout.remainingSeconds}s após ${updatedLockout.failedAttempts} tentativas falhas.`
+          : `Tentativa de login inválida (${updatedLockout.failedAttempts}/${5}).`,
+      });
+
+      if (updatedLockout.isLocked) {
+        return {
+          error: new Error(
+            `Acesso bloqueado temporariamente por ${updatedLockout.remainingSeconds}s devido a múltiplas tentativas incorretas.`
+          ),
+        };
+      }
+
+      return {
+        error: new Error(
+          `Credenciais inválidas. Verifique seu usuário/e-mail e senha (${updatedLockout.remainingAttempts} tentativa(s) restante(s) antes do bloqueio temporário).`
+        ),
+      };
     } catch (err: any) {
       return { error: err };
     } finally {
@@ -351,14 +502,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Sign Up with email, password, full name and phone (registers as customer seamlessly)
+  // Sign Up with email, password, full name and phone (hashes password with SHA-256)
   const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
     try {
       setIsLoading(true);
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = fullName.trim();
       const cleanPhone = (phone || '').trim();
+      const cleanPassword = password.trim();
 
+      if (cleanPassword.length < 6) {
+        return {
+          error: new Error('A senha deve possuir no mínimo 6 caracteres para sua segurança.'),
+          user: null,
+        };
+      }
+
+      const passwordHash = await hashPasswordSha256(cleanPassword);
       const customerId = `cust-${Date.now()}`;
 
       // 1. Try Supabase Auth
@@ -368,7 +528,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
-          password: password.trim(),
+          password: cleanPassword,
           options: {
             data: {
               full_name: cleanName,
@@ -397,6 +557,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             phone: cleanPhone,
             active: true,
             category: 'varejo',
+            credit_limit_brl: 500000,
             loyalty_points: 50, // Welcome points
           }, { onConflict: 'id' });
       } catch {}
@@ -415,7 +576,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, { onConflict: 'user_id' });
       } catch {}
 
-      // 4. Update local state customer list in localStorage
+      // 4. Update local state customer list in localStorage with SHA-256 passwordHash
       try {
         const rawState = localStorage.getItem('KORISKO_STATE_V2');
         if (rawState) {
@@ -426,8 +587,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: cleanName,
               email: cleanEmail,
               phone: cleanPhone,
+              passwordHash,
               category: 'varejo' as const,
-              creditLimitBrl: 300,
+              creditLimitBrl: 500000,
               outstandingBalanceBrl: 0,
               loyaltyPoints: 50,
               active: true,
@@ -473,11 +635,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user: finalUser,
       } as any));
 
+      createSecureSessionMeta({
+        userId: effectiveUserId,
+        email: cleanEmail,
+        role: 'customer',
+        rememberDevice: true,
+      });
+
       try {
         localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(finalProfile));
         localStorage.setItem('KORISKO_SAVED_USER', JSON.stringify(finalUser));
         localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
       } catch {}
+
+      await recordLoginAuditEvent({
+        eventType: 'cadastro_conta',
+        identifier: cleanEmail,
+        userId: effectiveUserId,
+        userName: cleanName,
+        userRole: 'customer',
+        success: true,
+        details: `Nova conta de cliente criada com proteção SHA-256 (${cleanName}).`,
+      });
 
       return { error: null, user: finalUser };
     } catch (err: any) {
@@ -489,6 +668,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign Out
   const signOut = async () => {
+    const prevEmail = user?.email || profile?.email || 'usuario';
+    const prevId = user?.id || profile?.userId;
+    const prevName = profile?.fullName;
+    const prevRole = profile?.role;
+
     try {
       setIsLoading(true);
       await supabase.auth.signOut();
@@ -499,13 +683,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setProfile(null);
       setIsLoading(false);
-      try {
-        localStorage.removeItem('KORISKO_SAVED_PROFILE');
-        localStorage.removeItem('KORISKO_SAVED_USER');
-        localStorage.removeItem('KORISKO_AUTH_SESSION');
-        localStorage.removeItem('KORISKO_REMEMBER_DEVICE');
-        sessionStorage.removeItem('KORISKO_AUTH_SESSION');
-      } catch {}
+      clearSecureSessionMeta();
+      await recordLoginAuditEvent({
+        eventType: 'logout',
+        identifier: prevEmail,
+        userId: prevId,
+        userName: prevName,
+        userRole: prevRole,
+        success: true,
+        details: 'Sessão encerrada com segurança pelo usuário.',
+      });
     }
   };
 

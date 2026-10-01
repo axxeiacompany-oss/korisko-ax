@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { 
   Lock, 
@@ -6,13 +6,22 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Employee } from '../../types';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { KorizkoEmblem, KorizkoFullLogo } from '../KorizkoLogo';
 import { StorageService } from '../../services/storageService';
 import { listUsuarios } from '../../lib/db';
+import {
+  checkLoginLockout,
+  recordFailedLoginAttempt,
+  clearLoginAttempts,
+  verifyStoredPassword,
+  recordLoginAuditEvent,
+} from '../../utils/loginSecurity';
 
 interface Props {
   onLoginSuccess: (rememberMe: boolean) => void;
@@ -27,11 +36,27 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [rememberDevice, setRememberDevice] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  useEffect(() => {
+    const status = checkLoginLockout(email);
+    setLockoutSeconds(status.remainingSeconds);
+    if (status.remainingSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      const next = checkLoginLockout(email);
+      setLockoutSeconds(next.remainingSeconds);
+      if (next.remainingSeconds <= 0) {
+        setErrorMsg(null);
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [email, errorMsg]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    setIsLoading(true);
 
     const inputIdentifier = email.trim().toLowerCase();
     const inputPassword = password.trim();
@@ -42,9 +67,21 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           ? 'Por favor ingrese su usuario y contraseña.'
           : 'Por favor preencha seu usuário/e-mail e senha.'
       );
-      setIsLoading(false);
       return;
     }
+
+    const lockCheck = checkLoginLockout(inputIdentifier);
+    if (lockCheck.isLocked) {
+      setLockoutSeconds(lockCheck.remainingSeconds);
+      setErrorMsg(
+        language === 'es'
+          ? `Acceso bloqueado temporalmente por seguridad. Espere ${lockCheck.remainingSeconds}s.`
+          : `Acesso bloqueado temporariamente por segurança. Aguarde ${lockCheck.remainingSeconds}s.`
+      );
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       let currentList = Array.isArray(employees) && employees.length > 0 ? employees : [];
@@ -53,15 +90,14 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         return list.find(emp => {
           const empEmail = (emp.email || '').toLowerCase().trim();
           const empName = (emp.name || '').toLowerCase().trim();
+          if (inputIdentifier.includes('@')) {
+            return empEmail === inputIdentifier;
+          }
           const empUsername = empEmail.includes('@') ? empEmail.split('@')[0] : empEmail;
-          const inputUserPart = inputIdentifier.includes('@') ? inputIdentifier.split('@')[0] : inputIdentifier;
 
           return (
-            empEmail === inputIdentifier ||
             empName === inputIdentifier ||
             empUsername === inputIdentifier ||
-            empUsername === inputUserPart ||
-            empName === inputUserPart ||
             emp.id === inputIdentifier
           );
         });
@@ -90,42 +126,60 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       }
 
       if (matchedEmp) {
-        const matchesPin = Boolean(matchedEmp.pin && inputPassword === matchedEmp.pin.trim());
-        const matchesPwd = Boolean(matchedEmp.password && inputPassword === matchedEmp.password.trim());
+        const matchesPin = await verifyStoredPassword(inputPassword, matchedEmp.pin);
+        const matchesPwd = await verifyStoredPassword(inputPassword, matchedEmp.password);
         const isMaster = inputPassword === '9APG_47z-EgF4yz' && (matchedEmp.email === 'axxeiacompany@gmail.com' || matchedEmp.role === 'admin');
 
         if (!matchesPin && !matchesPwd && !isMaster) {
+          const lockState = recordFailedLoginAttempt(inputIdentifier);
+          setLockoutSeconds(lockState.remainingSeconds);
+          await recordLoginAuditEvent({
+            eventType: lockState.isLocked ? 'bloqueio_forca_bruta' : 'login_falha',
+            identifier: inputIdentifier,
+            userId: matchedEmp.id,
+            userName: matchedEmp.name,
+            userRole: matchedEmp.role,
+            success: false,
+            details: `Senha incorreta informada para ${matchedEmp.name} (${lockState.failedAttempts}/5).`,
+          });
           setErrorMsg(
             language === 'es' 
-              ? `Contraseña incorrecta para "${matchedEmp.name}". Verifique su clave de acceso.` 
-              : `Senha incorreta para "${matchedEmp.name}". Verifique a sua senha de acesso.`
+              ? `Contraseña incorrecta para "${matchedEmp.name}" (${lockState.remainingAttempts} intento(s) restante(s)).` 
+              : `Senha incorreta para "${matchedEmp.name}" (${lockState.remainingAttempts} tentativa(s) restante(s)).`
           );
           setIsLoading(false);
           return;
         }
 
-        switchUser(matchedEmp.id);
+        clearLoginAttempts(inputIdentifier);
+        switchUser(matchedEmp.id, inputPassword);
+        await recordLoginAuditEvent({
+          eventType: 'login_sucesso',
+          identifier: inputIdentifier,
+          userId: matchedEmp.id,
+          userName: matchedEmp.name,
+          userRole: matchedEmp.role,
+          success: true,
+          details: `Login de operador confirmado (${matchedEmp.name}).`,
+        });
         setIsLoading(false);
         onLoginSuccess(rememberDevice);
         return;
       }
 
-      const empByCred = currentList.find(e => 
-        (e.password === inputPassword || e.pin === inputPassword) && 
-        (!e.email || e.email.toLowerCase() === inputIdentifier || e.name.toLowerCase() === inputIdentifier)
-      );
-
-      if (empByCred) {
-        switchUser(empByCred.id);
-        setIsLoading(false);
-        onLoginSuccess(rememberDevice);
-        return;
-      }
+      const lockState = recordFailedLoginAttempt(inputIdentifier);
+      setLockoutSeconds(lockState.remainingSeconds);
+      await recordLoginAuditEvent({
+        eventType: lockState.isLocked ? 'bloqueio_forca_bruta' : 'login_falha',
+        identifier: inputIdentifier,
+        success: false,
+        details: `Tentativa de login com usuário inexistente (${inputIdentifier}).`,
+      });
 
       setErrorMsg(
         language === 'es' 
-          ? `Usuario o correo "${email.trim()}" no encontrado. Verifique sus credenciales.` 
-          : `Usuário ou e-mail "${email.trim()}" não encontrado. Verifique seus dados de acesso.`
+          ? `Credenciales inválidas (${lockState.remainingAttempts} intento(s) restante(s)).` 
+          : `Credenciais inválidas (${lockState.remainingAttempts} tentativa(s) restante(s)).`
       );
       setIsLoading(false);
     } catch (err: any) {

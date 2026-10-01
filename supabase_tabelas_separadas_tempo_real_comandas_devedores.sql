@@ -547,3 +547,54 @@ ON CONFLICT (customer_id) DO UPDATE SET
 SELECT 'TABELAS SEPARADAS E SALDO DEVEDOR EM TEMPO REAL CONFIGURADOS COM SUCESSO!' AS status,
        (SELECT count(*) FROM public.saldos_devedores_tempo_real) AS clientes_sincronizados,
        (SELECT count(*) FROM public.comandas_abertas) AS comandas_ativas;
+
+
+-- ==============================================================================
+-- 10. TABELA DEDICADA: AUDITORIA E SEGURANÇA DE LOGINS (public.auditoria_acessos_logins)
+-- Registra em tempo real todos os acessos, falhas de senha, bloqueios anti-força bruta,
+-- trocas de operador, logouts e alterações de credenciais.
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.auditoria_acessos_logins (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL DEFAULT 'login_sucesso', -- 'login_sucesso' | 'login_falha' | 'bloqueio_forca_bruta' | 'troca_operador' | 'logout' | 'cadastro_conta' | 'alteracao_credencial'
+  identifier TEXT NOT NULL,
+  user_id TEXT,
+  user_name TEXT,
+  user_role TEXT,
+  device_fingerprint TEXT,
+  user_agent TEXT,
+  success BOOLEAN NOT NULL DEFAULT true,
+  details TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auditoria_logins_created_at
+  ON public.auditoria_acessos_logins (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_auditoria_logins_identifier
+  ON public.auditoria_acessos_logins (identifier, created_at DESC);
+
+ALTER TABLE public.auditoria_acessos_logins REPLICA IDENTITY FULL;
+ALTER TABLE public.auditoria_acessos_logins ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso Total Auditoria Logins Korisko" ON public.auditoria_acessos_logins;
+CREATE POLICY "Acesso Total Auditoria Logins Korisko"
+  ON public.auditoria_acessos_logins
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+GRANT ALL ON public.auditoria_acessos_logins TO anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'auditoria_acessos_logins'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.auditoria_acessos_logins;
+    END IF;
+  END IF;
+END $$;

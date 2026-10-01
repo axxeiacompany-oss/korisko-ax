@@ -19,6 +19,7 @@ import {
 import { NewProductModal } from '../modals/NewProductModal';
 import { StockMovementModal } from '../modals/StockMovementModal';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { resolveProductImageUrl } from '../../lib/db';
 
 export const InventoryView: React.FC = () => {
   const { products, stockMovements, deleteProduct, hasPermission, showToast, language } = useBakery();
@@ -254,9 +255,9 @@ export const InventoryView: React.FC = () => {
                     className="p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800/90 space-y-2.5 shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-2.5">
-                      {p.imageUrl ? (
+                      {resolveProductImageUrl(p) ? (
                         <img
-                          src={p.imageUrl}
+                          src={resolveProductImageUrl(p)}
                           alt={p.name}
                           className="w-11 h-11 rounded-xl object-cover border border-neutral-800 bg-neutral-900 shrink-0"
                           loading="lazy"
@@ -390,9 +391,9 @@ export const InventoryView: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 font-semibold text-neutral-200">
                           <div className="flex items-center gap-2.5">
-                            {p.imageUrl ? (
+                            {resolveProductImageUrl(p) ? (
                               <img
-                                src={p.imageUrl}
+                                src={resolveProductImageUrl(p)}
                                 alt={p.name}
                                 className="w-8 h-8 rounded-lg object-cover border border-neutral-750 bg-neutral-950 shrink-0"
                                 loading="lazy"

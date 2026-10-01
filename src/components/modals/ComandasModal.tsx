@@ -28,6 +28,7 @@ interface ComandasModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentCart?: CartItem[];
+  currentCartItems?: CartItem[];
   onLoadComanda?: (comanda: Comanda) => void;
   onClearCart?: () => void;
 }
@@ -36,9 +37,14 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
   isOpen,
   onClose,
   currentCart = [],
+  currentCartItems,
   onLoadComanda,
   onClearCart,
 }) => {
+  const effectiveCart = useMemo(() => {
+    if (currentCartItems && currentCartItems.length > 0) return currentCartItems;
+    return currentCart;
+  }, [currentCart, currentCartItems]);
   const { 
     openComandas, 
     saveComanda, 
@@ -60,8 +66,8 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'gerente' || currentUser.id === 'emp-admin-ax';
 
   const autoDetectedSector = useMemo(() => {
-    return resolveSetoresFromItems(currentCart);
-  }, [currentCart]);
+    return resolveSetoresFromItems(effectiveCart);
+  }, [effectiveCart]);
 
   const filteredComandas = useMemo(() => {
     if (activeSectorFilter === 'todas') return openComandas;
@@ -76,11 +82,6 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
     });
   }, [openComandas, activeSectorFilter]);
 
-  if (!isOpen) return null;
-
-  const cartTotalBrl = currentCart.reduce((acc, i) => acc + i.subtotalBrl, 0);
-  const cartTotalPyg = fromBrl(cartTotalBrl, 'PYG', exchangeRates);
-
   const chosenCustomer = useMemo(() => {
     if (selectedCustomerId) {
       return customers.find(c => c.id === selectedCustomerId);
@@ -92,9 +93,14 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
     return undefined;
   }, [customers, selectedCustomerId, customerName]);
 
+  if (!isOpen) return null;
+
+  const cartTotalBrl = effectiveCart.reduce((acc, i) => acc + i.subtotalBrl, 0);
+  const cartTotalPyg = fromBrl(cartTotalBrl, 'PYG', exchangeRates);
+
   const handleSaveCurrentCart = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comandaNumber.trim() || currentCart.length === 0) return;
+    if (!comandaNumber.trim() || effectiveCart.length === 0) return;
 
     const finalCustomerName = chosenCustomer ? chosenCustomer.name : (customerName.trim() || 'Cliente Balcão');
     const targetSetor: SetorResponsavel = selectedSetor === 'auto'
@@ -103,7 +109,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
 
     const saved = saveComanda(
       comandaNumber.trim(),
-      currentCart,
+      effectiveCart,
       finalCustomerName,
       notes.trim() || undefined,
       {
@@ -305,7 +311,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                 </span>
               </div>
 
-              {currentCart.length === 0 ? (
+              {effectiveCart.length === 0 ? (
                 <div className="py-10 text-center border border-dashed border-neutral-800 rounded-xl p-4">
                   <ShoppingBag className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
                   <p className="text-xs text-neutral-400 font-medium">
@@ -320,7 +326,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                   <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1.5">
                     <div className="flex justify-between items-center text-xs text-neutral-400">
                       <span>Itens confirmados no pedido:</span>
-                      <span className="font-bold text-white">{currentCart.reduce((a, b) => a + b.quantity, 0)} un</span>
+                      <span className="font-bold text-white">{effectiveCart.reduce((a, b) => a + b.quantity, 0)} un</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-neutral-400">Total da Comanda:</span>
@@ -388,7 +394,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                     />
                   </div>
 
-                  {chosenCustomer && (
+                  {(chosenCustomer || customerName.trim().length > 0) && (
                     <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
@@ -396,14 +402,14 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                           Atualização de Saldo Devedor em Tempo Real
                         </span>
                         <span className="text-[10px] font-bold text-emerald-300">
-                          Automático ao Lançar
+                          {chosenCustomer ? 'Cliente Cadastrado' : 'Nova Ficha Automática'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
                         <div className="bg-neutral-950/80 p-2 rounded-lg border border-neutral-800">
                           <span className="text-[10px] text-neutral-400 block">Saldo Atual</span>
                           <span className="font-mono font-bold text-neutral-200">
-                            {formatCurrency(chosenCustomer.outstandingBalanceBrl || 0, 'PYG')}
+                            {formatCurrency(chosenCustomer?.outstandingBalanceBrl || 0, 'PYG')}
                           </span>
                         </div>
                         <div className="bg-neutral-950/80 p-2 rounded-lg border border-rose-500/30">
@@ -415,7 +421,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                         <div className="bg-rose-500/15 p-2 rounded-lg border border-rose-500/40">
                           <span className="text-[10px] text-amber-300 block font-semibold">Novo Saldo</span>
                           <span className="font-mono font-extrabold text-amber-300">
-                            {formatCurrency((chosenCustomer.outstandingBalanceBrl || 0) + cartTotalBrl, 'PYG')}
+                            {formatCurrency((chosenCustomer?.outstandingBalanceBrl || 0) + cartTotalBrl, 'PYG')}
                           </span>
                         </div>
                       </div>

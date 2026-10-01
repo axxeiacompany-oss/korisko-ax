@@ -537,7 +537,7 @@ export const PdvView: React.FC = () => {
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 && openComandas.length === 0}
               onClick={() => setIsComandasOpen(true)}
               className="py-3 px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
               title={language === 'es' ? 'Guardar comanda para mesa o salón' : 'Salvar comanda para mesa ou balcão'}
@@ -703,6 +703,7 @@ export const PdvView: React.FC = () => {
       <ComandasModal
         isOpen={isComandasOpen}
         onClose={() => setIsComandasOpen(false)}
+        currentCart={cart}
         currentCartItems={cart}
         onLoadComanda={handleLoadComanda}
         onClearCart={handleClearCart}

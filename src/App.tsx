@@ -187,19 +187,35 @@ function MainAppShell() {
   }
 
   // -------------------------------------------------------------
-  // 4. ROTA PÚBLICA PADRÃO: /loja ou visitante / cliente
+  // 4. ROTA PÚBLICA PADRÃO: /loja (Vitrine Pública)
   // -------------------------------------------------------------
-  const isStaff = role === 'admin' || role === 'manager' || role === 'employee';
-
-  if (currentRoute === 'loja' || (!isAuthenticated && currentRoute !== 'crm' && currentRoute !== 'pdv')) {
+  if (currentRoute === 'loja') {
     return (
       <StoreView
-        onOpenAuth={(mode) => setCurrentRoute('login')}
+        onOpenAuth={() => setCurrentRoute('login')}
         onNavigateAccount={() => {
-          if (role === 'customer') setCurrentRoute('minha_conta');
-          else if (role === 'affiliate') setCurrentRoute('portal_afiliado');
-          else setCurrentRoute('crm');
+          if (!isAuthenticated) {
+            setCurrentRoute('login');
+          } else if (role === 'customer') {
+            setCurrentRoute('minha_conta');
+          } else if (role === 'affiliate') {
+            setCurrentRoute('portal_afiliado');
+          } else {
+            setCurrentRoute('crm');
+          }
         }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 4.1. BLOQUEIO DE SEGURANÇA: Qualquer rota interna exige login válido
+  // -------------------------------------------------------------
+  if (!isAuthenticated) {
+    return (
+      <AuthView
+        onSuccessRedirect={handleLoginSuccess}
+        onNavigateHome={() => setCurrentRoute('loja')}
       />
     );
   }

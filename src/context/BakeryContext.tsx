@@ -420,7 +420,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ? dbExtra.products 
               : (serverFallback?.products && serverFallback.products.length > 0 ? serverFallback.products : prev.products));
 
-          const products = (rawProducts || []).map(p => {
+          const products = (rawProducts || []).map((p: Product) => {
             const resolvedImg = resolveProductImageUrl(p);
             if (resolvedImg && resolvedImg !== p.imageUrl) {
               const updatedProd = { ...p, imageUrl: resolvedImg };
@@ -444,7 +444,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
           });
 
-          const customers = (baseCustomers || []).map(c => {
+          const customers = (baseCustomers || []).map((c: Customer) => {
             if (debtorMap.has(c.id)) {
               return { ...c, outstandingBalanceBrl: debtorMap.get(c.id)! };
             }

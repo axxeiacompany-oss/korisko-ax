@@ -43,6 +43,7 @@ export const PaymentModal: React.FC<Props> = ({
   const {
     completeSale,
     customers,
+    openComandas,
     addCustomer,
     redeemCustomerPoints,
     broadcastCheckoutSession,
@@ -164,7 +165,16 @@ export const PaymentModal: React.FC<Props> = ({
     return addedFiado;
   }, [payments, selectedMethod, remainingBrl]);
 
-  const previousDebtBrl = selectedCustomer?.outstandingBalanceBrl || 0;
+  const linkedComanda = useMemo(() => {
+    if (!comandaNumber) return undefined;
+    return openComandas.find(c => c.number === comandaNumber);
+  }, [openComandas, comandaNumber]);
+
+  const alreadyAppliedComandaDebt = linkedComanda?.debtAppliedBrl || 0;
+  const rawCustomerBalance = selectedCustomer?.outstandingBalanceBrl || 0;
+  const previousDebtBrl = alreadyAppliedComandaDebt > 0
+    ? Math.max(0, rawCustomerBalance - alreadyAppliedComandaDebt)
+    : rawCustomerBalance;
   const projectedDebtBrl = previousDebtBrl + activeFiadoAmount;
   const isFiadoActive = selectedMethod === 'fiado' || activeFiadoAmount > 0;
 

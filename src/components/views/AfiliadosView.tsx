@@ -29,10 +29,20 @@ import {
   Zap, 
   Eye, 
   EyeOff,
-  UserCheck
+  UserCheck,
+  Activity,
+  RefreshCw,
+  Unlock
 } from 'lucide-react';
 import { AppFeature, Employee, UserRole } from '../../types';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import {
+  getLoginAuditLogs,
+  clearLoginAttempts,
+  recordLoginAuditEvent,
+  LoginAuditLog,
+} from '../../utils/loginSecurity';
+import { supabase } from '../../lib/supabase';
 
 interface Props {
   onNavigate?: (tab: any) => void;
@@ -149,14 +159,48 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   } = useBakery();
 
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [auditLogs, setAuditLogs] = useState<LoginAuditLog[]>(() => getLoginAuditLogs());
+  const [isRefreshingAudit, setIsRefreshingAudit] = useState(false);
 
-  // Flexible check: Admin Ax, users with admin role or manager role can manage affiliates
+  // Strict check: ONLY Admin Ax (never regular managers or cashiers) can view/manage credentials
   const isAx = 
     currentUser.id === 'emp-admin-ax' || 
     currentUser.role === 'admin' ||
-    currentUser.role === 'gerente' ||
-    currentUser.email?.toLowerCase().includes('axxeia') ||
+    currentUser.email?.toLowerCase() === 'axxeiacompany@gmail.com' ||
     currentUser.name?.toLowerCase() === 'ax';
+
+  const refreshAuditLogs = async () => {
+    setIsRefreshingAudit(true);
+    try {
+      const { data } = await supabase
+        .from('auditoria_acessos_logins')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped: LoginAuditLog[] = data.map((r: any) => ({
+          id: String(r.id),
+          eventType: r.event_type || 'login_sucesso',
+          identifier: r.identifier || '',
+          userId: r.user_id || undefined,
+          userName: r.user_name || undefined,
+          userRole: r.user_role || undefined,
+          ipOrDevice: r.device_fingerprint || 'web',
+          userAgent: r.user_agent || '',
+          success: Boolean(r.success),
+          details: r.details || '',
+          createdAt: r.created_at || new Date().toISOString(),
+        }));
+        setAuditLogs(mapped);
+      } else {
+        setAuditLogs(getLoginAuditLogs());
+      }
+    } catch {
+      setAuditLogs(getLoginAuditLogs());
+    } finally {
+      setIsRefreshingAudit(false);
+    }
+  };
 
   // Form State for creating a new affiliate
   const [isCreating, setIsCreating] = useState(false);
@@ -297,6 +341,16 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
       role: editRole,
       allowedFeatures: editFeatures,
     });
+
+    recordLoginAuditEvent({
+      eventType: 'alteracao_credencial',
+      identifier: editEmail.trim() || editName.trim(),
+      userId: editingEmployee.id,
+      userName: editName.trim(),
+      userRole: editRole,
+      success: true,
+      details: `Credenciais e permissões atualizadas pelo Admin (${currentUser.name}).`,
+    }).then(() => setAuditLogs(getLoginAuditLogs()));
 
     setSuccessMessage(`Afiliado ${editName} atualizado com sucesso.`);
     setEditingEmployee(null);
@@ -702,6 +756,147 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* CENTRAL DE SEGURANÇA & AUDITORIA DE LOGINS EM TEMPO REAL */}
+      <div className="p-6 rounded-2xl bg-[#0C101A] border border-emerald-500/25 space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1A2234] pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                Segurança de Logins Ativa
+              </span>
+              <span className="text-[11px] text-neutral-400 font-mono">
+                public.auditoria_acessos_logins
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-white">
+              Blindagem de Autenticação & Auditoria de Acessos
+            </h2>
+            <p className="text-xs text-neutral-400">
+              Monitoramento de tentativas de login, bloqueio automático contra força bruta, criptografia SHA-256 e proteção de rotas internas.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                clearLoginAttempts();
+                showToast('Bloqueios temporários de login limpos com sucesso!', 'success');
+              }}
+              className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Unlock className="w-3.5 h-3.5" />
+              <span>Desbloquear Terminais</span>
+            </button>
+            <button
+              type="button"
+              onClick={refreshAuditLogs}
+              className="px-3 py-2 rounded-xl bg-[#141B2B] hover:bg-[#1C263C] border border-[#222E46] text-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingAudit ? 'animate-spin text-indigo-400' : ''}`} />
+              <span>Atualizar Log</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Camadas de Proteção Ativas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-emerald-400">Anti-Força Bruta</span>
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <p className="text-xs font-semibold text-white">Máx. 5 tentativas / Bloqueio 60s</p>
+            <p className="text-[10px] text-neutral-400">Bloqueia ataques de adivinhação de senha no login e na troca de operador.</p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-400">Hash SHA-256 & Senha Estrita</span>
+              <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <p className="text-xs font-semibold text-white">Verificação Criptográfica</p>
+            <p className="text-[10px] text-neutral-400">Clientes e operadores exigem senha verificada; sem senhas fracas genéricas.</p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-400">Guarda de Rotas & Sessão</span>
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <p className="text-xs font-semibold text-white">Expiração 8h (Aba) / 7 Dias</p>
+            <p className="text-[10px] text-neutral-400">Nenhuma rota interna (/crm, /pdv, /estoque) abre sem sessão autenticada válida.</p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-sky-400">Isolamento de Credenciais</span>
+              <EyeOff className="w-3.5 h-3.5 text-sky-400" />
+            </div>
+            <p className="text-xs font-semibold text-white">Exclusivo Admin Ax</p>
+            <p className="text-[10px] text-neutral-400">Revelação individual de 1 senha por vez; vedado para gerentes e operadores.</p>
+          </div>
+        </div>
+
+        {/* Tabela de Auditoria de Logins */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-neutral-200 flex items-center gap-1.5 uppercase tracking-wider">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Registro de Auditoria de Logins Recentes ({auditLogs.length})</span>
+            </h3>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <div className="p-4 rounded-xl bg-[#090D15] border border-[#1A2234] text-center text-xs text-neutral-500">
+              Nenhum evento de auditoria registrado nesta sessão ainda.
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-[#1A2234] bg-[#090D15] divide-y divide-[#151C2C]">
+              {auditLogs.slice(0, 25).map((log) => (
+                <div key={log.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 mt-0.5 ${
+                        log.eventType === 'bloqueio_forca_bruta'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : log.success
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      {log.eventType === 'login_sucesso' && 'Login OK'}
+                      {log.eventType === 'login_falha' && 'Falha Senha'}
+                      {log.eventType === 'bloqueio_forca_bruta' && 'Bloqueio 60s'}
+                      {log.eventType === 'troca_operador' && 'Troca Operador'}
+                      {log.eventType === 'logout' && 'Logout'}
+                      {log.eventType === 'cadastro_conta' && 'Novo Cadastro'}
+                      {log.eventType === 'alteracao_credencial' && 'Senha Alterada'}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white">{log.userName || log.identifier}</span>
+                        {log.userRole && (
+                          <span className="text-[10px] text-indigo-300 font-mono bg-indigo-500/10 px-1.5 py-0.2 rounded">
+                            {log.userRole}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-neutral-400 font-mono">({log.identifier})</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 mt-0.5">{log.details}</p>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-neutral-500 font-mono shrink-0">
+                    {new Date(log.createdAt).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

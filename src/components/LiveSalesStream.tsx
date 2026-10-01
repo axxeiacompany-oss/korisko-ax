@@ -92,10 +92,10 @@ export const LiveSalesStream: React.FC<Props> = ({
   // Today string for filtering
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Active live checkouts happening right now ("na hora de cobrar")
+  // Active live checkouts and launched comandas happening right now ("na hora de cobrar / lançar comanda")
   const liveInProgressCheckouts = useMemo(() => {
     return (activeCheckouts || []).filter(c => {
-      if (c.status !== 'em_cobranca') return false;
+      if (c.status !== 'em_cobranca' && c.status !== 'comanda_lancada') return false;
       const ageSec = (nowTime - new Date(c.updatedAt).getTime()) / 1000;
       return ageSec < 900; // active within last 15 min
     });

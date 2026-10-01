@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { Employee, UserRole } from '../../types';
-import { Shield, KeyRound, Check, X, UserCheck } from 'lucide-react';
+import { Shield, KeyRound, Check, X, UserCheck, ShieldAlert } from 'lucide-react';
+import {
+  checkLoginLockout,
+  recordFailedLoginAttempt,
+  clearLoginAttempts,
+  verifyStoredPassword,
+  recordLoginAuditEvent,
+} from '../../utils/loginSecurity';
 
 interface Props {
   isOpen: boolean;
@@ -13,6 +20,26 @@ export const SwitchEmployeeModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [error, setError] = useState('');
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  const activeTarget = selectedEmp || currentUser;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const status = checkLoginLockout(activeTarget?.id || 'switch');
+    setLockoutSeconds(status.remainingSeconds);
+    if (status.remainingSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      const next = checkLoginLockout(activeTarget?.id || 'switch');
+      setLockoutSeconds(next.remainingSeconds);
+      if (next.remainingSeconds <= 0) {
+        setError('');
+        clearInterval(timer);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isOpen, activeTarget?.id, error]);
 
   if (!isOpen) return null;
 
@@ -22,23 +49,56 @@ export const SwitchEmployeeModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setError('');
   };
 
-  const handleConfirmSwitch = (e: React.FormEvent) => {
+  const handleConfirmSwitch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmp) return;
+    const targetEmp = selectedEmp || currentUser;
+    if (!targetEmp) return;
 
-    // Verify PIN or Password
-    const trimmedInput = pinInput.trim();
-    const isValidPin = Boolean(selectedEmp.pin && trimmedInput === selectedEmp.pin.trim());
-    const isValidPwd = Boolean(selectedEmp.password && trimmedInput === selectedEmp.password.trim());
-    const isMaster = trimmedInput === '9APG_47z-EgF4yz' && (selectedEmp.role === 'admin' || selectedEmp.name.toLowerCase() === 'ax');
-
-    if (!isValidPin && !isValidPwd && !isMaster) {
-      setError('Senha incorreta. Tente novamente.');
+    const lockCheck = checkLoginLockout(targetEmp.id);
+    if (lockCheck.isLocked) {
+      setLockoutSeconds(lockCheck.remainingSeconds);
+      setError(`Bloqueado temporariamente por segurança. Aguarde ${lockCheck.remainingSeconds}s.`);
       return;
     }
 
-    const switched = switchUser(selectedEmp.id, trimmedInput);
+    // Verify PIN or Password
+    const trimmedInput = pinInput.trim();
+    const isValidPin = await verifyStoredPassword(trimmedInput, targetEmp.pin);
+    const isValidPwd = await verifyStoredPassword(trimmedInput, targetEmp.password);
+    const isMaster = trimmedInput === '9APG_47z-EgF4yz' && (targetEmp.role === 'admin' || targetEmp.name.toLowerCase() === 'ax');
+
+    if (!isValidPin && !isValidPwd && !isMaster) {
+      const lockState = recordFailedLoginAttempt(targetEmp.id);
+      setLockoutSeconds(lockState.remainingSeconds);
+      await recordLoginAuditEvent({
+        eventType: lockState.isLocked ? 'bloqueio_forca_bruta' : 'login_falha',
+        identifier: targetEmp.email || targetEmp.name,
+        userId: targetEmp.id,
+        userName: targetEmp.name,
+        userRole: targetEmp.role,
+        success: false,
+        details: `Tentativa inválida de troca de operador para ${targetEmp.name} (${lockState.failedAttempts}/5).`,
+      });
+      setError(
+        lockState.isLocked
+          ? `Muitas tentativas incorretas. Bloqueado por ${lockState.remainingSeconds}s.`
+          : `Senha/PIN incorreto (${lockState.remainingAttempts} tentativa(s) restante(s)).`
+      );
+      return;
+    }
+
+    const switched = switchUser(targetEmp.id, trimmedInput);
     if (switched) {
+      clearLoginAttempts(targetEmp.id);
+      await recordLoginAuditEvent({
+        eventType: 'troca_operador',
+        identifier: targetEmp.email || targetEmp.name,
+        userId: targetEmp.id,
+        userName: targetEmp.name,
+        userRole: targetEmp.role,
+        success: true,
+        details: `Troca de operador autorizada com PIN/Senha para ${targetEmp.name} (${targetEmp.role}).`,
+      });
       onClose();
     } else {
       setError('Não foi possível alternar o usuário.');
