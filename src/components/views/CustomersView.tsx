@@ -150,36 +150,20 @@ export const CustomersView: React.FC = () => {
   const computedAmortizedBrl = useMemo(() => {
     if (!paymentCustomer) return 0;
     const val = parseFloat(payAmount.replace(',', '.')) || 0;
-    if (val <= 0) return 0;
-
-    if (payCurrency === 'PYG') {
-      return val / (exchangeRates.BRL_TO_PYG || 1400);
-    }
-    if (payCurrency === 'USD') {
-      return val * (exchangeRates.USD_TO_BRL || 5.62);
-    }
-    return val;
-  }, [payAmount, payCurrency, paymentCustomer, exchangeRates]);
+    return val > 0 ? Math.round(val) : 0;
+  }, [payAmount, paymentCustomer]);
 
   const computedRemainingBrl = useMemo(() => {
     if (!paymentCustomer) return 0;
-    return Math.max(0, Math.round((paymentCustomer.outstandingBalanceBrl - computedAmortizedBrl) * 100) / 100);
+    return Math.max(0, Math.round(paymentCustomer.outstandingBalanceBrl - computedAmortizedBrl));
   }, [paymentCustomer, computedAmortizedBrl]);
 
-  // Live conversion for Manual Debt modal
+  // Live conversion for Manual Debt modal (Direct Guaranís)
   const computedDebtBrl = useMemo(() => {
     if (!debtCustomer) return 0;
     const val = parseFloat(debtAmount.replace(',', '.')) || 0;
-    if (val <= 0) return 0;
-
-    if (debtCurrency === 'PYG') {
-      return val / (exchangeRates.BRL_TO_PYG || 1400);
-    }
-    if (debtCurrency === 'USD') {
-      return val * (exchangeRates.USD_TO_BRL || 5.62);
-    }
-    return val;
-  }, [debtAmount, debtCurrency, debtCustomer, exchangeRates]);
+    return val > 0 ? Math.round(val) : 0;
+  }, [debtAmount, debtCustomer]);
 
   // Open Create Customer Modal
   const handleOpenCreate = () => {
@@ -256,32 +240,20 @@ export const CustomersView: React.FC = () => {
     setIsFormOpen(false);
   };
 
-  // Open Payment / Amortization with chosen currency
-  const handleOpenPayment = (c: Customer, initialCurrency: Currency = 'BRL') => {
+  // Open Payment / Amortization with Guaranis
+  const handleOpenPayment = (c: Customer) => {
     setPaymentCustomer(c);
-    setPayCurrency(initialCurrency);
-    if (initialCurrency === 'PYG') {
-      setPayAmount(Math.round(c.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toString());
-    } else if (initialCurrency === 'USD') {
-      setPayAmount((c.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2));
-    } else {
-      setPayAmount(c.outstandingBalanceBrl > 0 ? c.outstandingBalanceBrl.toFixed(2) : '');
-    }
+    setPayCurrency('PYG');
+    setPayAmount(c.outstandingBalanceBrl > 0 ? Math.round(c.outstandingBalanceBrl).toString() : '');
     setPayMethod('dinheiro');
     setPayNotes('');
   };
 
-  // Handle switching currency in payment modal
-  const handleSelectPayCurrency = (cur: Currency) => {
-    setPayCurrency(cur);
+  // Handle setting full amount in payment modal
+  const handleSelectPayCurrency = () => {
+    setPayCurrency('PYG');
     if (!paymentCustomer) return;
-    if (cur === 'PYG') {
-      setPayAmount(Math.round(paymentCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toString());
-    } else if (cur === 'USD') {
-      setPayAmount((paymentCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2));
-    } else {
-      setPayAmount(paymentCustomer.outstandingBalanceBrl.toFixed(2));
-    }
+    setPayAmount(Math.round(paymentCustomer.outstandingBalanceBrl).toString());
   };
 
   // Confirm Payment / Amortization
@@ -291,29 +263,17 @@ export const CustomersView: React.FC = () => {
     const rawVal = parseFloat(payAmount.replace(',', '.'));
     if (isNaN(rawVal) || rawVal <= 0) return;
 
-    let finalAmountBrl = rawVal;
-    let detailNote = '';
-
-    if (payCurrency === 'PYG') {
-      finalAmountBrl = rawVal / (exchangeRates.BRL_TO_PYG || 1400);
-      detailNote = `Amortização recebida em ₲ ${Math.round(rawVal).toLocaleString('pt-BR')} (Câmbio 1 R$ = ₲ ${exchangeRates.BRL_TO_PYG?.toLocaleString('pt-BR') || '1.380'}).`;
-    } else if (payCurrency === 'USD') {
-      finalAmountBrl = rawVal * (exchangeRates.USD_TO_BRL || 5.62);
-      detailNote = `Amortização recebida em US$ ${rawVal.toFixed(2)} (Câmbio 1 US$ = R$ ${exchangeRates.USD_TO_BRL?.toFixed(2) || '5.62'}).`;
-    } else {
-      detailNote = `Amortização recebida em R$ ${rawVal.toFixed(2)}.`;
-    }
-
-    finalAmountBrl = Math.round(finalAmountBrl * 100) / 100;
+    const finalAmountBrl = Math.round(rawVal);
+    const detailNote = `Amortização recebida em ₲ ${finalAmountBrl.toLocaleString('es-PY')}.`;
     const fullNote = [detailNote, payNotes.trim()].filter(Boolean).join(' ');
 
     await recordCustomerPayment(paymentCustomer.id, finalAmountBrl, payMethod, fullNote);
 
-    // If paid in cash and cash register is open, also register Entrada de Caixa with exact currency received!
+    // If paid in cash and cash register is open, also register Entrada de Caixa in Guaranis
     if (payMethod === 'dinheiro' && currentSession?.status === 'aberto') {
       recordEntradaCaixa(
-        rawVal,
-        payCurrency,
+        finalAmountBrl,
+        'PYG',
         `Amortização Fiado - Cliente: ${paymentCustomer.name}`,
         'Recebimento Avulso',
         `Recibo Fiado #${Date.now().toString().slice(-4)}`
@@ -326,7 +286,7 @@ export const CustomersView: React.FC = () => {
   // Open Manual Debt Modal
   const handleOpenDebt = (c: Customer) => {
     setDebtCustomer(c);
-    setDebtCurrency('BRL');
+    setDebtCurrency('PYG');
     setDebtAmount('');
     setDebtReason('');
   };
@@ -338,20 +298,8 @@ export const CustomersView: React.FC = () => {
     const rawVal = parseFloat(debtAmount.replace(',', '.'));
     if (isNaN(rawVal) || rawVal <= 0) return;
 
-    let finalAmountBrl = rawVal;
-    let detailNote = '';
-
-    if (debtCurrency === 'PYG') {
-      finalAmountBrl = rawVal / (exchangeRates.BRL_TO_PYG || 1400);
-      detailNote = `Débito lançado em ₲ ${Math.round(rawVal).toLocaleString('pt-BR')} (Câmbio 1 R$ = ₲ ${exchangeRates.BRL_TO_PYG?.toLocaleString('pt-BR') || '1.380'}).`;
-    } else if (debtCurrency === 'USD') {
-      finalAmountBrl = rawVal * (exchangeRates.USD_TO_BRL || 5.62);
-      detailNote = `Débito lançado em US$ ${rawVal.toFixed(2)} (Câmbio 1 US$ = R$ ${exchangeRates.USD_TO_BRL?.toFixed(2) || '5.62'}).`;
-    } else {
-      detailNote = `Débito lançado em R$ ${rawVal.toFixed(2)}.`;
-    }
-
-    finalAmountBrl = Math.round(finalAmountBrl * 100) / 100;
+    const finalAmountBrl = Math.round(rawVal);
+    const detailNote = `Débito lançado em ₲ ${finalAmountBrl.toLocaleString('es-PY')}.`;
     const fullDesc = [detailNote, debtReason.trim()].filter(Boolean).join(' ');
 
     await recordCustomerDebt(debtCustomer.id, finalAmountBrl, fullDesc || 'Lançamento manual de fiado/débito');
@@ -425,17 +373,15 @@ export const CustomersView: React.FC = () => {
     const sorted = [...mergedEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     let text = `🥖 *PADARIA & CONFEITARIA KORISKO*\n`;
-    text += `📄 *EXTRATO DE CONTA & FIADO*\n`;
+    text += `📄 *EXTRATO DE CONTA & FIADO (₲ PYG)*\n`;
     text += `--------------------------------\n`;
     text += `👤 *Cliente:* ${customer.name}\n`;
     if (customer.phone) text += `📱 *Telefone:* ${customer.phone}\n`;
-    if (customer.documentCpf) text += `📋 *CPF/Doc:* ${customer.documentCpf}\n`;
+    if (customer.documentCpf) text += `📋 *Doc:* ${customer.documentCpf}\n`;
     text += `📅 *Emissão:* ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n`;
     text += `--------------------------------\n`;
-    text += `💰 *SALDO ATUAL EM ABERTO: ${formatCurrency(customer.outstandingBalanceBrl, 'BRL')}*\n`;
-    text += `≈ 🇵🇾 ₲ ${Math.round(customer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}\n`;
-    text += `≈ 🇺🇸 $ ${(customer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}\n`;
-    text += `💳 *Limite de Crédito:* ${formatCurrency(customer.creditLimitBrl, 'BRL')} | *Fidelidade:* ${customer.loyaltyPoints} pts\n`;
+    text += `💰 *SALDO ATUAL EM ABERTO: ${formatCurrency(customer.outstandingBalanceBrl, 'PYG')}*\n`;
+    text += `💳 *Limite de Crédito:* ${formatCurrency(customer.creditLimitBrl, 'PYG')} | *Fidelidade:* ${customer.loyaltyPoints} pts\n`;
     text += `--------------------------------\n`;
     text += `📝 *LANÇAMENTOS NO EXTRATO:*\n`;
     
@@ -447,14 +393,14 @@ export const CustomersView: React.FC = () => {
         const d = new Date(entry.date).toLocaleDateString('pt-BR');
         const sign = isDebit ? '[+] Débito' : '[-] Amortização';
         const saleRef = entry.saleId ? (sales || []).find(s => s.id === entry.saleId) : null;
-        text += `${sign} (${d}): ${isDebit ? '' : '-'}${formatCurrency(entry.amountBrl, 'BRL')}\n`;
+        text += `${sign} (${d}): ${isDebit ? '' : '-'}${formatCurrency(entry.amountBrl, 'PYG')}\n`;
         text += `   ↳ ${entry.description}\n`;
         if (saleRef && Array.isArray(saleRef.items) && saleRef.items.length > 0) {
           saleRef.items.forEach(it => {
             const unit = it.product?.unit || (it as any).unit || 'un';
             const name = it.product?.name || (it as any).name || 'Produto';
             const subtotal = it.subtotalBrl ?? ((it.unitPriceBrl || 0) * (it.quantity || 1));
-            text += `     • ${it.quantity} ${unit} × ${name} = ${formatCurrency(subtotal, 'BRL')}\n`;
+            text += `     • ${it.quantity} ${unit} × ${name} = ${formatCurrency(subtotal, 'PYG')}\n`;
           });
         }
       });
@@ -838,13 +784,8 @@ export const CustomersView: React.FC = () => {
                       </span>
                       <div className="flex items-baseline gap-1.5 mt-0.5">
                         <span className={`text-base sm:text-lg font-black font-mono-nums ${hasDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {formatCurrency(cust.outstandingBalanceBrl, 'BRL')}
+                          {formatCurrency(cust.outstandingBalanceBrl, 'PYG')}
                         </span>
-                        {hasDebt && (
-                          <span className="text-[10px] text-neutral-500 font-mono-nums">
-                            (≈ ₲ {Math.round(cust.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')})
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -862,7 +803,7 @@ export const CustomersView: React.FC = () => {
 
                   {/* Credit limit progress */}
                   <div className="mt-2 pt-2 border-t border-neutral-800/60 flex items-center justify-between text-[11px] text-neutral-400">
-                    <span>{language === 'es' ? 'Límite de Crédito:' : 'Limite de Crédito:'} <strong>{formatCurrency(cust.creditLimitBrl, 'BRL')}</strong></span>
+                    <span>{language === 'es' ? 'Límite de Crédito:' : 'Limite de Crédito:'} <strong>{formatCurrency(cust.creditLimitBrl, 'PYG')}</strong></span>
                     <span className={isOverLimit ? 'text-rose-400 font-bold' : 'text-neutral-500'}>
                       {isOverLimit 
                         ? (language === 'es' ? '¡Límite Excedido!' : 'Limite Excedido!') 
@@ -883,7 +824,7 @@ export const CustomersView: React.FC = () => {
                   <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538]">
                     <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Total Comprado' : 'Total Comprado'}</span>
                     <span className="font-bold text-neutral-200 font-mono-nums mt-0.5 block">
-                      {formatCurrency(cust.totalSpentBrl, 'BRL')}
+                      {formatCurrency(cust.totalSpentBrl, 'PYG')}
                     </span>
                   </div>
                 </div>
@@ -1012,81 +953,22 @@ export const CustomersView: React.FC = () => {
               {/* Current Debt Header */}
               <div className="p-3.5 rounded-2xl bg-[#080B12] border border-[#1C2538] text-center">
                 <span className="text-[11px] text-neutral-400 block">
-                  {language === 'es' ? 'Saldo Actual de la Cuenta' : 'Saldo Atual em Aberto (Fiado)'}
+                  {language === 'es' ? 'Saldo Actual de la Cuenta (₲ Guaraní)' : 'Saldo Atual em Aberto (₲ Guaraní)'}
                 </span>
                 <span className="text-2xl font-black text-rose-400 font-mono-nums block mt-0.5">
-                  {formatCurrency(paymentCustomer.outstandingBalanceBrl, 'BRL')}
+                  {formatCurrency(paymentCustomer.outstandingBalanceBrl, 'PYG')}
                 </span>
-                <div className="flex items-center justify-center gap-3 text-[11px] text-neutral-400 mt-1 font-mono-nums">
-                  <span>≈ ₲ {Math.round(paymentCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}</span>
-                  <span>·</span>
-                  <span>≈ US$ {(paymentCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}</span>
-                </div>
-              </div>
-
-              {/* CURRENCY SELECTOR (Qual moeda para amortizar?) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
-                    <Coins className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{language === 'es' ? '¿En qué moneda paga?' : 'Moeda para Amortizar'}</span>
-                  </label>
-                  <span className="text-[10px] text-neutral-400 font-mono">
-                    {payCurrency === 'PYG' ? `1 R$ = ₲ ${exchangeRates.BRL_TO_PYG?.toLocaleString('pt-BR') || '1.380'}` : payCurrency === 'USD' ? `US$ = R$ ${exchangeRates.USD_TO_BRL?.toFixed(2) || '5.62'}` : 'Moeda Base'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPayCurrency('BRL')}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
-                      payCurrency === 'BRL'
-                        ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-sm ring-1 ring-emerald-500/40'
-                        : 'border-[#1C2538] bg-[#080B12] text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    <span>🇧🇷 Real</span>
-                    <span className="text-[10px] font-mono opacity-80">R$ (BRL)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPayCurrency('PYG')}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
-                      payCurrency === 'PYG'
-                        ? 'border-amber-500 bg-amber-500/20 text-amber-300 shadow-sm ring-1 ring-amber-500/40'
-                        : 'border-[#1C2538] bg-[#080B12] text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    <span>🇵🇾 Guaraní</span>
-                    <span className="text-[10px] font-mono opacity-80">₲ (PYG)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPayCurrency('USD')}
-                    className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
-                      payCurrency === 'USD'
-                        ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-sm ring-1 ring-emerald-500/40'
-                        : 'border-[#1C2538] bg-[#080B12] text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    <span>🇺🇸 Dólar</span>
-                    <span className="text-[10px] font-mono opacity-80">$ (USD)</span>
-                  </button>
-                </div>
               </div>
 
               {/* Amount input with Quick Settle button */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="customer-pay-amount" className="text-xs font-semibold text-neutral-300">
-                    {language === 'es' ? `Valor entregado (${payCurrency})` : `Valor a Pagar / Amortizar (${payCurrency})`} *
+                    {language === 'es' ? 'Monto a Pagar / Amortizar (₲)' : 'Valor a Pagar / Amortizar (₲)'} *
                   </label>
                   <button
                     type="button"
-                    onClick={() => handleSelectPayCurrency(payCurrency)}
+                    onClick={handleSelectPayCurrency}
                     className="text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
                   >
                     {language === 'es' ? 'Saldar Todo' : 'Quitar Tudo'}
@@ -1094,78 +976,52 @@ export const CustomersView: React.FC = () => {
                 </div>
 
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400 font-mono font-bold text-sm">
-                    {payCurrency === 'BRL' ? 'R$' : payCurrency === 'PYG' ? '₲' : '$'}
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-400 font-mono font-bold text-sm">
+                    ₲
                   </div>
                   <input
                     id="customer-pay-amount"
                     name="payAmount"
                     type="number"
-                    step={payCurrency === 'PYG' ? '500' : '0.01'}
-                    min="0.01"
+                    step="500"
+                    min="500"
                     required
                     value={payAmount}
                     onChange={(e) => setPayAmount(e.target.value)}
-                    placeholder="0,00"
-                    className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl pl-12 pr-4 py-2.5 text-base font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="0"
+                    className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl pl-10 pr-4 py-2.5 text-base font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
-                {/* Quick bills chips */}
+                {/* Quick bills chips in Guaranís */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {payCurrency === 'BRL' && [10, 20, 50, 100, 200].map(val => (
+                  {[20000, 50000, 100000, 200000, 500000].map(val => (
                     <button
                       key={val}
                       type="button"
                       onClick={() => setPayAmount(val.toString())}
-                      className="px-2 py-1 rounded-lg border border-[#1C2538] bg-[#080B12] hover:bg-neutral-800 text-[11px] font-mono font-medium text-neutral-300 cursor-pointer active:scale-95"
+                      className="px-2.5 py-1 rounded-lg border border-[#1C2538] bg-[#080B12] hover:bg-neutral-800 text-[11px] font-mono font-medium text-amber-300 cursor-pointer active:scale-95"
                     >
-                      +R$ {val}
-                    </button>
-                  ))}
-                  {payCurrency === 'PYG' && [20000, 50000, 100000, 200000, 500000].map(val => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setPayAmount(val.toString())}
-                      className="px-2 py-1 rounded-lg border border-[#1C2538] bg-[#080B12] hover:bg-neutral-800 text-[11px] font-mono font-medium text-amber-300 cursor-pointer active:scale-95"
-                    >
-                      +₲ {val.toLocaleString('pt-BR')}
-                    </button>
-                  ))}
-                  {payCurrency === 'USD' && [5, 10, 20, 50, 100].map(val => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setPayAmount(val.toString())}
-                      className="px-2 py-1 rounded-lg border border-[#1C2538] bg-[#080B12] hover:bg-neutral-800 text-[11px] font-mono font-medium text-emerald-300 cursor-pointer active:scale-95"
-                    >
-                      +${val}
+                      +₲ {val.toLocaleString('es-PY')}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Real-time conversion & balance preview */}
+              {/* Balance preview */}
               <div className="p-3 rounded-xl bg-[#080B12] border border-[#1C2538] space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">{language === 'es' ? 'Amortizado en cuenta:' : 'Amortizado da conta:'}</span>
                   <span className="font-bold text-emerald-400 font-mono-nums text-sm">
-                    {formatCurrency(computedAmortizedBrl, 'BRL')}
+                    {formatCurrency(computedAmortizedBrl, 'PYG')}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">{language === 'es' ? 'Nuevo saldo restante:' : 'Novo saldo restante:'}</span>
                   <span className={`font-bold font-mono-nums ${computedRemainingBrl <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {formatCurrency(computedRemainingBrl, 'BRL')}
+                    {formatCurrency(computedRemainingBrl, 'PYG')}
                   </span>
                 </div>
-                {payCurrency !== 'BRL' && (
-                  <div className="text-[10px] text-neutral-500 pt-1 border-t border-neutral-800/80 flex items-center justify-between font-mono">
-                    <span>{language === 'es' ? 'Tipo de cambio:' : 'Taxa aplicada:'}</span>
-                    <span>{payCurrency === 'PYG' ? `1 R$ = ₲ ${exchangeRates.BRL_TO_PYG?.toLocaleString('pt-BR') || '1.380'}` : `1 US$ = R$ ${exchangeRates.USD_TO_BRL?.toFixed(2) || '5.62'}`}</span>
-                  </div>
-                )}
               </div>
 
               {/* Payment Method */}

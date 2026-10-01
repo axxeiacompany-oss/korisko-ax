@@ -50,6 +50,38 @@
           return false;
         }, { capture: true, passive: false });
 
+        // Silenciamento de rejeições não tratadas de WebSocket e conexões
+        window.addEventListener('unhandledrejection', function(event) {
+          try {
+            var reason = (event && event.reason) ? (event.reason.message || String(event.reason)) : '';
+            if (
+              reason.indexOf('WebSocket') !== -1 ||
+              reason.indexOf('closed without opened') !== -1 ||
+              reason.indexOf('failed to fetch') !== -1 ||
+              reason.indexOf('NetworkError') !== -1 ||
+              reason.indexOf('aborted') !== -1
+            ) {
+              if (event.preventDefault) event.preventDefault();
+              if (event.stopPropagation) event.stopPropagation();
+              return false;
+            }
+          } catch(err) {}
+        });
+
+        window.addEventListener('error', function(event) {
+          try {
+            var msg = (event && event.message) ? String(event.message) : '';
+            if (
+              msg.indexOf('WebSocket') !== -1 ||
+              msg.indexOf('closed without opened') !== -1
+            ) {
+              if (event.preventDefault) event.preventDefault();
+              if (event.stopPropagation) event.stopPropagation();
+              return false;
+            }
+          } catch(err) {}
+        });
+
         // Limpeza de logs
         try {
           var noop = function() {};

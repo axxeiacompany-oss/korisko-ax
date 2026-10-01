@@ -563,12 +563,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         });
 
-      activeChannel.subscribe((status: string) => {
-        isSubscribed = status === 'SUBSCRIBED';
+      activeChannel.subscribe((status: string, err?: any) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+          isSubscribed = false;
+        }
       });
     };
 
-    setupRealtime();
+    try {
+      setupRealtime();
+    } catch (e) {
+      console.warn('[Realtime] Subscription setup warning:', e);
+    }
 
     // Prevent "Page entered Back-Forward Cache" WebSocket crash:
     // Cleanly close connection on pagehide, and reconnect on pageshow/resume
@@ -584,13 +592,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const handlePageShow = (e: PageTransitionEvent) => {
       if (e.persisted || !activeChannel) {
-        setupRealtime();
+        try {
+          setupRealtime();
+        } catch {}
       }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !isSubscribed) {
-        setupRealtime();
+        try {
+          setupRealtime();
+        } catch {}
       }
     };
 

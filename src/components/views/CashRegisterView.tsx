@@ -279,11 +279,11 @@ export const CashRegisterView: React.FC = () => {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-900/30 flex items-center justify-between">
               <span className="text-emerald-400/80 font-medium">{language === 'es' ? 'Total Entradas:' : 'Total Entradas:'}</span>
-              <span className="font-bold text-emerald-300 font-mono-nums">+{formatCurrency(transactionTotals.entradasBrl, 'BRL')}</span>
+              <span className="font-bold text-emerald-300 font-mono-nums">+{formatCurrency(transactionTotals.entradasBrl, 'PYG')}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-900/30 flex items-center justify-between">
               <span className="text-rose-400/80 font-medium">{language === 'es' ? 'Total Salidas:' : 'Total Saídas:'}</span>
-              <span className="font-bold text-rose-300 font-mono-nums">-{formatCurrency(transactionTotals.saidasBrl, 'BRL')}</span>
+              <span className="font-bold text-rose-300 font-mono-nums">-{formatCurrency(transactionTotals.saidasBrl, 'PYG')}</span>
             </div>
           </div>
 
@@ -375,25 +375,11 @@ export const CashRegisterView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-neutral-850">
-                      <div>
-                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado R$' : 'Contado R$'}</span>
-                        <span className="font-mono-nums font-semibold text-neutral-200">
-                          {formatCurrency(s.countedOnClose?.brl || 0, 'BRL')}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado ₲' : 'Contado ₲'}</span>
-                        <span className="font-mono-nums font-semibold text-amber-400">
-                          {formatCurrency(s.countedOnClose?.pyg || 0, 'PYG')}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Contado $' : 'Contado $'}</span>
-                        <span className="font-mono-nums font-semibold text-emerald-400">
-                          {formatCurrency(s.countedOnClose?.usd || 0, 'USD')}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-neutral-850">
+                      <span className="text-[11px] text-neutral-400">{language === 'es' ? 'Total en Caja (Guaraníes):' : 'Total Contado em Gaveta:'}</span>
+                      <span className="font-mono-nums font-bold text-amber-400">
+                        {formatCurrency(s.countedOnClose?.pyg || s.countedOnClose?.brl || 0, 'PYG')}
+                      </span>
                     </div>
 
                     {s.closingNotes && (
@@ -420,7 +406,7 @@ export const CashRegisterView: React.FC = () => {
             </h3>
           </div>
           <span className="text-xs text-neutral-400 font-mono-nums">
-            {formatCurrency(currentSessionSales.reduce((acc, s) => acc + s.totalBrl, 0), 'BRL')}
+            {formatCurrency(currentSessionSales.reduce((acc, s) => acc + s.totalBrl, 0), 'PYG')}
           </span>
         </div>
 
@@ -435,8 +421,6 @@ export const CashRegisterView: React.FC = () => {
                 language === 'es' ? 'es-PY' : 'pt-BR',
                 { hour: '2-digit', minute: '2-digit' }
               );
-              const pygVal = fromBrl(s.totalBrl, 'PYG', exchangeRates);
-              const usdVal = fromBrl(s.totalBrl, 'USD', exchangeRates);
 
               return (
                 <div
@@ -463,11 +447,8 @@ export const CashRegisterView: React.FC = () => {
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-850">
                     <div className="text-right">
-                      <span className="text-sm font-bold text-neutral-100 font-mono-nums block">
-                        {formatCurrency(s.totalBrl, 'BRL')}
-                      </span>
-                      <span className="text-[10px] text-neutral-500 font-mono-nums">
-                        ₲ {Math.round(pygVal).toLocaleString('es-PY')} · $ {usdVal.toFixed(2)}
+                      <span className="text-sm font-bold text-amber-400 font-mono-nums block">
+                        {formatCurrency(s.totalBrl, 'PYG')}
                       </span>
                     </div>
 

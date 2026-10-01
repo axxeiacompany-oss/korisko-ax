@@ -43,10 +43,10 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
       const unit = it.product?.unit || (it as any).unit || 'un';
       const unitPrice = it.unitPriceBrl || 0;
       const subtotal = it.subtotalBrl || (unitPrice * (it.quantity || 1));
-      text += `${name}\n${it.quantity} ${unit} x R$ ${unitPrice.toFixed(2)} = R$ ${subtotal.toFixed(2)}\n`;
+      text += `${name}\n${it.quantity} ${unit} x ₲ ${Math.round(unitPrice).toLocaleString('es-PY')} = ₲ ${Math.round(subtotal).toLocaleString('es-PY')}\n`;
     });
     text += `--------------------------------\n`;
-    text += `*TOTAL: R$ ${sale.totalBrl.toFixed(2)}*\n`;
+    text += `*TOTAL: ₲ ${Math.round(sale.totalBrl).toLocaleString('es-PY')}*\n`;
     text += `Obrigado pela preferência!`;
     return text;
   };

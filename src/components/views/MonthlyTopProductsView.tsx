@@ -197,7 +197,7 @@ export const MonthlyTopProductsView: React.FC = () => {
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
           <span className="text-xs text-neutral-400 font-medium block">Faturamento do Mês</span>
           <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
-            {formatCurrency(productStats.totalMonthRevenue, 'BRL')}
+            {formatCurrency(productStats.totalMonthRevenue, 'PYG')}
           </div>
           <p className="text-[11px] text-neutral-500 font-mono-nums">
             Em vendas de balcão e padaria
@@ -220,7 +220,7 @@ export const MonthlyTopProductsView: React.FC = () => {
             {productStats.items[0]?.product.name || 'Nenhum'}
           </div>
           <p className="text-[11px] text-neutral-500 font-mono-nums">
-            {productStats.items[0] ? `${formatCurrency(productStats.items[0].revenueBrl, 'BRL')} (${productStats.items[0].sharePercent}% do total)` : '—'}
+            {productStats.items[0] ? `${formatCurrency(productStats.items[0].revenueBrl, 'PYG')} (${productStats.items[0].sharePercent}% do total)` : '—'}
           </p>
         </div>
       </div>
@@ -291,15 +291,14 @@ export const MonthlyTopProductsView: React.FC = () => {
               <th className="py-3.5 px-4 font-medium">Produto</th>
               <th className="py-3.5 px-4 font-medium">Categoria</th>
               <th className="py-3.5 px-4 font-medium text-right">Qtd. Vendida</th>
-              <th className="py-3.5 px-4 font-medium text-right">Faturamento (R$)</th>
-              <th className="py-3.5 px-4 font-medium text-right">Equiv. ₲ / $</th>
+              <th className="py-3.5 px-4 font-medium text-right">Faturamento (₲ PYG)</th>
               <th className="py-3.5 px-4 font-medium w-48">Participação no Mês</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-800/60">
             {productStats.items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-neutral-500">
+                <td colSpan={6} className="py-8 text-center text-neutral-500">
                   Nenhuma venda registrada para os filtros selecionados neste mês.
                 </td>
               </tr>
@@ -336,14 +335,8 @@ export const MonthlyTopProductsView: React.FC = () => {
                     <td className="py-3.5 px-4 text-right font-mono-nums font-bold text-neutral-200">
                       {it.quantity} {it.product.unit}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono-nums font-bold text-emerald-400">
-                      {formatCurrency(it.revenueBrl, 'BRL')}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-mono-nums text-[11px] text-neutral-400">
-                      <span>₲ {fromBrl(it.revenueBrl, 'PYG', exchangeRates).toLocaleString('es-PY')}</span>
-                      <span className="block text-[10px] text-neutral-500">
-                        $ {fromBrl(it.revenueBrl, 'USD', exchangeRates).toFixed(2)}
-                      </span>
+                    <td className="py-3.5 px-4 text-right font-mono-nums font-bold text-amber-400">
+                      {formatCurrency(it.revenueBrl, 'PYG')}
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="space-y-1">
