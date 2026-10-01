@@ -30,12 +30,11 @@ function MainAppShell() {
   const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError, toast, clearToast } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
+      localStorage.removeItem('KORISKO_AUTH_SESSION');
       const sessionSaved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
-      if (sessionSaved === 'true') return true;
-      const localSaved = localStorage.getItem('KORISKO_AUTH_SESSION');
-      return localSaved === 'true';
+      return sessionSaved === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 

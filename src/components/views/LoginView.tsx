@@ -29,7 +29,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -115,11 +114,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         }
 
         switchUser(matchedEmp.id);
-        if (rememberMe) {
-          try {
-            localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-          } catch {}
-        }
         setIsLoading(false);
         onLoginSuccess();
         return;
@@ -240,7 +234,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     name="username"
                     type="text"
                     required
-                    autoComplete="username email"
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -280,7 +274,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     name="password"
                     type={showPassword ? 'text' : 'password'}
                     required
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -294,21 +288,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
-
-              {/* Remember me */}
-              <div className="flex items-center justify-between pt-1">
-                <label htmlFor="login-remember-me" className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-400 hover:text-neutral-300">
-                  <input
-                    id="login-remember-me"
-                    name="remember"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#273248] bg-[#090D15] text-indigo-600 focus:ring-indigo-500/30"
-                  />
-                  <span>{t.loginRememberMe}</span>
-                </label>
               </div>
 
               {/* Submit Button with UTMify styling */}
@@ -326,34 +305,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   </>
                 )}
               </button>
-
-              {/* Quick Profile Access Pills */}
-              {employees && employees.length > 0 && (
-                <div className="pt-3 border-t border-[#1C2436] space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium">
-                    <span>{t.loginQuickRoles}</span>
-                    <span className="text-[10px] text-neutral-500">1-Clique</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {employees.slice(0, 3).map((emp) => (
-                      <button
-                        key={emp.id}
-                        type="button"
-                        onClick={() => {
-                          setEmail(emp.email || emp.name);
-                          setPassword(emp.password || emp.pin || '');
-                          setErrorMsg(null);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-[#141B2B] hover:bg-indigo-600/20 hover:border-indigo-500/40 border border-[#1E293B] text-[11px] text-neutral-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <span className={`w-2 h-2 rounded-full ${emp.role === 'admin' ? 'bg-amber-400' : 'bg-indigo-400'}`} />
-                        <span>{emp.name}</span>
-                        <span className="text-[9px] text-neutral-500 uppercase">{emp.role}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
             </form>
 
