@@ -8,7 +8,8 @@ import {
   Users, 
   Menu,
   Vault,
-  ShieldCheck
+  ShieldCheck,
+  Store
 } from 'lucide-react';
 
 interface Props {
@@ -36,7 +37,7 @@ export const MobileBottomNav: React.FC<Props> = ({
   return (
     <nav 
       aria-label="Navegação Rápida Mobile"
-      className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[#0A0D15] border-t border-[#1C2538] px-2 pt-1 safe-area-pb shadow-2xl select-none"
+      className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-[#07090E]/95 backdrop-blur-xl border-t border-[#C89B6E]/25 px-2 pt-1 safe-area-pb shadow-2xl select-none"
     >
       <div className="grid grid-cols-5 items-center justify-around max-w-md mx-auto h-14">
         
@@ -47,12 +48,12 @@ export const MobileBottomNav: React.FC<Props> = ({
             onClick={() => onSelectTab('dashboard')}
             className={`flex flex-col items-center justify-center h-full rounded-xl transition-all cursor-pointer active:scale-95 ${
               activeTab === 'dashboard'
-                ? 'text-indigo-400 font-bold'
+                ? 'text-[#F2D6B8] font-bold'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <div className={`p-1.5 rounded-xl transition-colors ${
-              activeTab === 'dashboard' ? 'bg-indigo-500/20 text-indigo-400' : ''
+              activeTab === 'dashboard' ? 'bg-[#C89B6E]/20 text-[#C89B6E]' : ''
             }`}>
               <LayoutDashboard className="w-5 h-5" />
             </div>
@@ -136,19 +137,38 @@ export const MobileBottomNav: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* 4. CRM / Clientes (or Afiliados if Admin) */}
-        {isAx ? (
+        {/* 4. Loja / Equipe / Clientes */}
+        {isFeatureAllowed('loja') ? (
+          <button
+            type="button"
+            onClick={() => onSelectTab('loja')}
+            className={`flex flex-col items-center justify-center h-full rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'loja'
+                ? 'text-[#F2D6B8] font-bold'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition-colors ${
+              activeTab === 'loja' ? 'bg-[#C89B6E]/20 text-[#C89B6E]' : ''
+            }`}>
+              <Store className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] mt-0.5 tracking-tight truncate">
+              Loja
+            </span>
+          </button>
+        ) : isAx ? (
           <button
             type="button"
             onClick={() => onSelectTab('afiliados')}
             className={`flex flex-col items-center justify-center h-full rounded-xl transition-all cursor-pointer active:scale-95 ${
               activeTab === 'afiliados'
-                ? 'text-indigo-400 font-bold'
+                ? 'text-[#F2D6B8] font-bold'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <div className={`p-1.5 rounded-xl transition-colors ${
-              activeTab === 'afiliados' ? 'bg-indigo-500/20 text-indigo-400' : ''
+              activeTab === 'afiliados' ? 'bg-[#C89B6E]/20 text-[#C89B6E]' : ''
             }`}>
               <ShieldCheck className="w-5 h-5" />
             </div>

@@ -227,7 +227,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     tabAffiliates: 'Equipo & Roles',
 
     // Tab Subtitles
-    subDashboard: 'Visión general consolidada en tiempo real del negocio',
+    subDashboard: 'Visión ejecutiva y consolidada de la alta panadería',
     subPdv: 'Frente de caja, pesaje y cobro en Guaraníes (₲ PYG)',
     subDirectSale: 'Cobro rápido ingresando solo el monto y confirmando',
     subInventory: 'Insumos, productos terminados y alertas de vencimiento',
@@ -420,7 +420,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     tabAffiliates: 'Equipe & Permissões',
 
     // Tab Subtitles
-    subDashboard: 'Visão consolidada em tempo real da padaria',
+    subDashboard: 'Visão executiva e consolidada da alta confeitaria e panificação',
     subPdv: 'Frente de caixa, pesagem e recebimento multi-moeda',
     subDirectSale: 'Lançamento rápido digitando apenas o valor e confirmando',
     subInventory: 'Insumos, produtos acabados e alertas de validade',
@@ -443,7 +443,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     noResultsFound: 'Nenhum resultado encontrado para',
     quickActionFornada: 'Fornada',
     quickActionDirectSale: 'Venda Direta',
-    quickActionNewSale: 'Nova Venta',
+    quickActionNewSale: 'Nova Venda',
     myProfile: 'Meu Perfil',
     myPassword: 'Minha Senha 👤',
     onlineStatus: 'ONLINE',

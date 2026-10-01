@@ -191,32 +191,28 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-[#090C14] border border-[#C89B6E]/25 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
-        {/* Header with Korizko + Panificação confeitaria artesanal + Real-Time Sector & Admin Badge */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 bg-neutral-950 border-b border-neutral-800">
+        {/* Header with Korizko + Panificação confeitaria artesanal */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 bg-[#07090E] border-b border-[#C89B6E]/20">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <div className="p-2.5 rounded-xl bg-[#C89B6E]/10 border border-[#C89B6E]/25 text-[#C89B6E]">
               <ClipboardList className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                  Korizko • Comandas & Setores em Tempo Real
+                <h3 className="text-base sm:text-lg font-extrabold text-[#F2D6B8] tracking-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+                  Korizko • Comandas & Setores de Produção
                 </h3>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <Radio className="w-3 h-3 animate-pulse" />
-                  TEMPO REAL ATIVO
-                </span>
                 {isAdmin && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#C89B6E]/20 text-[#F2D6B8] border border-[#C89B6E]/40">
                     <ShieldCheck className="w-3 h-3" />
-                    ADMIN: ACESSO TOTAL A TODOS OS SETORES
+                    ADMIN: ACESSO A TODOS OS SETORES
                   </span>
                 )}
               </div>
-              <p className="text-xs font-medium text-amber-400/90">
-                Panificação confeitaria artesanal — Pedidos confirmados pelo cliente enviados direto ao setor responsável
+              <p className="text-xs font-medium text-[#C89B6E]/90">
+                Panificação confeitaria artesanal — Pedidos confirmados direcionados ao setor responsável
               </p>
             </div>
           </div>

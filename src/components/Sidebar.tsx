@@ -100,10 +100,10 @@ export const Sidebar: React.FC<Props> = ({
         },
         {
           id: 'loja' as TabType,
-          label: 'Loja Online',
+          label: 'Loja & Vitrine',
           icon: Store,
-          badge: 'Online',
-          badgeColor: 'bg-amber-500/20 text-amber-300',
+          badge: 'Boutique',
+          badgeColor: 'bg-[#C89B6E]/20 text-[#F2D6B8]',
         },
       ]
     },
@@ -196,13 +196,13 @@ export const Sidebar: React.FC<Props> = ({
       )}
 
       <aside 
-        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#090D15] border-r border-[#1B2335] flex flex-col justify-between transition-transform lg:transition-all duration-300 select-none shadow-2xl lg:shadow-none ${
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#07090E] border-r border-[#C89B6E]/20 flex flex-col justify-between transition-transform lg:transition-all duration-300 select-none shadow-2xl lg:shadow-none ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'lg:w-20' : 'w-72 sm:w-64'}`}
       >
         
-        {/* Top Header / Workspace Selector in UTMify Style */}
-        <div className="p-4 border-b border-[#182030] flex items-center justify-between">
+        {/* Top Header / Brand Identity */}
+        <div className="p-4 border-b border-[#C89B6E]/15 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             {/* Logo Mark */}
             <div className="w-9 h-9 rounded-full bg-[#07070A] border border-[#C89B6E]/40 flex items-center justify-center shadow-md shadow-black/60 shrink-0">
@@ -276,14 +276,14 @@ export const Sidebar: React.FC<Props> = ({
                         }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group relative cursor-pointer ${
                           isActive
-                            ? 'bg-gradient-to-r from-indigo-600/25 to-violet-600/15 text-white font-semibold border border-indigo-500/40 shadow-sm'
-                            : 'text-neutral-400 hover:text-white hover:bg-[#121826]'
+                            ? 'bg-gradient-to-r from-[#C89B6E]/20 to-[#8A623E]/10 text-[#F2D6B8] font-semibold border border-[#C89B6E]/40 shadow-sm'
+                            : 'text-neutral-400 hover:text-white hover:bg-[#101520]'
                         } ${isCollapsed ? 'lg:justify-center justify-between' : 'justify-between'}`}
                         title={isCollapsed ? item.label : undefined}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <Icon className={`w-4 h-4 shrink-0 transition-colors ${
-                            isActive ? 'text-indigo-400' : 'text-neutral-400 group-hover:text-neutral-200'
+                            isActive ? 'text-[#C89B6E]' : 'text-neutral-400 group-hover:text-neutral-200'
                           }`} />
                           <span className={`truncate ${isCollapsed ? 'lg:hidden' : 'inline'}`}>
                             {item.label}
@@ -300,7 +300,7 @@ export const Sidebar: React.FC<Props> = ({
 
                         {/* Active vertical pill indicator */}
                         {isActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-indigo-500" />
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-[#C89B6E]" />
                         )}
                       </button>
                     );
@@ -335,14 +335,13 @@ export const Sidebar: React.FC<Props> = ({
             
             <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : 'block'}`}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-white truncate leading-tight group-hover:text-indigo-300 transition-colors">
+                <p className="text-xs font-semibold text-[#F2D6B8] truncate leading-tight group-hover:text-white transition-colors">
                   {currentUser.name}
                 </p>
-                <span className="text-[9px] text-emerald-400 font-bold">ONLINE</span>
               </div>
               <p className="text-[10px] text-neutral-400 flex items-center justify-between mt-0.5">
-                <span className="capitalize">{currentUser.role === 'admin' ? (language === 'es' ? 'Admin Ax' : 'Admin Ax') : currentUser.role}</span>
-                <span className="text-indigo-400 group-hover:underline text-[9px] font-semibold">{t.myPassword}</span>
+                <span className="capitalize">{currentUser.role === 'admin' ? 'Admin Master' : currentUser.role}</span>
+                <span className="text-[#C89B6E] group-hover:underline text-[9px] font-semibold">{t.myPassword}</span>
               </p>
             </div>
           </div>

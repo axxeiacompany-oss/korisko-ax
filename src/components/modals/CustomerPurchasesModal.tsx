@@ -417,21 +417,20 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
-      <div className="w-full sm:max-w-4xl bg-[#0B0F19] border-t sm:border border-[#1E293B] rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
+      <div className="w-full sm:max-w-4xl bg-[#090C14] border-t sm:border border-[#C89B6E]/25 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200 flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-[#1E293B] bg-gradient-to-r from-[#0F172A] via-[#0B0F19] to-amber-950/25">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-[#C89B6E]/20 bg-gradient-to-r from-[#0F1523] via-[#090C14] to-[#1A140E]">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#C89B6E]/15 border border-[#C89B6E]/35 flex items-center justify-center text-[#C89B6E] shrink-0">
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-black text-white truncate">
-                  Total Comprado & Registro de Compras — {customer.name}
+                <h2 className="text-sm sm:text-base font-black text-[#F2D6B8] truncate" style={{ fontFamily: "'Cinzel', serif" }}>
+                  Total Comprado & Histórico de Compras — {customer.name}
                 </h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-                  <Database className="w-3 h-3" />
-                  SQL: registro_compras_clientes
+                <span className="px-2.5 py-0.5 rounded-full bg-[#C89B6E]/15 text-[#F2D6B8] border border-[#C89B6E]/30 text-[10px] font-bold uppercase tracking-wider">
+                  Extrato de Compras
                 </span>
               </div>
               <p className="text-xs text-neutral-400 truncate mt-0.5">

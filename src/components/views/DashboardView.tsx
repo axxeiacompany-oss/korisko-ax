@@ -18,7 +18,8 @@ import {
   ChefHat,
   Users,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  Store
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import { Sale, Customer } from '../../types';
@@ -189,10 +190,18 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           <button
             type="button"
             onClick={() => onNavigate('pdv')}
-            className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4A76A] to-[#B38248] hover:from-[#DFB77E] hover:to-[#C49256] active:scale-95 text-[#090705] font-bold text-xs shadow-lg shadow-[#C89B6E]/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
             <span>{language === 'es' ? 'Abrir PDV' : 'Abrir PDV'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('loja')}
+            className="px-3 py-2.5 rounded-xl border border-[#C89B6E]/35 bg-[#C89B6E]/10 hover:bg-[#C89B6E]/20 active:scale-95 text-[#F2D6B8] text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Store className="w-4 h-4 text-[#C89B6E]" />
+            <span>Loja & Vitrine</span>
           </button>
           {isAx && (
             <button
@@ -204,13 +213,6 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               <span>{t.tabAffiliates}</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => onNavigate('caixa')}
-            className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-800 active:scale-95 text-neutral-200 text-xs font-medium transition-colors flex items-center justify-center cursor-pointer"
-          >
-            {language === 'es' ? 'Ver Caja' : 'Ver Caixa'}
-          </button>
         </div>
       </div>
 

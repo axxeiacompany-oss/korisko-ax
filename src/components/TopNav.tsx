@@ -19,8 +19,8 @@ import {
   Zap, 
   ShieldCheck,
   Menu,
-  Radio,
-  ClipboardList
+  ClipboardList,
+  Store
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
@@ -58,6 +58,7 @@ export const TopNav: React.FC<Props> = ({
     openComandas,
     liveRateStatus,
     fetchLiveRates,
+    isFeatureAllowed,
     t,
     language
   } = useBakery();
@@ -87,7 +88,7 @@ export const TopNav: React.FC<Props> = ({
     cambio: { title: t.tabCurrency, subtitle: t.subCurrency },
     backup: { title: t.tabBackup, subtitle: t.subBackup },
     afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
-    loja: { title: 'Loja Online', subtitle: 'Vitrine pública e catálogo da loja virtual' },
+    loja: { title: 'Boutique & Loja Online', subtitle: 'Vitrine exclusiva, catálogo gourmet e pedidos' },
     minha_conta: { title: 'Minha Conta', subtitle: 'Área do cliente, pedidos e endereços' },
     portal_afiliado: { title: 'Portal de Afiliados', subtitle: 'Links de divulgação, métricas e comissões' },
   };
@@ -109,7 +110,7 @@ export const TopNav: React.FC<Props> = ({
   return (
     <>
       <header 
-        className={`sticky top-0 z-30 h-16 bg-[#090D15] border-b border-[#182030] px-4 sm:px-6 flex items-center justify-between transition-all duration-300 ${
+        className={`sticky top-0 z-30 h-16 bg-[#080B12]/95 backdrop-blur-xl border-b border-[#C89B6E]/20 px-3 sm:px-6 flex items-center justify-between transition-all duration-300 ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >
@@ -119,79 +120,81 @@ export const TopNav: React.FC<Props> = ({
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="p-2 -ml-1 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 lg:hidden cursor-pointer shrink-0"
+            className="p-2 -ml-1 rounded-xl text-[#F2D6B8] hover:text-white hover:bg-[#141B2B] lg:hidden cursor-pointer shrink-0"
             title="Abrir Menu de Navegação"
             aria-label="Abrir Menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-sm sm:text-base font-bold text-white tracking-tight leading-none truncate">
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-bold text-[#F5E6D3] tracking-tight leading-none truncate">
               {currentTabInfo.title}
             </h1>
-            <p className="text-[11px] text-amber-400/90 font-medium hidden sm:block mt-0.5 truncate">
+            <p className="text-[11px] text-[#C89B6E] font-medium hidden sm:block mt-0.5 truncate">
               Korizko • Panificação confeitaria artesanal — {currentTabInfo.subtitle}
             </p>
           </div>
         </div>
 
-        {/* Center: Command + K Search Bar - only shown on large desktops (xl) so it never overflows or wraps */}
+        {/* Center: Command + K Search Bar - only shown on large desktops (xl) */}
         <div className="hidden xl:flex items-center flex-1 max-w-xs mx-4 min-w-[180px]">
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#0E1422] border border-[#1E273A] text-xs text-neutral-400 hover:text-neutral-200 hover:border-neutral-600 transition-colors cursor-pointer overflow-hidden"
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#0D121D] border border-[#C89B6E]/25 text-xs text-neutral-400 hover:text-[#F2D6B8] hover:border-[#C89B6E]/50 transition-colors cursor-pointer overflow-hidden"
           >
             <div className="flex items-center gap-2 min-w-0 truncate">
-              <Search className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+              <Search className="w-3.5 h-3.5 text-[#C89B6E] shrink-0" />
               <span className="truncate">{t.searchPlaceholder}</span>
             </div>
-            <kbd className="px-1.5 py-0.5 rounded bg-[#161E30] text-[10px] font-mono text-neutral-400 border border-[#232D44] shrink-0 ml-2">
+            <kbd className="px-1.5 py-0.5 rounded bg-[#151D2E] text-[10px] font-mono text-[#C89B6E] border border-[#C89B6E]/30 shrink-0 ml-2">
               ⌘K
             </kbd>
           </button>
         </div>
 
         {/* Right: Currency ticker, Language Switcher, Actions & User */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           
           {/* Language Selector Switcher (ES / PT) */}
           <LanguageSwitcher />
 
           {/* Moeda Oficial Guaraní (PYG) Pill */}
           <div
-            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs text-amber-300 items-center gap-1.5 font-mono-nums"
+            className="hidden md:flex px-2.5 py-1.5 rounded-xl border border-[#C89B6E]/30 bg-[#C89B6E]/10 text-xs text-[#F2D6B8] items-center gap-1.5 font-mono-nums"
             title="Moeda Oficial: Guaraní (₲ PYG)"
           >
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="font-bold text-[11px]">₲ PYG (Guaraní)</span>
+            <span className="w-2 h-2 rounded-full bg-[#C89B6E]" />
+            <span className="font-bold text-[11px]">₲ PYG</span>
           </div>
 
-          {/* Live Sales Stream Continuous Button - hidden on small mobile, visible sm+ */}
-          <button
-            type="button"
-            onClick={() => setIsStreamDrawerOpen(true)}
-            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors items-center gap-1.5 cursor-pointer"
-            title={language === 'es' ? 'Flujo Continuo de Ventas en Vivo' : 'Fluxo Contínuo de Vendas ao Vivo'}
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden xl:inline">{language === 'es' ? 'Flujo en Vivo' : 'Fluxo ao Vivo'}</span>
-          </button>
+          {/* Quick Store Access Button (if allowed by Admin) */}
+          {isFeatureAllowed('loja') && (
+            <button
+              type="button"
+              onClick={() => onSelectTab('loja')}
+              className={`hidden sm:flex px-3 py-1.5 rounded-xl border text-xs font-bold transition-all items-center gap-1.5 cursor-pointer ${
+                activeTab === 'loja'
+                  ? 'bg-[#C89B6E] text-neutral-950 border-[#C89B6E] shadow-md'
+                  : 'border-[#C89B6E]/35 bg-[#C89B6E]/10 hover:bg-[#C89B6E]/20 text-[#F2D6B8]'
+              }`}
+              title="Acessar Loja & Catálogo Online"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Loja</span>
+            </button>
+          )}
 
-          {/* Comandas & Setores em Tempo Real Button */}
+          {/* Comandas & Setores Button */}
           <button
             type="button"
             onClick={() => setIsComandasOpen(true)}
-            className="flex px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition-all items-center gap-1.5 cursor-pointer"
-            title="Comandas Confirmadas & Setores Responsáveis em Tempo Real"
+            className="flex px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#C89B6E]/35 bg-[#0F1523] hover:bg-[#161F33] text-[#F2D6B8] text-xs font-bold transition-all items-center gap-1.5 cursor-pointer"
+            title="Comandas & Setores"
           >
-            <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">Comandas & Setores</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-neutral-950 text-[10px] font-extrabold">
+            <ClipboardList className="w-3.5 h-3.5 text-[#C89B6E]" />
+            <span className="hidden md:inline">Comandas</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-[#C89B6E] text-neutral-950 text-[10px] font-extrabold">
               {openComandas.length}
             </span>
           </button>
@@ -200,18 +203,18 @@ export const TopNav: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => setIsFornadaOpen(true)}
-            className="hidden sm:flex px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold transition-colors items-center gap-1.5"
-            title="Registrar Fornada do Padeiro"
+            className="hidden lg:flex px-3 py-1.5 rounded-xl border border-[#C89B6E]/25 bg-[#0F1523] hover:bg-[#161F33] text-[#F2D6B8] text-xs font-semibold transition-colors items-center gap-1.5 cursor-pointer"
+            title="Registrar Fornada"
           >
-            <Flame className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{t.quickActionFornada}</span>
+            <Flame className="w-3.5 h-3.5 text-[#C89B6E]" />
+            <span>{t.quickActionFornada}</span>
           </button>
 
-          {/* Venda Direta Rápida - hidden on mobile (already main action in MobileBottomNav) */}
+          {/* Venda Direta Rápida - hidden on mobile */}
           <button
             type="button"
             onClick={() => setIsDirectSaleOpen(true)}
-            className="hidden md:flex px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all items-center gap-1.5 cursor-pointer"
+            className="hidden md:flex px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all items-center gap-1.5 cursor-pointer"
             title={t.directSaleSubtitle}
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
@@ -222,7 +225,7 @@ export const TopNav: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => onSelectTab('pdv')}
-            className="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all items-center gap-1.5 cursor-pointer"
+            className="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#C89B6E] to-[#DFB78C] hover:from-[#D8AB7E] hover:to-[#E8C59E] text-neutral-950 text-xs font-black shadow-md shadow-[#C89B6E]/20 transition-all items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span className="hidden md:inline">{t.quickActionNewSale}</span>

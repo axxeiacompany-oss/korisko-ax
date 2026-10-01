@@ -32,7 +32,9 @@ import {
   UserCheck,
   Activity,
   RefreshCw,
-  Unlock
+  Unlock,
+  Store,
+  ExternalLink
 } from 'lucide-react';
 import { AppFeature, Employee, UserRole } from '../../types';
 import { ConfirmModal } from '../modals/ConfirmModal';
@@ -79,6 +81,14 @@ const AVAILABLE_FEATURES: Array<{
     description: 'Lançar venda instantânea digitando apenas o valor e confirmando',
     icon: Zap,
     color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  },
+  {
+    id: 'loja',
+    label: 'Loja & Boutique Online',
+    category: 'Vendas & Vitrine',
+    description: 'Acesso à vitrine de luxo, catálogo de produtos e pedidos da loja',
+    icon: Store,
+    color: 'text-amber-300 bg-amber-500/15 border-amber-500/30',
   },
   {
     id: 'crm',
@@ -143,6 +153,14 @@ const AVAILABLE_FEATURES: Array<{
     description: 'Exportação, restauração de snapshots e dados locais',
     icon: Cloud,
     color: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  },
+  {
+    id: 'portal_afiliado',
+    label: 'Portal de Afiliados',
+    category: 'Parcerias',
+    description: 'Acesso ao painel de indicações, links e comissões de vendas',
+    icon: Sparkles,
+    color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   },
 ];
 
@@ -212,6 +230,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     'dashboard', 
     'pdv', 
     'venda_direta', 
+    'loja',
     'crm'
   ]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -274,6 +293,28 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   // Automatically conceals all other passwords, showing strictly ONLY this one.
   const handleToggleRevealPassword = (empId: string) => {
     setVisiblePasswordEmpId(prev => (prev === empId ? null : empId));
+  };
+
+  // Direct 1-click toggle of any feature (e.g., 'loja' or any programmed area) for an employee
+  const handleQuickToggleEmployeeFeature = async (emp: Employee, featureId: AppFeature) => {
+    const isAxMember = emp.id === 'emp-admin-ax' || emp.email === 'axxeiacompany@gmail.com';
+    if (isAxMember) return;
+    const currentList = emp.allowedFeatures && emp.allowedFeatures.length > 0
+      ? emp.allowedFeatures
+      : AVAILABLE_FEATURES.map(f => f.id);
+    const hasFeature = currentList.includes(featureId);
+    const nextFeatures = hasFeature
+      ? currentList.filter(f => f !== featureId)
+      : [...currentList, featureId];
+
+    await updateEmployeePermissions(emp.id, nextFeatures);
+    const featObj = AVAILABLE_FEATURES.find(f => f.id === featureId);
+    showToast(
+      hasFeature
+        ? `Acesso a "${featObj?.label || featureId}" revogado para ${emp.name}.`
+        : `Acesso a "${featObj?.label || featureId}" liberado para ${emp.name}!`,
+      'success'
+    );
   };
 
   const handleCreateAffiliate = async (e: React.FormEvent) => {
@@ -367,32 +408,43 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 lg:pb-0">
       
-      {/* Header Banner - Painel de Controle de Afiliados do Admin Ax */}
-      <div className="p-6 rounded-2xl bg-[#0D121E] border border-[#1E273A] relative overflow-hidden shadow-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      {/* Header Banner - Painel de Controle de Equipe, Loja e Permissões */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-[#0C101A] via-[#0F1523] to-[#171311] border border-[#C89B6E]/30 relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#C89B6E]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Painel do Administrador Geral · Ax
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-3 py-0.5 rounded-full bg-[#C89B6E]/15 text-[#F2D6B8] border border-[#C89B6E]/40 text-xs font-semibold flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#C89B6E]" />
+                Administração Geral · Ax
               </span>
               <span className="text-xs text-neutral-400 font-mono">axxeiacompany@gmail.com</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Gestão de Equipe & Permissões
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+              Gestão de Equipe, Loja & Permissões
             </h1>
-            <p className="text-xs text-neutral-400 max-w-2xl">
-              Somente você (<b className="text-white">Ax</b>) tem acesso a este painel para cadastrar colaboradores, definir credenciais e conceder individualmente as permissões de acesso aos módulos do sistema.
+            <p className="text-xs text-neutral-300 max-w-2xl">
+              Conceda ou restrinja o acesso à <b className="text-[#F2D6B8]">Loja & Boutique Online</b> e a todas as áreas programadas do sistema para cada colaborador com atualização automática imediata.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('loja')}
+                className="px-4 py-2.5 rounded-xl bg-[#C89B6E]/15 hover:bg-[#C89B6E]/25 border border-[#C89B6E]/40 text-[#F2D6B8] font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <Store className="w-4 h-4 text-[#C89B6E]" />
+                <span>Acessar Loja</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-75" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsCreating(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#C89B6E] to-[#A87B4F] hover:from-[#D8AB7E] hover:to-[#B88B5F] text-neutral-950 font-bold text-xs shadow-lg shadow-[#C89B6E]/20 flex items-center gap-2 transition-all cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
               <span>Novo Colaborador</span>
@@ -407,6 +459,88 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
             <span>{successMessage}</span>
           </div>
         )}
+      </div>
+
+      {/* CONTROLE RÁPIDO DE ACESSO À LOJA & MÓDULOS POR COLABORADOR */}
+      <div className="p-5 rounded-2xl bg-[#0C101A] border border-[#C89B6E]/25 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1A2234] pb-3.5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#C89B6E]/15 border border-[#C89B6E]/30 flex items-center justify-center text-[#F2D6B8] shrink-0">
+              <Store className="w-5 h-5 text-[#C89B6E]" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-white">
+                Controle de Acesso à Loja & Áreas Programadas
+              </h2>
+              <p className="text-xs text-neutral-400">
+                Ative ou desative com 1 clique a permissão de acesso à Loja Online e aos demais módulos para cada membro da equipe.
+              </p>
+            </div>
+          </div>
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('loja')}
+              className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-[#141B2B] hover:bg-[#1C263B] border border-[#C89B6E]/30 text-[#F2D6B8] text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Store className="w-3.5 h-3.5 text-[#C89B6E]" />
+              <span>Abrir Vitrine da Loja</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {employees.map(emp => {
+            const isAxMember = emp.id === 'emp-admin-ax' || emp.email === 'axxeiacompany@gmail.com';
+            const empFeatures = emp.allowedFeatures && emp.allowedFeatures.length > 0
+              ? emp.allowedFeatures
+              : AVAILABLE_FEATURES.map(f => f.id);
+            const hasStoreAccess = isAxMember || empFeatures.includes('loja');
+
+            return (
+              <div
+                key={`store-ctrl-${emp.id}`}
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                  hasStoreAccess
+                    ? 'bg-[#101726] border-[#C89B6E]/35'
+                    : 'bg-[#090D15] border-[#1A2234] opacity-80'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`w-8 h-8 rounded-lg ${emp.avatarColor || 'bg-indigo-600'} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
+                    {emp.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">{emp.name}</p>
+                    <p className="text-[10px] text-neutral-400 capitalize">
+                      {isAxMember ? 'Admin Geral (Acesso Total)' : `${emp.role} • ${empFeatures.length} áreas`}
+                    </p>
+                  </div>
+                </div>
+
+                {isAxMember ? (
+                  <span className="px-2.5 py-1 rounded-lg bg-[#C89B6E]/20 border border-[#C89B6E]/40 text-[#F2D6B8] text-[10px] font-bold shrink-0">
+                    Loja Ativa
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickToggleEmployeeFeature(emp, 'loja')}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      hasStoreAccess
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-300'
+                        : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-[#C89B6E] hover:text-[#F2D6B8]'
+                    }`}
+                    title={hasStoreAccess ? 'Clique para revogar acesso à Loja' : 'Clique para liberar acesso à Loja'}
+                  >
+                    <Store className="w-3.5 h-3.5" />
+                    <span>{hasStoreAccess ? 'Loja Liberada' : 'Liberar Loja'}</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* COLLAPSIBLE / FORM: Adicionar Novo Afiliado */}
@@ -715,38 +849,49 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                   </button>
                 </div>
 
-                {/* Functions allowed breakdown */}
+                {/* Functions allowed breakdown (Interactive 1-click toggles for Admin) */}
                 <div className="mt-3.5 pt-3 border-t border-[#182030] space-y-2">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-neutral-400">
-                      Funções Liberadas: <b className="text-white font-mono">{unlockedCount} de {AVAILABLE_FEATURES.length}</b>
+                      Áreas Programadas Liberadas: <b className="text-white font-mono">{unlockedCount} de {AVAILABLE_FEATURES.length}</b>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(emp)}
-                      className="text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer"
+                      className="text-[#C89B6E] hover:text-[#F2D6B8] font-semibold cursor-pointer"
                     >
-                      Editar Funções
+                      Configurar Acessos
                     </button>
                   </div>
 
-                  {/* Pills of unlocked features */}
+                  {/* Interactive Pills of all programmed features so Admin can grant/revoke Store or any area with 1 click */}
                   <div className="flex flex-wrap gap-1.5">
                     {isAxCard ? (
-                      <span className="px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold">
-                        Acesso Total a Todas as Funções & Administração
+                      <span className="px-2.5 py-1 rounded-lg bg-[#C89B6E]/15 text-[#F2D6B8] border border-[#C89B6E]/40 text-[10px] font-semibold">
+                        Acesso Total à Loja, Financeiro & Administração
                       </span>
                     ) : (
-                      (emp.allowedFeatures || AVAILABLE_FEATURES.map(f => f.id)).map(featId => {
-                        const feat = AVAILABLE_FEATURES.find(f => f.id === featId);
-                        if (!feat) return null;
+                      AVAILABLE_FEATURES.map(feat => {
+                        const empFeatures = emp.allowedFeatures && emp.allowedFeatures.length > 0
+                          ? emp.allowedFeatures
+                          : AVAILABLE_FEATURES.map(f => f.id);
+                        const isAllowed = empFeatures.includes(feat.id);
                         return (
-                          <span 
-                            key={featId}
-                            className="px-2 py-0.5 rounded-md bg-[#141B2B] text-neutral-300 border border-[#222E46] text-[10px] font-medium"
+                          <button
+                            key={feat.id}
+                            type="button"
+                            onClick={() => handleQuickToggleEmployeeFeature(emp, feat.id)}
+                            title={isAllowed ? `Clique para bloquear ${feat.label}` : `Clique para liberar ${feat.label}`}
+                            className={`px-2 py-0.5 rounded-md border text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                              isAllowed
+                                ? feat.id === 'loja'
+                                  ? 'bg-[#C89B6E]/20 text-[#F2D6B8] border-[#C89B6E]/50 font-bold'
+                                  : 'bg-[#141B2B] text-emerald-300 border-emerald-500/30 hover:border-rose-500/40'
+                                : 'bg-[#090D15] text-neutral-500 border-[#1A2234] hover:border-neutral-600 hover:text-neutral-300 line-through decoration-neutral-600'
+                            }`}
                           >
-                            {feat.label}
-                          </span>
+                            <span>{feat.label}</span>
+                          </button>
                         );
                       })
                     )}
@@ -759,8 +904,8 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* CENTRAL DE SEGURANÇA & AUDITORIA DE LOGINS EM TEMPO REAL */}
-      <div className="p-6 rounded-2xl bg-[#0C101A] border border-emerald-500/25 space-y-5 shadow-xl">
+      {/* CENTRAL DE SEGURANÇA & AUDITORIA DE LOGINS */}
+      <div className="p-6 rounded-2xl bg-[#0C101A] border border-[#C89B6E]/25 space-y-5 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1A2234] pb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -768,15 +913,12 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 Segurança de Logins Ativa
               </span>
-              <span className="text-[11px] text-neutral-400 font-mono">
-                public.auditoria_acessos_logins
-              </span>
             </div>
             <h2 className="text-base font-bold text-white">
-              Blindagem de Autenticação & Auditoria de Acessos
+              Proteção de Autenticação & Auditoria de Acessos
             </h2>
             <p className="text-xs text-neutral-400">
-              Monitoramento de tentativas de login, bloqueio automático contra força bruta, criptografia SHA-256 e proteção de rotas internas.
+              Monitoramento de acessos, bloqueio automático contra tentativas inválidas, criptografia SHA-256 e proteção de módulos.
             </p>
           </div>
 

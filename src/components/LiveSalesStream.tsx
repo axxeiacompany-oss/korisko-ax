@@ -177,32 +177,30 @@ export const LiveSalesStream: React.FC<Props> = ({
 
   return (
     <>
-      <div className={`flex flex-col ${mode === 'drawer' ? 'h-full bg-neutral-950 p-5' : 'p-5 rounded-2xl bg-neutral-900 border border-neutral-800'}`}>
+      <div className={`flex flex-col ${mode === 'drawer' ? 'h-full bg-[#07090E] p-5' : 'p-5 rounded-2xl bg-[#0B0F17] border border-[#C89B6E]/20 shadow-xl'}`}>
         
         {/* Stream Top Control Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#C89B6E]/15">
           <div className="flex items-center gap-3">
-            <div className="relative flex items-center justify-center">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 relative" />
+            <div className="w-9 h-9 rounded-xl bg-[#C89B6E]/10 border border-[#C89B6E]/30 flex items-center justify-center shrink-0">
+              <Radio className="w-4 h-4 text-[#C89B6E]" />
             </div>
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-neutral-100 tracking-tight flex items-center gap-2">
-                  <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <h3 className="text-sm font-bold text-[#F2D6B8] tracking-tight flex items-center gap-2" style={{ fontFamily: "'Cinzel', serif" }}>
                   <span>
                     {language === 'es'
-                      ? 'Flujo en Tiempo Real: Cobros, Fiado & Ventas'
-                      : 'Fluxo em Tempo Real: Cobranças na Hora, Fiado & Vendas'}
+                      ? 'Movimiento de Ventas, Cobros & Caderneta'
+                      : 'Movimentação do Turno: Vendas, Comandas & Caderneta'}
                   </span>
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono-nums font-bold tracking-wider uppercase">
-                  Ao Vivo
+                <span className="px-2 py-0.5 rounded-full bg-[#C89B6E]/15 border border-[#C89B6E]/30 text-[#F2D6B8] text-[10px] font-mono-nums font-bold tracking-wider uppercase">
+                  Consolidado
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400">
-                Korizko • Panificação confeitaria artesanal — Monitoramento instantâneo anti-perda de Fiado e métodos de pagamento
+                Korizko • Panificação confeitaria artesanal — Acompanhamento executivo de vendas, comandas e pagamentos
               </p>
             </div>
           </div>

@@ -835,6 +835,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }));
           }
         })
+        .on('broadcast', { event: 'live_user_permissions' }, ({ payload }) => {
+          if (!payload || !payload.id) return;
+          const updatedUser = payload as Employee;
+          setData(prev => ({
+            ...prev,
+            employees: prev.employees.map(e => e.id === updatedUser.id ? updatedUser : e),
+          }));
+          setCurrentUser(curr => curr.id === updatedUser.id ? updatedUser : curr);
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comandas' }, (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const cmd = rowToComanda(payload.new);
@@ -1264,12 +1273,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
     if (currentUser.role === 'caixa') {
-      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
+      return ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
     }
     if (currentUser.role === 'padeiro') {
-      return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);
+      return ['dashboard', 'estoque', 'fichas_tecnicas', 'loja'].includes(feature);
     }
-    return ['dashboard', 'pdv', 'venda_direta'].includes(feature);
+    return ['dashboard', 'pdv', 'venda_direta', 'loja', 'portal_afiliado'].includes(feature);
   }, [currentUser]);
 
   // Switch employee
@@ -1361,11 +1370,21 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         employees: prev.employees.map(e => e.id === emp.id ? persisted : e),
       };
       StorageService.saveState(nextState);
+      saveSystemStateDoc(nextState);
       return nextState;
     });
     if (currentUser.id === emp.id) {
       setCurrentUser(persisted);
     }
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_user_permissions',
+          payload: persisted,
+        }).catch?.(() => {});
+      }
+    } catch {}
   }, [currentUser.id]);
 
   const deleteEmployee = useCallback(async (id: string) => {
@@ -1405,11 +1424,21 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         employees: prev.employees.map(e => e.id === id ? updated : e),
       };
       StorageService.saveState(nextState);
+      saveSystemStateDoc(nextState);
       return nextState;
     });
     if (currentUser.id === id) {
       setCurrentUser(prev => ({ ...prev, allowedFeatures }));
     }
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_user_permissions',
+          payload: updated,
+        }).catch?.(() => {});
+      }
+    } catch {}
   }, [currentUser.id, data.employees]);
 
   // ==========================================
@@ -3167,12 +3196,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (syncedToCloud) {
       showToast(
         fiadoAmountBrl > 0
-          ? (language === 'es' ? '¡Venta en FIADO registrada en tiempo real en Supabase!' : `Venda no FIADO registrada em tempo real para ${resolvedCustomerName || 'Cliente'}!`)
-          : (language === 'es' ? '¡Venta registrada con éxito en Supabase!' : 'Venda registrada com sucesso em tempo real no Supabase!'),
+          ? (language === 'es' ? '¡Venta en cuenta registrada con éxito!' : `Venda em conta registrada para ${resolvedCustomerName || 'Cliente'}!`)
+          : (language === 'es' ? '¡Venta registrada con éxito!' : 'Venda registrada com sucesso!'),
         'success'
       );
     } else {
-      showToast(language === 'es' ? 'Venta registrada con éxito en el caja local (guardada en el dispositivo).' : 'Venda registrada com sucesso no caixa local (salva no dispositivo)!', 'info');
+      showToast(language === 'es' ? 'Venta registrada con éxito.' : 'Venda registrada com sucesso!', 'info');
     }
 
     return persistedSale;

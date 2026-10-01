@@ -52,6 +52,7 @@ function MainAppShell() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
+  const [isStandaloneStorePreview, setIsStandaloneStorePreview] = useState<boolean>(false);
 
   // Auto-route on login status change
   useEffect(() => {
@@ -107,9 +108,8 @@ function MainAppShell() {
 
   // Instant scroll & tab switch
   const handleSelectTab = (tab: TabType) => {
-    if (tab === 'loja') {
-      setCurrentRoute('loja');
-    } else if (tab === 'minha_conta') {
+    setIsStandaloneStorePreview(false);
+    if (tab === 'minha_conta') {
       setCurrentRoute('minha_conta');
     } else if (tab === 'portal_afiliado') {
       setCurrentRoute('portal_afiliado');
@@ -187,13 +187,17 @@ function MainAppShell() {
   }
 
   // -------------------------------------------------------------
-  // 4. ROTA PÚBLICA PADRÃO: /loja (Vitrine Pública)
+  // 4. ROTA PÚBLICA PADRÃO: /loja (Vitrine Pública para visitantes/clientes ou modo tela cheia)
+  // Quando Admin/Colaborador está autenticado, 'loja' abre integrada ao sistema igual às outras áreas programadas!
   // -------------------------------------------------------------
-  if (currentRoute === 'loja') {
+  const isStaffAuthenticated = isAuthenticated && (role === 'admin' || role === 'manager' || role === 'employee');
+
+  if ((currentRoute === 'loja' && !isStaffAuthenticated) || isStandaloneStorePreview) {
     return (
       <StoreView
         onOpenAuth={() => setCurrentRoute('login')}
         onNavigateAccount={() => {
+          setIsStandaloneStorePreview(false);
           if (!isAuthenticated) {
             setCurrentRoute('login');
           } else if (role === 'customer') {
@@ -201,7 +205,8 @@ function MainAppShell() {
           } else if (role === 'affiliate') {
             setCurrentRoute('portal_afiliado');
           } else {
-            setCurrentRoute('crm');
+            setCurrentRoute('loja');
+            setActiveTab('loja');
           }
         }}
       />
@@ -332,10 +337,18 @@ function MainAppShell() {
             </div>
           ) : (
             <div className="w-full min-h-[60vh]">
-              {/* PRESERVAÇÃO TOTAL DOS MÓDULOS EXISTENTES */}
+              {/* PRESERVAÇÃO TOTAL DOS MÓDULOS EXISTENTES + LOJA INTEGRADA */}
               {activeTab === 'dashboard' && <DashboardView onNavigate={handleSelectTab} />}
               {activeTab === 'pdv' && <PdvView />}
               {activeTab === 'venda_direta' && <DirectSaleView />}
+              {activeTab === 'loja' && (
+                <StoreView
+                  embeddedInAdmin
+                  onOpenAuth={() => setCurrentRoute('login')}
+                  onNavigateAdmin={handleSelectTab}
+                  onOpenStandaloneStore={() => setIsStandaloneStorePreview(true)}
+                />
+              )}
               {activeTab === 'estoque' && <InventoryView />}
               {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
               {activeTab === 'crm' && <CustomersView />}

@@ -272,25 +272,24 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
   }, [customers, customerPurchases]);
 
   return (
-    <div className="rounded-2xl bg-[#0D121E] border border-[#1E273A] shadow-xl overflow-hidden">
+    <div className="rounded-2xl bg-[#0B0F17] border border-[#C89B6E]/25 shadow-xl overflow-hidden">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-[#0F172A] via-[#0D121E] to-emerald-950/20 border-b border-[#1E273A]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-[#0F1523] via-[#0B0F17] to-[#1A140E] border-b border-[#C89B6E]/20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#C89B6E]/15 border border-[#C89B6E]/35 flex items-center justify-center text-[#C89B6E] shrink-0">
             <BarChart3 className="w-5 h-5" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm sm:text-base font-black text-white tracking-tight">
-                Gráfico Financeiro: Análise de Entradas e Saídas & Total Comprado
+              <h2 className="text-sm sm:text-base font-black text-[#F2D6B8] tracking-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+                Gráfico Financeiro: Análise de Entradas, Saídas & Total Comprado
               </h2>
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1">
-                <Database className="w-3 h-3" />
-                SQL: registro_compras_clientes
+              <span className="px-2.5 py-0.5 rounded-full bg-[#C89B6E]/15 text-[#F2D6B8] border border-[#C89B6E]/30 text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider">
+                Auditoria Financeira
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-0.5">
-              Comparativo em tempo real de Entradas no Caixa vs Saídas/Custos Operacionais e Histórico de Compras por Cliente
+              Comparativo consolidado de Entradas no Caixa vs Saídas Operacionais e Histórico de Compras por Cliente
             </p>
           </div>
         </div>

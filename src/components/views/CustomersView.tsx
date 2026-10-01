@@ -818,7 +818,7 @@ export const CustomersView: React.FC = () => {
             {formatCurrency(stats.totalDebtBrl, 'PYG')}
           </div>
           <p className="text-[10px] text-neutral-500 mt-0.5 truncate">
-            🇵🇾 Sincronizado em Tempo Real (₲ PYG)
+            Moeda oficial Guaraní (₲ PYG)
           </p>
         </div>
 
@@ -833,15 +833,15 @@ export const CustomersView: React.FC = () => {
           <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'Cuentas abiertas' : 'Contas em aberto'}</p>
         </div>
 
-        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
+        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#C89B6E]/25">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
             <span className="truncate">{language === 'es' ? 'Total Comprado Geral' : 'Total Comprado (Clientes)'}</span>
-            <ShoppingBag className="w-4 h-4 text-emerald-400 shrink-0" />
+            <ShoppingBag className="w-4 h-4 text-[#C89B6E] shrink-0" />
           </div>
-          <div className="text-lg sm:text-2xl font-bold text-emerald-400 font-mono-nums">
+          <div className="text-lg sm:text-2xl font-bold text-[#F2D6B8] font-mono-nums">
             {formatCurrency(stats.totalPurchasedAllBrl, 'PYG')}
           </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">SQL: registro_compras_clientes</p>
+          <p className="text-[10px] text-[#C89B6E]/80 mt-0.5 truncate">Histórico consolidado de compras</p>
         </div>
 
       </div>
