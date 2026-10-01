@@ -440,139 +440,165 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Created once in a useEffect with [] dependencies and cleanup
   // ==========================================
   useEffect(() => {
-    // 1. Channel Vendas
-    const chanVendas = supabase
-      .channel('rt-vendas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newSale = rowToSale(payload.new);
-          setData(prev => ({
-            ...prev,
-            sales: [newSale, ...prev.sales.filter(s => s.id !== newSale.id)],
-          }));
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedSale = rowToSale(payload.new);
-          setData(prev => ({
-            ...prev,
-            sales: prev.sales.map(s => s.id === updatedSale.id ? updatedSale : s),
-          }));
-        } else if (payload.eventType === 'DELETE') {
-          const oldId = String((payload.old as any)?.id);
-          setData(prev => ({
-            ...prev,
-            sales: prev.sales.filter(s => s.id !== oldId),
-          }));
-        }
-      })
-      .subscribe();
+    let activeChannel: any = null;
+    let isSubscribed = false;
 
-    // 2. Channel Produtos
-    const chanProdutos = supabase
-      .channel('rt-produtos')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newProd = rowToProduct(payload.new);
-          setData(prev => ({
-            ...prev,
-            products: [newProd, ...prev.products.filter(p => p.id !== newProd.id)],
-          }));
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedProd = rowToProduct(payload.new);
-          setData(prev => ({
-            ...prev,
-            products: prev.products.map(p => p.id === updatedProd.id ? updatedProd : p),
-          }));
-        } else if (payload.eventType === 'DELETE') {
-          const oldId = String((payload.old as any)?.id);
-          setData(prev => ({
-            ...prev,
-            products: prev.products.filter(p => p.id !== oldId),
-          }));
-        }
-      })
-      .subscribe();
+    const setupRealtime = () => {
+      if (activeChannel) {
+        try {
+          supabase.removeChannel(activeChannel);
+        } catch {}
+        activeChannel = null;
+      }
 
-    // 3. Channel Clientes
-    const chanClientes = supabase
-      .channel('rt-clientes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newCust = rowToCustomer(payload.new);
-          setData(prev => ({
-            ...prev,
-            customers: [newCust, ...(prev.customers || []).filter(c => c.id !== newCust.id)],
-          }));
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedCust = rowToCustomer(payload.new);
-          setData(prev => ({
-            ...prev,
-            customers: (prev.customers || []).map(c => c.id === updatedCust.id ? updatedCust : c),
-          }));
-        } else if (payload.eventType === 'DELETE') {
-          const oldId = String((payload.old as any)?.id);
-          setData(prev => ({
-            ...prev,
-            customers: (prev.customers || []).filter(c => c.id !== oldId),
-          }));
-        }
-      })
-      .subscribe();
-
-    // 4. Channel Caixa Sessões
-    const chanCaixa = supabase
-      .channel('rt-caixa')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'caixa_sessoes' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const sess = rowToSession(payload.new);
-          setData(prev => {
-            const isCurrent = prev.currentSession.id === sess.id || sess.status === 'aberto';
-            return {
+      activeChannel = supabase
+        .channel('korisko-realtime-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newSale = rowToSale(payload.new);
+            setData(prev => ({
               ...prev,
-              currentSession: isCurrent ? { ...prev.currentSession, ...sess } : prev.currentSession,
-              sessionHistory: [
-                sess,
-                ...prev.sessionHistory.filter(s => s.id !== sess.id)
-              ],
-            };
-          });
-        }
-      })
-      .subscribe();
+              sales: [newSale, ...prev.sales.filter(s => s.id !== newSale.id)],
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedSale = rowToSale(payload.new);
+            setData(prev => ({
+              ...prev,
+              sales: prev.sales.map(s => s.id === updatedSale.id ? updatedSale : s),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              sales: prev.sales.filter(s => s.id !== oldId),
+            }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newProd = rowToProduct(payload.new);
+            setData(prev => ({
+              ...prev,
+              products: [newProd, ...prev.products.filter(p => p.id !== newProd.id)],
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedProd = rowToProduct(payload.new);
+            setData(prev => ({
+              ...prev,
+              products: prev.products.map(p => p.id === updatedProd.id ? updatedProd : p),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              products: prev.products.filter(p => p.id !== oldId),
+            }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newCust = rowToCustomer(payload.new);
+            setData(prev => ({
+              ...prev,
+              customers: [newCust, ...(prev.customers || []).filter(c => c.id !== newCust.id)],
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedCust = rowToCustomer(payload.new);
+            setData(prev => ({
+              ...prev,
+              customers: (prev.customers || []).map(c => c.id === updatedCust.id ? updatedCust : c),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              customers: (prev.customers || []).filter(c => c.id !== oldId),
+            }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'caixa_sessoes' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const sess = rowToSession(payload.new);
+            setData(prev => {
+              const isCurrent = prev.currentSession.id === sess.id || sess.status === 'aberto';
+              return {
+                ...prev,
+                currentSession: isCurrent ? { ...prev.currentSession, ...sess } : prev.currentSession,
+                sessionHistory: [
+                  sess,
+                  ...prev.sessionHistory.filter(s => s.id !== sess.id)
+                ],
+              };
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const user = rowToUser(payload.new);
+            setData(prev => ({
+              ...prev,
+              employees: [...prev.employees.filter(e => e.id !== user.id), user],
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const user = rowToUser(payload.new);
+            setData(prev => ({
+              ...prev,
+              employees: prev.employees.map(e => e.id === user.id ? user : e),
+            }));
+            setCurrentUser(curr => curr.id === user.id ? user : curr);
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              employees: prev.employees.filter(e => e.id !== oldId),
+            }));
+          }
+        });
 
-    // 5. Channel Usuários
-    const chanUsuarios = supabase
-      .channel('rt-usuarios')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const user = rowToUser(payload.new);
-          setData(prev => ({
-            ...prev,
-            employees: [...prev.employees.filter(e => e.id !== user.id), user],
-          }));
-        } else if (payload.eventType === 'UPDATE') {
-          const user = rowToUser(payload.new);
-          setData(prev => ({
-            ...prev,
-            employees: prev.employees.map(e => e.id === user.id ? user : e),
-          }));
-          setCurrentUser(curr => curr.id === user.id ? user : curr);
-        } else if (payload.eventType === 'DELETE') {
-          const oldId = String((payload.old as any)?.id);
-          setData(prev => ({
-            ...prev,
-            employees: prev.employees.filter(e => e.id !== oldId),
-          }));
-        }
-      })
-      .subscribe();
+      activeChannel.subscribe((status: string) => {
+        isSubscribed = status === 'SUBSCRIBED';
+      });
+    };
 
-    // Cleanup: remove all channels
+    setupRealtime();
+
+    // Prevent "Page entered Back-Forward Cache" WebSocket crash:
+    // Cleanly close connection on pagehide, and reconnect on pageshow/resume
+    const handlePageHide = () => {
+      if (activeChannel) {
+        try {
+          supabase.removeChannel(activeChannel);
+        } catch {}
+        activeChannel = null;
+        isSubscribed = false;
+      }
+    };
+
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted || !activeChannel) {
+        setupRealtime();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isSubscribed) {
+        setupRealtime();
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      supabase.removeChannel(chanVendas);
-      supabase.removeChannel(chanProdutos);
-      supabase.removeChannel(chanClientes);
-      supabase.removeChannel(chanCaixa);
-      supabase.removeChannel(chanUsuarios);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (activeChannel) {
+        try {
+          supabase.removeChannel(activeChannel);
+        } catch {}
+      }
     };
   }, []);
 

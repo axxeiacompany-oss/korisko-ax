@@ -537,12 +537,60 @@ app.get(['/api/download-zip', '/download', '/download-project'], (_req, res) => 
 // ==========================================
 // STATIC ASSETS & VITE INTEGRATION
 // ==========================================
+// Fallback for stale/cached hashed CSS bundles (e.g. index-B5XNrk3e.css):
+// Serves the current compiled CSS bundle so cached pages never 404
+app.get(['/assets/index-*.css', '*/index-*.css'], (_req, res, next) => {
+  const assetsDir = path.resolve(process.cwd(), 'dist', 'assets');
+  if (fs.existsSync(assetsDir)) {
+    try {
+      const files = fs.readdirSync(assetsDir);
+      const cssFile = files.find(f => f.startsWith('index-') && f.endsWith('.css'));
+      if (cssFile) {
+        res.setHeader('Content-Type', 'text/css');
+        return res.sendFile(path.join(assetsDir, cssFile));
+      }
+    } catch {}
+  }
+  res.setHeader('Content-Type', 'text/css');
+  return res.send('/* CSS bundle updated */');
+});
+
+// Fallback for stale/cached hashed JS bundles
+app.get(['/assets/index-*.js', '*/index-*.js'], (_req, res, next) => {
+  const assetsDir = path.resolve(process.cwd(), 'dist', 'assets');
+  if (fs.existsSync(assetsDir)) {
+    try {
+      const files = fs.readdirSync(assetsDir);
+      const jsFile = files.find(f => f.startsWith('index-') && f.endsWith('.js'));
+      if (jsFile) {
+        res.setHeader('Content-Type', 'application/javascript');
+        return res.sendFile(path.join(assetsDir, jsFile));
+      }
+    } catch {}
+  }
+  next();
+});
+
 async function start() {
   if (isProduction) {
     const distPath = path.resolve(process.cwd(), 'dist');
     if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get('*', (_req, res) => {
+      app.use(express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+          }
+        }
+      }));
+      app.get('*', (_req, res, next) => {
+        if (_req.path.startsWith('/api') || _req.path.startsWith('/assets')) {
+          return next();
+        }
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(path.join(distPath, 'index.html'));
       });
     } else {
