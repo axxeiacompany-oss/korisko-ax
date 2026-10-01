@@ -184,15 +184,15 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
 
           {/* Total */}
           <div className="py-3 border-b border-dashed border-neutral-300 space-y-1">
-            {sale.discountBrl && sale.discountBrl > 0 && (
+            {Boolean(sale.discountBrl && sale.discountBrl > 0) && (
               <>
                 <div className="flex justify-between text-[11px] text-neutral-600">
                   <span>SUBTOTAL:</span>
-                  <span>{formatCurrency(sale.subtotalBrl || sale.totalBrl + sale.discountBrl, 'BRL')}</span>
+                  <span>{formatCurrency(sale.subtotalBrl || (sale.totalBrl + (sale.discountBrl || 0)), 'BRL')}</span>
                 </div>
                 <div className="flex justify-between text-[11px] text-emerald-700 font-semibold">
                   <span>DESCONTO / CORTESIA:</span>
-                  <span>- {formatCurrency(sale.discountBrl, 'BRL')}</span>
+                  <span>- {formatCurrency(sale.discountBrl || 0, 'BRL')}</span>
                 </div>
               </>
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useBakery } from '../../context/BakeryContext';
-import { Customer, CustomerAccountEntry, CustomerCategory, PaymentMethod, Currency } from '../../types';
+import { Customer, CustomerAccountEntry, CustomerCategory, PaymentMethod, Currency, Sale } from '../../types';
 import { formatCurrency } from '../../utils/currency';
 import { 
   Users, 
@@ -40,11 +40,14 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { ReceiptModal } from '../modals/ReceiptModal';
 
 export const CustomersView: React.FC = () => {
   const { 
     customers, 
     customerEntries, 
+    sales,
+    currentUser,
     addCustomer, 
     updateCustomer, 
     deleteCustomer, 
@@ -70,6 +73,8 @@ export const CustomersView: React.FC = () => {
 
   // Statement / History Modal
   const [statementCustomer, setStatementCustomer] = useState<Customer | null>(null);
+  const [statementViewMode, setStatementViewMode] = useState<'thermal' | 'table'>('thermal');
+  const [selectedSaleForReceipt, setSelectedSaleForReceipt] = useState<Sale | null>(null);
   const [statementSearch, setStatementSearch] = useState('');
   const [statementTypeFilter, setStatementTypeFilter] = useState<'all' | 'debito' | 'amortizacao'>('all');
   const [statementPeriodFilter, setStatementPeriodFilter] = useState<'all' | '7d' | '30d' | 'month'>('all');
@@ -1298,249 +1303,240 @@ export const CustomersView: React.FC = () => {
       )}
 
       {/* ============================================================ */}
-      {/* MODAL 3: EXTRATO COMPLETO DE CONTA & AMORTIZAÇÕES */}
+      {/* MODAL 3: EXTRATO COMPLETO DE CONTA & AMORTIZAÇÕES (CUPOM NÃO-FISCAL) */}
       {/* ============================================================ */}
       {statementCustomer && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto no-print">
-          <div className="w-full sm:max-w-3xl bg-[#0B0F19] border-t sm:border border-[#1E273A] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 max-h-[94vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
+          <div className={`w-full ${statementViewMode === 'thermal' ? 'max-w-sm' : 'sm:max-w-3xl'} bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200 flex flex-col max-h-[94vh] transition-all`}>
             
             {/* Mobile drag handle */}
             <div className="sm:hidden w-12 h-1 rounded-full bg-neutral-700 mx-auto mt-2.5 mb-1" />
 
-            {/* Modal Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-5 sm:px-6 py-4 border-b border-[#1C2538] bg-[#070A11] gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-base shrink-0 shadow-md">
-                  {statementCustomer.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-white tracking-tight truncate">
-                      {statementCustomer.name}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#162033] text-indigo-300 border border-indigo-500/30">
-                      {statementCustomer.category}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-neutral-400 mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-neutral-500" />
-                      {statementCustomer.phone}
-                    </span>
-                    {statementCustomer.documentCpf && (
-                      <span className="font-mono text-[11px] text-neutral-500">
-                        CPF/Doc: {statementCustomer.documentCpf}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Toolbar */}
-              <div className="flex items-center gap-1.5 self-end sm:self-center">
+            {/* Top actions bar - EXACTLY AS IN THE SCREENSHOT */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-neutral-950/60 no-print">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-neutral-300">Cupom Não-Fiscal</span>
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  title={language === 'es' ? 'Imprimir Extracto' : 'Imprimir Extrato'}
-                  className="px-2.5 py-1.5 rounded-xl bg-[#131B2E] border border-[#202C48] hover:bg-[#1C2742] text-neutral-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  onClick={() => setStatementViewMode(prev => prev === 'thermal' ? 'table' : 'thermal')}
+                  className="px-2 py-0.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-[10px] font-medium transition-colors cursor-pointer"
+                  title="Alternar entre Cupom Térmico e Tabela Completa"
                 >
-                  <Printer className="w-3.5 h-3.5 text-sky-400" />
-                  <span className="hidden sm:inline">{language === 'es' ? 'Imprimir' : 'Imprimir'}</span>
+                  {statementViewMode === 'thermal' ? '📊 Ver Tabela' : '🧾 Ver Cupom'}
                 </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {currentUser?.role === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomerToDelete(statementCustomer)}
+                    className="p-1.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 text-xs font-medium flex items-center justify-center transition-colors cursor-pointer"
+                    title={language === 'es' ? 'Eliminar Cliente' : 'Excluir Cliente'}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={() => handleSendWhatsAppNotice(statementCustomer)}
-                  title="Enviar Extrato no WhatsApp"
-                  className="px-2.5 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-700/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 text-xs font-medium flex items-center justify-center transition-colors cursor-pointer"
+                  title="Compartilhar pelo WhatsApp"
                 >
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden sm:inline">WhatsApp</span>
+                  <Share2 className="w-3.5 h-3.5" />
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleCopyStatement(statementCustomer)}
-                  title="Copiar Extrato em Texto"
-                  className="p-1.5 rounded-xl bg-[#131B2E] border border-[#202C48] hover:bg-[#1C2742] text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                  onClick={() => window.print()}
+                  className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center justify-center transition-colors cursor-pointer"
+                  title="Imprimir Cupom"
                 >
-                  {statementCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-neutral-400" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDownloadStatementTxt(statementCustomer)}
-                  title="Baixar Extrato TXT"
-                  className="p-1.5 rounded-xl bg-[#131B2E] border border-[#202C48] hover:bg-[#1C2742] text-neutral-300 hover:text-white transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-amber-400" />
+                  <Printer className="w-3.5 h-3.5" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setStatementCustomer(null)}
-                  className="p-1.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer ml-1"
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Scrollable Body */}
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
-              
-              {/* Financial Health Overview Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                
-                {/* 1. Saldo em Aberto */}
-                <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Saldo Devedor</span>
-                      <span className={`w-2 h-2 rounded-full ${statementCustomer.outstandingBalanceBrl > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
-                    </div>
-                    <div className={`text-xl font-black font-mono-nums mt-1 ${statementCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}
-                    </div>
+            {/* If Thermal View Mode: EXACT Thermal Paper Layout matching the user screenshot! */}
+            {statementViewMode === 'thermal' ? (
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6 bg-white text-neutral-950 font-mono text-xs selection:bg-neutral-200" id="printable-receipt">
+                  
+                  {/* Header */}
+                  <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
+                    <h3 className="text-base font-bold tracking-tight uppercase">KORIZKO</h3>
+                    <p className="text-[10px] text-neutral-500">Câmbio Multi-Moeda BRL · PYG · USD</p>
+                    <p className="text-[10px] text-neutral-500">CNPJ: 12.345.678/0001-90</p>
                   </div>
-                  <div className="text-[10px] text-neutral-400 font-mono space-y-0.5 pt-2 border-t border-[#161E30] mt-2">
-                    <div className="flex items-center justify-between">
-                      <span>🇵🇾 PYG:</span>
-                      <span className="font-bold text-neutral-300">
-                        ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>🇺🇸 USD:</span>
-                      <span className="font-bold text-neutral-300">
-                        $ {(statementCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* 2. Total Comprado */}
-                <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Total Comprado</span>
-                      <ArrowUpRight className="w-3.5 h-3.5 text-rose-400" />
+                  {/* Details block */}
+                  <div className="py-2.5 border-b border-dashed border-neutral-300 text-[11px] space-y-0.5">
+                    <div className="flex justify-between">
+                      <span>EXTRATO DE CONTA & FIADO:</span>
+                      <span className="font-bold">#{statementCustomer.id.slice(-4).toUpperCase() || '25'}</span>
                     </div>
-                    <div className="text-xl font-black text-white font-mono-nums mt-1">
-                      {formatCurrency(statementTotals.totalDebits, 'BRL')}
+                    <div className="flex justify-between text-neutral-600">
+                      <span>DATA/HORA:</span>
+                      <span>{new Date().toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="flex justify-between text-neutral-600">
+                      <span>OPERADOR:</span>
+                      <span>{currentUser?.name || 'Operador'}</span>
+                    </div>
+                    <div className="flex justify-between text-neutral-600">
+                      <span>CLIENTE:</span>
+                      <span className="font-bold text-neutral-900">{statementCustomer.name}</span>
                     </div>
                   </div>
-                  <div className="text-[11px] text-neutral-400 pt-2 border-t border-[#161E30] mt-2 flex items-center justify-between">
-                    <span>Lançamentos:</span>
-                    <span className="font-bold text-rose-400 font-mono-nums">{statementTotals.debitCount} compras</span>
-                  </div>
-                </div>
 
-                {/* 3. Total Amortizado */}
-                <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Total Amortizado</span>
-                      <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+                  {/* Items Table */}
+                  <div className="py-3 border-b border-dashed border-neutral-300 space-y-2">
+                    <div className="text-[10px] uppercase font-bold text-neutral-500 flex justify-between">
+                      <span>ITEM / QTD × PREÇO</span>
+                      <span>TOTAL</span>
                     </div>
-                    <div className="text-xl font-black text-emerald-400 font-mono-nums mt-1">
-                      {formatCurrency(statementTotals.totalAmortized, 'BRL')}
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-neutral-400 pt-2 border-t border-[#161E30] mt-2 flex items-center justify-between">
-                    <span>Pagamentos:</span>
-                    <span className="font-bold text-emerald-400 font-mono-nums">{statementTotals.amortizedCount} recebidos</span>
-                  </div>
-                </div>
 
-                {/* 4. Limite de Crédito */}
-                <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Limite de Crédito</span>
-                      <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
-                    </div>
-                    <div className="text-xl font-black text-indigo-300 font-mono-nums mt-1">
-                      {formatCurrency(statementCustomer.creditLimitBrl, 'BRL')}
-                    </div>
-                  </div>
-                  <div className="space-y-1 pt-2 border-t border-[#161E30] mt-2">
-                    {(() => {
-                      const limit = statementCustomer.creditLimitBrl || 1;
-                      const pct = Math.min(100, Math.round((statementCustomer.outstandingBalanceBrl / limit) * 100));
-                      const available = Math.max(0, statementCustomer.creditLimitBrl - statementCustomer.outstandingBalanceBrl);
-                      return (
-                        <>
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-neutral-400">Uso: {pct}%</span>
-                            <span className="text-emerald-400 font-mono font-medium">Livre: {formatCurrency(available, 'BRL')}</span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-neutral-800 overflow-hidden">
-                            <div 
-                              className={`h-full transition-all duration-300 ${pct > 85 ? 'bg-rose-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
+                    <div className="space-y-2">
+                      {filteredStatementEntries.length === 0 ? (
+                        <div className="py-2 text-center text-neutral-500 italic text-[11px]">
+                          Nenhum lançamento no extrato deste cliente.
+                        </div>
+                      ) : (
+                        filteredStatementEntries.map((entry) => {
+                          const isDebit = entry.type === 'debito_compra';
+                          const entrySale = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
 
-              </div>
+                          return (
+                            <div key={entry.id} className="space-y-0.5 border-b border-dotted border-neutral-200 pb-1.5 last:border-0 last:pb-0">
+                              <div className="font-semibold text-neutral-900 leading-tight">
+                                {isDebit ? entry.description : `Amortização de fiado: ${entry.description}`}
+                              </div>
 
-              {/* Action Buttons: Amortização Imediata & Novo Débito */}
-              <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-[#0C1220] via-[#0E1526] to-[#0C1220] border border-[#1E2942] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <DollarSign className="w-5 h-5 stroke-[2.5]" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                      <span>Gerenciar Saldo & Amortizações</span>
-                      {statementCustomer.outstandingBalanceBrl > 0 && (
-                        <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 text-[10px] font-bold">
-                          Débito Ativo
-                        </span>
+                              {entrySale && entrySale.items && entrySale.items.length > 0 && (
+                                <div className="pl-1 text-[10px] text-neutral-600 space-y-0.5">
+                                  {entrySale.items.map((it, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                      <span>{it.quantity} {it.product.unit} × {formatCurrency(it.unitPriceBrl, 'BRL')}</span>
+                                      <span>{formatCurrency(it.subtotalBrl, 'BRL')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex justify-between text-[11px] text-neutral-600 pt-0.5">
+                                <span>
+                                  1 un × {formatCurrency(entry.amountBrl, 'BRL')}
+                                </span>
+                                <span className={`font-bold ${isDebit ? 'text-neutral-900' : 'text-emerald-700'}`}>
+                                  {isDebit ? '' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
+                                </span>
+                              </div>
+
+                              {entrySale && (
+                                <div className="text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSaleForReceipt(entrySale)}
+                                    className="text-[10px] text-indigo-600 hover:underline font-semibold"
+                                  >
+                                    Ver Cupom da Venda #{entrySale.saleNumber} →
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
                       )}
-                    </h4>
-                    <p className="text-[11px] text-neutral-400 mt-0.5">
-                      {statementCustomer.outstandingBalanceBrl > 0 
-                        ? 'Abata o fiado recebendo em Real (R$), Guaraní (₲) ou Dólar ($) com baixa imediata.' 
-                        : 'Cliente em dia! Não há pendências de fiado em aberto.'}
-                    </p>
+                    </div>
                   </div>
+
+                  {/* Total */}
+                  <div className="py-3 border-b border-dashed border-neutral-300 space-y-1">
+                    <div className="flex justify-between text-sm font-bold pt-0.5">
+                      <span>TOTAL (BRL):</span>
+                      <span>{formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}</span>
+                    </div>
+                  </div>
+
+                  {/* Multi-Currency Payments breakdown - EXACTLY AS IN THE SCREENSHOT */}
+                  <div className="py-3 border-b border-dashed border-neutral-300 text-[11px] space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-neutral-500 block">
+                      FORMA DE PAGAMENTO RECEBIDA:
+                    </span>
+                    <div className="flex justify-between">
+                      <span>PYG (Fiado):</span>
+                      <span className="font-bold">
+                        ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')} (R$ {statementCustomer.outstandingBalanceBrl.toFixed(2)})
+                      </span>
+                    </div>
+                    {statementCustomer.outstandingBalanceBrl > 0 && (
+                      <div className="flex justify-between text-neutral-600">
+                        <span>USD (Fiado):</span>
+                        <span className="font-bold">
+                          $ {(statementCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)} (R$ {statementCustomer.outstandingBalanceBrl.toFixed(2)})
+                        </span>
+                      </div>
+                    )}
+                    {statementTotals.totalAmortized > 0 && (
+                      <div className="flex justify-between text-emerald-700 font-semibold pt-1 border-t border-dotted border-neutral-200">
+                        <span>AMORTIZAÇÃO PAGA:</span>
+                        <span>- {formatCurrency(statementTotals.totalAmortized, 'BRL')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer message - EXACTLY AS IN THE SCREENSHOT */}
+                  <div className="pt-4 text-center text-[10px] text-neutral-500 space-y-1">
+                    <p>Obrigado pela preferência!</p>
+                    <p>Pão quentinho a toda hora.</p>
+                    <p className="text-[9px] text-neutral-400 mt-2">www.korisko.com.br</p>
+                  </div>
+
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {statementCustomer.outstandingBalanceBrl > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cust = statementCustomer;
-                          setStatementCustomer(null);
-                          handleOpenPayment(cust, 'BRL');
-                        }}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer transition-all"
-                      >
-                        <DollarSign className="w-4 h-4 stroke-[2.5]" />
-                        <span>Amortizar / Abater Saldo</span>
-                      </button>
+                {/* Bottom action buttons */}
+                <div className="p-4 bg-neutral-950 border-t border-neutral-800 no-print space-y-2 safe-area-pb">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyStatement(statementCustomer)}
+                      className="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {statementCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{statementCopied ? 'Copiado!' : 'Copiar Texto'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSendWhatsAppNotice(statementCustomer)}
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cust = statementCustomer;
-                          setStatementCustomer(null);
-                          handleOpenPayment(cust, 'PYG');
-                        }}
-                        title="Amortizar direto em Guaraníes"
-                        className="px-2.5 py-2 rounded-xl bg-[#141C2E] border border-[#222E4A] hover:bg-[#1E2B48] text-amber-300 font-mono font-bold text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>🇵🇾 ₲</span>
-                      </button>
-                    </>
+                  {statementCustomer.outstandingBalanceBrl > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cust = statementCustomer;
+                        setStatementCustomer(null);
+                        handleOpenPayment(cust, 'BRL');
+                      }}
+                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-neutral-950 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
+                    >
+                      <DollarSign className="w-4 h-4 stroke-[2.5]" />
+                      <span>Amortizar / Abater Dívida Agora</span>
+                    </button>
                   )}
 
                   <button
@@ -1550,257 +1546,328 @@ export const CustomersView: React.FC = () => {
                       setStatementCustomer(null);
                       handleOpenDebt(cust);
                     }}
-                    className="px-3.5 py-2 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
+                    className="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>+ Lançar Débito</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Lançar Novo Débito / Fiado</span>
                   </button>
                 </div>
               </div>
-
-              {/* Filter Controls & Search */}
-              <div className="space-y-2.5 pt-1">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            ) : (
+              /* If Table View Mode: Full Filtered Management Dashboard! */
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+                
+                {/* Financial Health Overview Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   
-                  {/* Search Input */}
-                  <div className="relative flex-1">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                    <input
-                      type="text"
-                      value={statementSearch}
-                      onChange={(e) => setStatementSearch(e.target.value)}
-                      placeholder="Buscar por descrição, forma de pagamento, atendente ou valor..."
-                      className="w-full bg-[#070A11] border border-[#1C2538] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500"
-                    />
-                    {statementSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setStatementSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                  {/* 1. Saldo em Aberto */}
+                  <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Saldo Devedor</span>
+                        <span className={`w-2 h-2 rounded-full ${statementCustomer.outstandingBalanceBrl > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      </div>
+                      <div className={`text-xl font-black font-mono-nums mt-1 ${statementCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-neutral-400 font-mono space-y-0.5 pt-2 border-t border-[#161E30] mt-2">
+                      <div className="flex items-center justify-between">
+                        <span>🇵🇾 PYG:</span>
+                        <span className="font-bold text-neutral-300">
+                          ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>🇺🇸 USD:</span>
+                        <span className="font-bold text-neutral-300">
+                          $ {(statementCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Period Filter Dropdown */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070A11] border border-[#1C2538] text-xs">
-                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
-                      <select
-                        value={statementPeriodFilter}
-                        onChange={(e) => setStatementPeriodFilter(e.target.value as any)}
-                        className="bg-transparent text-neutral-200 text-xs focus:outline-none cursor-pointer"
-                      >
-                        <option value="all" className="bg-[#0B0F19]">Todo o Histórico</option>
-                        <option value="7d" className="bg-[#0B0F19]">Últimos 7 dias</option>
-                        <option value="30d" className="bg-[#0B0F19]">Últimos 30 dias</option>
-                        <option value="month" className="bg-[#0B0F19]">Este Mês</option>
-                      </select>
+                  {/* 2. Total Comprado */}
+                  <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Total Comprado</span>
+                        <ArrowUpRight className="w-3.5 h-3.5 text-rose-400" />
+                      </div>
+                      <div className="text-xl font-black text-white font-mono-nums mt-1">
+                        {formatCurrency(statementTotals.totalDebits, 'BRL')}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-neutral-400 pt-2 border-t border-[#161E30] mt-2 flex items-center justify-between">
+                      <span>Lançamentos:</span>
+                      <span className="font-bold text-rose-400 font-mono-nums">{statementTotals.debitCount} compras</span>
+                    </div>
+                  </div>
+
+                  {/* 3. Total Amortizado */}
+                  <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Total Amortizado</span>
+                        <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <div className="text-xl font-black text-emerald-400 font-mono-nums mt-1">
+                        {formatCurrency(statementTotals.totalAmortized, 'BRL')}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-neutral-400 pt-2 border-t border-[#161E30] mt-2 flex items-center justify-between">
+                      <span>Pagamentos:</span>
+                      <span className="font-bold text-emerald-400 font-mono-nums">{statementTotals.amortizedCount} recebidos</span>
+                    </div>
+                  </div>
+
+                  {/* 4. Limite de Crédito */}
+                  <div className="p-3.5 rounded-2xl bg-[#070A11] border border-[#1C2538] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Limite de Crédito</span>
+                        <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
+                      </div>
+                      <div className="text-xl font-black text-indigo-300 font-mono-nums mt-1">
+                        {formatCurrency(statementCustomer.creditLimitBrl, 'BRL')}
+                      </div>
+                    </div>
+                    <div className="space-y-1 pt-2 border-t border-[#161E30] mt-2">
+                      {(() => {
+                        const limit = statementCustomer.creditLimitBrl || 1;
+                        const pct = Math.min(100, Math.round((statementCustomer.outstandingBalanceBrl / limit) * 100));
+                        const available = Math.max(0, statementCustomer.creditLimitBrl - statementCustomer.outstandingBalanceBrl);
+                        return (
+                          <>
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-neutral-400">Uso: {pct}%</span>
+                              <span className="text-emerald-400 font-mono font-medium">Livre: {formatCurrency(available, 'BRL')}</span>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-300 ${pct > 85 ? 'bg-rose-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Filter Controls & Search */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                      <input
+                        type="text"
+                        value={statementSearch}
+                        onChange={(e) => setStatementSearch(e.target.value)}
+                        placeholder="Buscar por descrição, forma de pagamento, atendente ou valor..."
+                        className="w-full bg-[#070A11] border border-[#1C2538] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500"
+                      />
+                      {statementSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setStatementSearch('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
 
-                    {(statementSearch || statementPeriodFilter !== 'all' || statementTypeFilter !== 'all') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStatementSearch('');
-                          setStatementPeriodFilter('all');
-                          setStatementTypeFilter('all');
-                        }}
-                        className="p-1.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white text-xs cursor-pointer"
-                        title="Limpar Filtros"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Filter Tabs (Todos, Débitos, Amortizações) */}
-                <div className="flex items-center gap-2 border-b border-[#161F32] pb-2 overflow-x-auto">
-                  <button
-                    type="button"
-                    onClick={() => setStatementTypeFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                      statementTypeFilter === 'all'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-[#070A11] text-neutral-400 hover:text-white border border-[#1C2538]'
-                    }`}
-                  >
-                    <span>Todos os Lançamentos</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px] font-bold">
-                      {customerEntries.filter(e => e.customerId === statementCustomer.id).length}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStatementTypeFilter('debito')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                      statementTypeFilter === 'debito'
-                        ? 'bg-rose-600 text-white shadow-sm'
-                        : 'bg-[#070A11] text-neutral-400 hover:text-rose-300 border border-[#1C2538]'
-                    }`}
-                  >
-                    <ArrowUpRight className="w-3 h-3 text-rose-400" />
-                    <span>Débitos / Compras ({statementTotals.debitCount})</span>
-                    <span className="font-mono text-[10px] opacity-80">
-                      {formatCurrency(statementTotals.totalDebits, 'BRL')}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStatementTypeFilter('amortizacao')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                      statementTypeFilter === 'amortizacao'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-[#070A11] text-neutral-400 hover:text-emerald-300 border border-[#1C2538]'
-                    }`}
-                  >
-                    <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
-                    <span>Amortizações / Pagos ({statementTotals.amortizedCount})</span>
-                    <span className="font-mono text-[10px] opacity-80">
-                      {formatCurrency(statementTotals.totalAmortized, 'BRL')}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Statement Entries List */}
-              <div className="space-y-2">
-                {filteredStatementEntries.length === 0 ? (
-                  <div className="p-8 text-center border border-dashed border-[#1C2538] rounded-2xl bg-[#070A11] space-y-2">
-                    <Receipt className="w-8 h-8 text-neutral-600 mx-auto" />
-                    <p className="text-xs font-semibold text-neutral-300">
-                      {statementSearch 
-                        ? 'Nenhum lançamento corresponde à busca realizada.' 
-                        : 'Nenhum lançamento no extrato para o filtro selecionado.'}
-                    </p>
-                    <p className="text-[11px] text-neutral-500">
-                      Utilize os botões acima para lançar débitos ou amortizações na conta deste cliente.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredStatementEntries.map((entry) => {
-                      const isDebit = entry.type === 'debito_compra';
-                      const entryDate = new Date(entry.date);
-                      const dateStr = entryDate.toLocaleDateString('pt-BR');
-                      const timeStr = entryDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-                      return (
-                        <div 
-                          key={entry.id}
-                          className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                            isDebit 
-                              ? 'bg-[#090D17] border-[#1C2538] hover:border-rose-500/30' 
-                              : 'bg-[#071212] border-emerald-950/60 hover:border-emerald-500/40'
-                          }`}
+                    {/* Period Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070A11] border border-[#1C2538] text-xs">
+                        <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                        <select
+                          value={statementPeriodFilter}
+                          onChange={(e) => setStatementPeriodFilter(e.target.value as any)}
+                          className="bg-transparent text-neutral-200 text-xs focus:outline-none cursor-pointer"
                         >
-                          {/* Left: Icon & Description */}
-                          <div className="flex items-start gap-3 min-w-0">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-sm ${
-                              isDebit 
-                                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' 
-                                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            }`}>
-                              {isDebit ? <ArrowUpRight className="w-4 h-4 stroke-[2.5]" /> : <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />}
-                            </div>
+                          <option value="all" className="bg-[#0B0F19]">Todo o Histórico</option>
+                          <option value="7d" className="bg-[#0B0F19]">Últimos 7 dias</option>
+                          <option value="30d" className="bg-[#0B0F19]">Últimos 30 dias</option>
+                          <option value="month" className="bg-[#0B0F19]">Este Mês</option>
+                        </select>
+                      </div>
 
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                                  isDebit 
-                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                }`}>
-                                  {isDebit ? 'Débito / Fiado' : 'Amortização'}
-                                </span>
+                      {(statementSearch || statementPeriodFilter !== 'all' || statementTypeFilter !== 'all') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStatementSearch('');
+                            setStatementPeriodFilter('all');
+                            setStatementTypeFilter('all');
+                          }}
+                          className="p-1.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white text-xs cursor-pointer"
+                          title="Limpar Filtros"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                                {entry.paymentMethod && (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#141C2E] text-sky-300 border border-sky-500/20 uppercase">
-                                    {entry.paymentMethod}
-                                  </span>
-                                )}
+                  {/* Filter Tabs (Todos, Débitos, Amortizações) */}
+                  <div className="flex items-center gap-2 border-b border-[#161F32] pb-2 overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => setStatementTypeFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                        statementTypeFilter === 'all'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-[#070A11] text-neutral-400 hover:text-white border border-[#1C2538]'
+                      }`}
+                    >
+                      <span>Todos os Lançamentos</span>
+                      <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px] font-bold">
+                        {customerEntries.filter(e => e.customerId === statementCustomer.id).length}
+                      </span>
+                    </button>
 
-                                {entry.saleId && (
-                                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                                    Venda Balcão
-                                  </span>
-                                )}
-                              </div>
+                    <button
+                      type="button"
+                      onClick={() => setStatementTypeFilter('debito')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                        statementTypeFilter === 'debito'
+                          ? 'bg-rose-600 text-white shadow-sm'
+                          : 'bg-[#070A11] text-neutral-400 hover:text-rose-300 border border-[#1C2538]'
+                      }`}
+                    >
+                      <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                      <span>Débitos / Compras ({statementTotals.debitCount})</span>
+                      <span className="font-mono text-[10px] opacity-80">
+                        {formatCurrency(statementTotals.totalDebits, 'BRL')}
+                      </span>
+                    </button>
 
-                              <div className="font-semibold text-neutral-100 text-xs mt-1 leading-snug break-words">
-                                {entry.description}
-                              </div>
+                    <button
+                      type="button"
+                      onClick={() => setStatementTypeFilter('amortizacao')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                        statementTypeFilter === 'amortizacao'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-[#070A11] text-neutral-400 hover:text-emerald-300 border border-[#1C2538]'
+                      }`}
+                    >
+                      <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                      <span>Amortizações / Pagos ({statementTotals.amortizedCount})</span>
+                      <span className="font-mono text-[10px] opacity-80">
+                        {formatCurrency(statementTotals.totalAmortized, 'BRL')}
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-neutral-400 mt-1">
-                                <span className="font-mono text-neutral-400">
-                                  {dateStr} às {timeStr}
-                                </span>
-                                {entry.recordedBy && (
-                                  <>
-                                    <span className="text-neutral-600">·</span>
-                                    <span className="text-neutral-400">
-                                      Atendente: <strong className="text-neutral-300 font-medium">{entry.recordedBy}</strong>
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                {/* Table of entries */}
+                <div className="space-y-2">
+                  {filteredStatementEntries.map((entry) => {
+                    const isDebit = entry.type === 'debito_compra';
+                    const entrySale = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
+
+                    return (
+                      <div 
+                        key={entry.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isDebit 
+                            ? 'bg-[#090D17] border-[#1C2538] hover:border-rose-500/30' 
+                            : 'bg-[#071212] border-emerald-950/60 hover:border-emerald-500/40'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-sm ${
+                            isDebit 
+                              ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' 
+                              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          }`}>
+                            {isDebit ? <ArrowUpRight className="w-4 h-4 stroke-[2.5]" /> : <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />}
                           </div>
 
-                          {/* Right: Values & Running Balance */}
-                          <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-[#151E30] shrink-0 gap-1">
-                            <div className={`font-mono font-black text-sm sm:text-base ${isDebit ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                isDebit 
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              }`}>
+                                {isDebit ? 'Débito / Fiado' : 'Amortização'}
+                              </span>
+
+                              {entry.paymentMethod && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#141C2E] text-sky-300 border border-sky-500/20 uppercase">
+                                  {entry.paymentMethod}
+                                </span>
+                              )}
                             </div>
 
-                            {entry.runningBalanceBrl !== undefined && (
-                              <div className="text-[11px] font-mono text-neutral-400 bg-[#06080E] px-2 py-0.5 rounded-md border border-[#1A2234]">
-                                Saldo após: <span className="font-bold text-neutral-200">{formatCurrency(entry.runningBalanceBrl, 'BRL')}</span>
-                              </div>
-                            )}
+                            <div className="font-semibold text-neutral-100 text-xs mt-1 leading-snug break-words">
+                              {entry.description}
+                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setEntryForReceipt(entry)}
-                              className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer mt-0.5 sm:mt-1 hover:underline"
-                            >
-                              <Receipt className="w-3 h-3" />
-                              <span>Comprovante</span>
-                            </button>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-neutral-400 mt-1">
+                              <span className="font-mono text-neutral-400">
+                                {new Date(entry.date).toLocaleString('pt-BR')}
+                              </span>
+                              {entry.recordedBy && (
+                                <>
+                                  <span className="text-neutral-600">·</span>
+                                  <span>Atendente: <strong className="text-neutral-300 font-medium">{entry.recordedBy}</strong></span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
 
-            </div>
+                        <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-[#151E30] shrink-0 gap-1">
+                          <div className={`font-mono font-black text-sm sm:text-base ${isDebit ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
+                          </div>
 
-            {/* Modal Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 sm:px-6 py-3.5 border-t border-[#1C2538] bg-[#070A11]">
-              <div className="flex items-center gap-2 text-xs text-neutral-400">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Extrato sincronizado em tempo real com o banco de dados.</span>
-              </div>
+                          {entrySale && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSaleForReceipt(entrySale)}
+                              className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
+                            >
+                              <Receipt className="w-3 h-3" />
+                              <span>Cupom #{entrySale.saleNumber}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatementCustomer(null)}
-                  className="px-5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-xs font-semibold text-neutral-200 cursor-pointer transition-colors"
-                >
-                  Fechar
-                </button>
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1C2538]">
+                  <button
+                    type="button"
+                    onClick={() => setStatementCustomer(null)}
+                    className="px-5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 cursor-pointer"
+                  >
+                    Fechar
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>
+      )}
+
+      {/* Sale Receipt Modal (when viewing a specific sale from Extrato or CRM) */}
+      {selectedSaleForReceipt && (
+        <ReceiptModal
+          sale={selectedSaleForReceipt}
+          onClose={() => setSelectedSaleForReceipt(null)}
+        />
       )}
 
       {/* ============================================================ */}
