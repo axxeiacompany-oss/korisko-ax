@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { AppFeature } from '../types';
+import { KorizkoEmblem } from './KorizkoLogo';
 
 interface Props {
   activeTab: TabType;
@@ -204,21 +205,22 @@ export const Sidebar: React.FC<Props> = ({
         <div className="p-4 border-b border-[#182030] flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             {/* Logo Mark */}
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-amber-500 p-[1.5px] shadow-md shadow-indigo-500/20 shrink-0">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-amber-300 text-sm">
-                K
-              </div>
+            <div className="w-9 h-9 rounded-full bg-[#07070A] border border-[#C89B6E]/40 flex items-center justify-center shadow-md shadow-black/60 shrink-0">
+              <KorizkoEmblem size={28} />
             </div>
 
             <div className={`min-w-0 flex-1 ${isCollapsed ? 'lg:hidden' : 'block'}`}>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm text-white tracking-tight truncate">
+                <span
+                  className="font-semibold text-sm text-[#F2D6B8] tracking-[0.16em] uppercase truncate"
+                  style={{ fontFamily: "'Cinzel', serif" }}
+                >
                   {t.appName}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
               </div>
               {t.appSlogan ? (
-                <p className="text-[10px] text-neutral-400 truncate">
+                <p className="text-[10px] text-[#C89B6E] truncate">
                   {t.appSlogan}
                 </p>
               ) : null}

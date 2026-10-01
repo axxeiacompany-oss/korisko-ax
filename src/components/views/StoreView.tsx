@@ -28,6 +28,7 @@ import {
   Store
 } from 'lucide-react';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { KorizkoEmblem } from '../KorizkoLogo';
 import { resolveSetoresFromItems } from '../../lib/db';
 
 interface Props {
@@ -411,18 +412,17 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
           
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-indigo-600 p-[1.5px] shadow-lg shadow-amber-500/10 shrink-0">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
-                <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-300 to-amber-200 text-base">
-                  K
-                </span>
-              </div>
+            <div className="w-10 h-10 rounded-full bg-[#07070A] border border-[#C89B6E]/40 flex items-center justify-center shadow-lg shadow-black/60 shrink-0">
+              <KorizkoEmblem size={32} />
             </div>
             <div>
-              <span className="font-black text-base tracking-tight text-white block leading-tight">
+              <span
+                className="font-semibold text-base tracking-[0.18em] text-[#F2D6B8] uppercase block leading-tight"
+                style={{ fontFamily: "'Cinzel', serif" }}
+              >
                 {t.appName}
               </span>
-              <span className="text-[10px] text-amber-400 font-semibold tracking-wide block">
+              <span className="text-[10px] text-[#C89B6E] font-semibold tracking-wide block">
                 Panificação confeitaria artesanal
               </span>
             </div>

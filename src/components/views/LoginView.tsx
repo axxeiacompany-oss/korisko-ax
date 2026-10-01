@@ -6,16 +6,11 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  Sparkles, 
-  CheckCircle2, 
-  AlertCircle,
-  KeyRound,
-  Store,
-  Layers,
-  ChevronRight
+  AlertCircle
 } from 'lucide-react';
 import { Employee } from '../../types';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { KorizkoEmblem, KorizkoFullLogo } from '../KorizkoLogo';
 import { StorageService } from '../../services/storageService';
 import { listUsuarios } from '../../lib/db';
 
@@ -24,7 +19,7 @@ interface Props {
 }
 
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
-  const { employees, switchUser, currentUser, t, language } = useBakery();
+  const { employees, switchUser, t, language } = useBakery();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,10 +47,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     }
 
     try {
-      // 1. Initial list from React memory
       let currentList = Array.isArray(employees) && employees.length > 0 ? employees : [];
 
-      // Helper function to match an affiliate/employee flexibly
       const findMatchingEmployee = (list: Employee[]) => {
         return list.find(emp => {
           const empEmail = (emp.email || '').toLowerCase().trim();
@@ -63,7 +56,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           const empUsername = empEmail.includes('@') ? empEmail.split('@')[0] : empEmail;
           const inputUserPart = inputIdentifier.includes('@') ? inputIdentifier.split('@')[0] : inputIdentifier;
 
-          // Flexible match: full email, full name, username before @, exact ID, or user prefix
           return (
             empEmail === inputIdentifier ||
             empName === inputIdentifier ||
@@ -77,8 +69,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
       let matchedEmp = findMatchingEmployee(currentList);
 
-      // 2. Real-time Cloud Fetch: If not found in current device memory,
-      // fetch directly from Supabase usuarios table without waiting for full state!
       if (!matchedEmp) {
         try {
           const freshUsers = await listUsuarios();
@@ -120,7 +110,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         return;
       }
 
-      // Fallback: match by password or PIN if unique
       const empByCred = currentList.find(e => 
         (e.password === inputPassword || e.pin === inputPassword) && 
         (!e.email || e.email.toLowerCase() === inputIdentifier || e.name.toLowerCase() === inputIdentifier)
@@ -133,7 +122,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         return;
       }
 
-      // User not found in database - Professional message without leaking internal database records
       setErrorMsg(
         language === 'es' 
           ? `Usuario o correo "${email.trim()}" no encontrado. Verifique sus credenciales.` 
@@ -147,41 +135,34 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#080B11] text-neutral-100 flex flex-col justify-between overflow-x-hidden selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="relative min-h-screen w-full bg-[#050507] text-neutral-100 flex flex-col justify-between overflow-x-hidden selection:bg-[#D8AB7E]/30 selection:text-[#F5DEC4]">
       
-      {/* Ambient background glows */}
+      {/* Iluminação ambiente Dourado Champagne & Obsidiana */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Subtle radial tech gradient top-left */}
-        <div className="absolute -top-[25%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-indigo-600/15 via-violet-600/10 to-transparent blur-3xl opacity-70" />
-        {/* Subtle cyan/emerald glow bottom-right */}
-        <div className="absolute -bottom-[20%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-tl from-emerald-600/10 via-cyan-600/5 to-transparent blur-3xl opacity-60" />
-        {/* High-tech grid overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.03]" 
+        <div
+          className="absolute top-[-15%] left-1/2 -translate-x-1/2 w-[760px] h-[520px] rounded-full blur-3xl opacity-35"
           style={{
-            backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px)`,
-            backgroundSize: '24px 24px'
-          }} 
+            background: 'radial-gradient(circle, rgba(212,165,116,0.22) 0%, rgba(148,98,55,0.06) 50%, transparent 75%)',
+          }}
         />
       </div>
 
       {/* Top minimal header */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-violet-500 to-amber-500 p-[1.5px] shadow-lg shadow-indigo-500/20">
-            <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
-              <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-300 to-amber-300 text-base">
-                K
-              </span>
-            </div>
+          <div className="w-10 h-10 rounded-full bg-[#0B0A0E] border border-[#C89B6E]/35 flex items-center justify-center shadow-lg shadow-black/80">
+            <KorizkoEmblem size={32} />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base tracking-tight text-white">
+            <span
+              className="font-semibold text-sm tracking-[0.22em] text-[#F2D6B8] uppercase"
+              style={{ fontFamily: "'Cinzel', serif" }}
+            >
               {t.appName}
             </span>
-            {t.appSlogan ? (
-              <span className="text-[11px] text-neutral-400">{t.appSlogan}</span>
-            ) : null}
+            <span className="text-[11px] text-[#C89B6E] font-medium">
+              Panificação confeitaria artesanal
+            </span>
           </div>
         </div>
 
@@ -191,18 +172,25 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       </header>
 
       {/* Central Login Card Section */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-8 sm:px-6">
-        <div className="w-full max-w-[440px] space-y-6">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-4 sm:px-6">
+        <div className="w-full max-w-[460px] flex flex-col items-center">
           
-          {/* Main Card with UTMify styling */}
-          <div className="rounded-2xl border border-[#1E273A] bg-[#0D121D]/90 backdrop-blur-xl p-5 sm:p-9 shadow-2xl shadow-black/80 relative overflow-hidden">
+          {/* Logo Oficial KORIZKO em Destaque */}
+          <div className="w-full mb-6 pt-1">
+            <KorizkoFullLogo showMotto={true} />
+          </div>
+
+          {/* Main Card */}
+          <div className="w-full rounded-2xl border border-[#C89B6E]/25 bg-[#0A0A0F]/95 backdrop-blur-xl p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.9)] relative overflow-hidden">
             
-            {/* Ambient top highlight line */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#E6BE94]/70 to-transparent" />
 
             {/* Header Text */}
-            <div className="space-y-1.5 mb-7 text-center sm:text-left">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            <div className="space-y-1 mb-6 text-center">
+              <h1
+                className="text-lg sm:text-xl font-semibold tracking-[0.12em] text-[#F5DEC4] uppercase"
+                style={{ fontFamily: "'Cinzel', serif" }}
+              >
                 {t.loginTitle}
               </h1>
               <p className="text-xs text-neutral-400">
@@ -212,7 +200,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
             {/* Error message */}
             {errorMsg && (
-              <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start gap-2.5 animate-in fade-in">
+              <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 flex items-start gap-2.5 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
@@ -223,11 +211,11 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               
               {/* Email / Username / Name Input */}
               <div className="space-y-1.5">
-                <label htmlFor="login-username" className="text-xs font-medium text-neutral-300 block">
+                <label htmlFor="login-username" className="text-xs font-medium text-[#E6C39F] block">
                   {language === 'es' ? 'Usuario o Correo Electrónico' : 'E-mail ou Usuário'}
                 </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-[#D8AB7E] transition-colors">
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
@@ -242,7 +230,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={language === 'es' ? 'Ej: usuario o correo@empresa.com' : 'Ex: usuario ou seu-email@empresa.com'}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition-all font-sans"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-[#060609] border border-[#C89B6E]/25 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D8AB7E] focus:ring-1 focus:ring-[#D8AB7E]/30 transition-all font-sans"
                   />
                 </div>
               </div>
@@ -250,7 +238,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               {/* Password Input */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="login-password" className="text-xs font-medium text-neutral-300">
+                  <label htmlFor="login-password" className="text-xs font-medium text-[#E6C39F]">
                     {t.loginPasswordLabel}
                   </label>
                   <a
@@ -261,13 +249,13 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         ? 'Para recuperar su contraseña, comuníquese con el Administrador (Ax) no panel de gestão.' 
                         : 'Para recuperar a senha de acesso, solicite ao Administrador (Ax) no painel de gestão.');
                     }}
-                    className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="text-[11px] text-[#D8AB7E] hover:text-[#F5DEC4] transition-colors"
                   >
                     {language === 'es' ? '¿Olvidó su contraseña?' : 'Esqueceu a senha?'}
                   </a>
                 </div>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-[#D8AB7E] transition-colors">
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
@@ -279,12 +267,12 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition-all font-mono-nums"
+                    className="w-full pl-10 pr-10 py-2.5 bg-[#060609] border border-[#C89B6E]/25 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D8AB7E] focus:ring-1 focus:ring-[#D8AB7E]/30 transition-all font-mono-nums"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-neutral-500 hover:text-neutral-300 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-neutral-500 hover:text-[#E6C39F] transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -298,22 +286,22 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     type="checkbox"
                     checked={rememberDevice}
                     onChange={(e) => setRememberDevice(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#243048] bg-[#090D15] text-indigo-600 focus:ring-1 focus:ring-indigo-500/40 cursor-pointer accent-indigo-600 transition-all"
+                    className="w-4 h-4 rounded border-[#C89B6E]/40 bg-[#060609] text-[#CFA070] focus:ring-1 focus:ring-[#D8AB7E]/40 cursor-pointer accent-[#CFA070] transition-all"
                   />
-                  <span className="group-hover:text-white transition-colors">
+                  <span className="group-hover:text-[#F5DEC4] transition-colors">
                     {language === 'es' ? 'Guardar inicio de sesión en este dispositivo' : 'Guardar login somente neste dispositivo'}
                   </span>
                 </label>
               </div>
 
-              {/* Submit Button with UTMify styling */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 disabled:opacity-50 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#E8C39E] via-[#CFA070] to-[#B37E4C] hover:from-[#F3D5B5] hover:via-[#D8AB7E] hover:to-[#C48E5A] text-[#090807] font-bold text-xs tracking-wider uppercase shadow-lg shadow-[#C89B6E]/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 group cursor-pointer"
               >
                 {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-[#090807]/30 border-t-[#090807] rounded-full animate-spin" />
                 ) : (
                   <>
                     <span>{t.loginButton}</span>
@@ -326,26 +314,12 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
           </div>
 
-          {/* Bottom helper */}
-          <div className="text-center text-xs text-neutral-500 space-y-1">
-            <p>
-              {language === 'es' ? 'Sistema Administrativo Korizko' : 'Sistema Administrativo Korizko'}
-            </p>
-          </div>
-
         </div>
       </main>
 
-      {/* Footer matching UTMify */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-[#141A28] text-neutral-500 text-xs">
-        <p>© 2026 Korizko Sistemas. Todos os direitos reservados.</p>
-        <div className="flex items-center gap-4 text-[11px]">
-          <a href="#termos" onClick={(e) => e.preventDefault()} className="hover:text-neutral-300 transition-colors">Termos de Uso</a>
-          <span aria-hidden="true">·</span>
-          <a href="#privacidade" onClick={(e) => e.preventDefault()} className="hover:text-neutral-300 transition-colors">Privacidade</a>
-          <span aria-hidden="true">·</span>
-          <a href="#ajuda" onClick={(e) => e.preventDefault()} className="hover:text-neutral-300 transition-colors">Central de Ajuda</a>
-        </div>
+      {/* Footer */}
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-center gap-2 border-t border-[#C89B6E]/15 text-neutral-500 text-xs">
+        <p>© 2026 {t.appName} • Panificação confeitaria artesanal.</p>
       </footer>
 
     </div>
