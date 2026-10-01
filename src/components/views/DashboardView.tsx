@@ -172,11 +172,6 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-100">
             {language === 'es' ? 'Panel Financiero en Tiempo Real' : 'Painel Financeiro em Tempo Real'}
           </h1>
-          <p className="text-xs text-neutral-400 mt-0.5">
-            {language === 'es'
-              ? 'Monitoreo de ventas diarias, flujo en 3 monedas y cumplimiento de metas.'
-              : 'Monitoramento das vendas diárias, fluxo em 3 moedas e desempenho de metas.'}
-          </p>
         </div>
 
         <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">

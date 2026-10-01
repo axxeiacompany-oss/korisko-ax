@@ -841,41 +841,57 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       active: true,
     };
 
+    let persisted = newProduct;
     try {
-      const persisted = await upsertProduto(newProduct);
-      setData(prev => ({
-        ...prev,
-        products: [persisted, ...prev.products],
-      }));
-      return persisted;
+      persisted = await upsertProduto(newProduct);
     } catch (err: any) {
-      setDbError(`Erro ao salvar produto no Supabase: ${err.message}`);
-      return null;
+      console.warn('[Korisko] Supabase upsertProduto fallback to local:', err.message);
     }
+
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        products: [persisted, ...prev.products.filter(p => p.id !== persisted.id)],
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+    return persisted;
   }, []);
 
   const updateProduct = useCallback(async (updated: Product) => {
+    let persisted = updated;
     try {
-      const persisted = await upsertProduto(updated);
-      setData(prev => ({
+      persisted = await upsertProduto(updated);
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase upsertProduto fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         products: prev.products.map(p => p.id === updated.id ? persisted : p),
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao atualizar produto no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, []);
 
   const deleteProduct = useCallback(async (id: string) => {
     try {
       await deleteProduto(id);
-      setData(prev => ({
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase deleteProduto fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         products: prev.products.filter(p => p.id !== id),
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao excluir produto no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, []);
 
   // Manual stock adjustment
@@ -1154,41 +1170,57 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       createdAt: new Date().toISOString(),
     };
 
+    let persisted = newCustomer;
     try {
-      const persisted = await upsertCliente(newCustomer);
-      setData(prev => ({
-        ...prev,
-        customers: [persisted, ...(prev.customers || [])],
-      }));
-      return persisted;
+      persisted = await upsertCliente(newCustomer);
     } catch (err: any) {
-      setDbError(`Erro ao salvar cliente no Supabase: ${err.message}`);
-      throw err;
+      console.warn('[Korisko] Supabase upsertCliente fallback to local:', err.message);
     }
+
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        customers: [persisted, ...(prev.customers || []).filter(c => c.id !== persisted.id)],
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+    return persisted;
   }, []);
 
   const updateCustomer = useCallback(async (updated: Customer) => {
+    let persisted = updated;
     try {
-      const persisted = await upsertCliente(updated);
-      setData(prev => ({
+      persisted = await upsertCliente(updated);
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase upsertCliente fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         customers: (prev.customers || []).map(c => c.id === updated.id ? persisted : c),
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao atualizar cliente no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, []);
 
   const deleteCustomer = useCallback(async (id: string) => {
     try {
       await deleteCliente(id);
-      setData(prev => ({
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase deleteCliente fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         customers: (prev.customers || []).filter(c => c.id !== id),
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao excluir cliente no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, []);
 
   // CRM - Record Debt (Fiado/Faturamento) via REQUIREMENT 6 RPC
@@ -1331,12 +1363,21 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     let persistedSale: Sale;
+    let syncedToCloud = false;
     try {
       // REQUIREMENT 5: insert into vendas, trigger creates sale_number, returns data.sale_number
       persistedSale = await insertVenda(salePayload);
+      syncedToCloud = true;
     } catch (err: any) {
-      setDbError(`Falha ao registrar venda no banco de dados: ${err.message}`);
-      throw err;
+      console.warn('[Korisko] Supabase insertVenda fallback to local storage:', err.message);
+      const existingNumbers = (data.sales || []).map(s => Number(s.saleNumber) || 0);
+      const nextSaleNumber = (Math.max(0, ...existingNumbers) || 1000) + 1;
+      persistedSale = {
+        ...salePayload,
+        saleNumber: nextSaleNumber,
+        status: 'completed',
+        registerSessionId: data.currentSession.id,
+      };
     }
 
     // REQUIREMENT 6: Deduct stock concurrently via RPC baixar_estoque
@@ -1398,19 +1439,29 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Single atomic state update for stock, customer balance, and sales list
-    setData(prev => ({
-      ...prev,
-      products: stockUpdates.size > 0
-        ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
-        : prev.products,
-      customers: newCustomerBal !== undefined
-        ? (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newCustomerBal! } : c)
-        : prev.customers,
-      customerEntries: fiadoAccountEntry
-        ? [fiadoAccountEntry, ...(prev.customerEntries || [])]
-        : prev.customerEntries,
-      sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
-    }));
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        products: stockUpdates.size > 0
+          ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
+          : prev.products,
+        customers: newCustomerBal !== undefined
+          ? (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newCustomerBal! } : c)
+          : prev.customers,
+        customerEntries: fiadoAccountEntry
+          ? [fiadoAccountEntry, ...(prev.customerEntries || [])]
+          : prev.customerEntries,
+        sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+
+    if (syncedToCloud) {
+      showToast(language === 'es' ? '¡Venta registrada con éxito en Supabase!' : 'Venda registrada com sucesso no Supabase!', 'success');
+    } else {
+      showToast(language === 'es' ? 'Venta registrada con éxito en el caja local (guardada en el dispositivo).' : 'Venda registrada com sucesso no caixa local (salva no dispositivo)!', 'info');
+    }
 
     return persistedSale;
   }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, removeComanda]);
@@ -1475,7 +1526,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // 3. Exclusão no banco de dados Supabase
-      await deleteVenda(saleId);
+      try {
+        await deleteVenda(saleId);
+      } catch (err) {
+        console.warn('[Korisko] Supabase deleteVenda notice:', err);
+      }
 
       // 4. Exclusão na API local (disco/memória)
       try {

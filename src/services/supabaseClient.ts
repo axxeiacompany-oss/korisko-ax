@@ -387,8 +387,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Executar a sincronização padrão de fábrica inicial
-SELECT public.korisko_reset_factory_zero();
+-- Opcional: Se desejar zerar completamente o banco para padrão de fábrica, descomente a linha abaixo:
+-- SELECT public.korisko_reset_factory_zero();
 `;
 
 /**
@@ -569,6 +569,44 @@ export async function saveStateToSupabase(stateData: any): Promise<boolean> {
         }));
 
         await supabase.from('vendas').upsert(recentSales, { onConflict: 'id' });
+      } catch {}
+    }
+
+    // Sync produtos to functional 'produtos' table for Table Editor
+    if (Array.isArray(stateData.products) && stateData.products.length > 0) {
+      try {
+        const prodRows = stateData.products.map((p: any) => ({
+          id: p.id,
+          code: p.code || '',
+          name: p.name,
+          category: p.category || 'paes',
+          price_brl: Number(p.priceBrl) || 0,
+          cost_price_brl: Number(p.costPriceBrl) || 0,
+          stock: Number(p.stock) || 0,
+          min_stock: Number(p.minStock) || 0,
+          unit: p.unit || 'un',
+          active: p.active !== false,
+          updated_at: new Date().toISOString()
+        }));
+        await supabase.from('produtos').upsert(prodRows, { onConflict: 'id' });
+      } catch {}
+    }
+
+    // Sync clientes to functional 'clientes' table for Table Editor
+    if (Array.isArray(stateData.customers) && stateData.customers.length > 0) {
+      try {
+        const custRows = stateData.customers.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone || '',
+          email: c.email || null,
+          credit_limit_brl: Number(c.creditLimitBrl) || 0,
+          outstanding_balance_brl: Number(c.outstandingBalanceBrl) || 0,
+          loyalty_points: Math.round(Number(c.loyaltyPoints) || 0),
+          active: true,
+          updated_at: new Date().toISOString()
+        }));
+        await supabase.from('clientes').upsert(custRows, { onConflict: 'id' });
       } catch {}
     }
 

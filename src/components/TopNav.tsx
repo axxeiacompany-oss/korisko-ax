@@ -129,18 +129,18 @@ export const TopNav: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Center: Command + K Search Bar */}
-        <div className="hidden md:flex items-center flex-1 max-w-xs mx-4">
+        {/* Center: Command + K Search Bar - only shown on large desktops (xl) so it never overflows or wraps */}
+        <div className="hidden xl:flex items-center flex-1 max-w-xs mx-4 min-w-[180px]">
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#0E1422] border border-[#1E273A] text-xs text-neutral-400 hover:text-neutral-200 hover:border-neutral-600 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#0E1422] border border-[#1E273A] text-xs text-neutral-400 hover:text-neutral-200 hover:border-neutral-600 transition-colors cursor-pointer overflow-hidden"
           >
-            <div className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-neutral-500" />
-              <span>{t.searchPlaceholder}</span>
+            <div className="flex items-center gap-2 min-w-0 truncate">
+              <Search className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+              <span className="truncate">{t.searchPlaceholder}</span>
             </div>
-            <kbd className="px-1.5 py-0.5 rounded bg-[#161E30] text-[10px] font-mono text-neutral-400 border border-[#232D44]">
+            <kbd className="px-1.5 py-0.5 rounded bg-[#161E30] text-[10px] font-mono text-neutral-400 border border-[#232D44] shrink-0 ml-2">
               ⌘K
             </kbd>
           </button>

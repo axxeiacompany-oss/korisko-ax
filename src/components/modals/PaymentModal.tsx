@@ -159,7 +159,26 @@ export const PaymentModal: React.FC<Props> = ({
   const [isFinishing, setIsFinishing] = useState(false);
 
   const handleFinishSale = async () => {
-    if (remainingBrl > 0.05) {
+    let finalPayments = [...payments];
+
+    // Se nenhum pagamento avulso foi adicionado, assume o valor exato no método selecionado (ex: Dinheiro)
+    if (finalPayments.length === 0 && totalBrl > 0) {
+      if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+        showToast(
+          language === 'es' ? 'Para registrar venta como Cuenta Corriente, seleccione un cliente.' : 'Para lançar venda como Fiado, selecione ou identifique o cliente.',
+          'error'
+        );
+        return;
+      }
+      finalPayments = [{
+        id: `pay-${Date.now()}`,
+        currency: 'PYG',
+        amountReceived: totalBrl,
+        exchangeRateUsed: 1,
+        equivalentBrl: totalBrl,
+        method: selectedMethod,
+      }];
+    } else if (remainingBrl > 0.05) {
       showToast(
         language === 'es' ? 'El valor recibido aún es menor que el total de la venta.' : 'O valor recebido ainda é menor que o total da venda.',
         'error'
@@ -167,17 +186,20 @@ export const PaymentModal: React.FC<Props> = ({
       return;
     }
 
-    const changeData = changeBrl > 0 ? {
+    const currentTotalPaid = finalPayments.reduce((acc, p) => acc + p.equivalentBrl, 0);
+    const calculatedChange = Math.max(0, Math.round(currentTotalPaid - totalBrl));
+
+    const changeData = calculatedChange > 0 ? {
       currency: changeCurrency,
-      amount: changeInSelectedCurrency,
-      equivalentBrl: changeBrl,
+      amount: calculatedChange,
+      equivalentBrl: calculatedChange,
     } : undefined;
 
     setIsFinishing(true);
     try {
       const sale = await completeSale(
         cartItems, 
-        payments, 
+        finalPayments, 
         changeData, 
         customerName || undefined,
         comandaNumber || undefined,
@@ -562,11 +584,11 @@ export const PaymentModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleFinishSale}
-              disabled={remainingBrl > 0.05 || isFinishing}
+              disabled={isFinishing || (payments.length > 0 && remainingBrl > 0.05)}
               className="flex-1 py-3 sm:py-2.5 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{isFinishing ? 'Gravando no Supabase...' : 'Concluir Venda & Cupom'}</span>
+              <span>{isFinishing ? (language === 'es' ? 'Registrando venta...' : 'Gravando venda...') : (language === 'es' ? 'Concluir Venta & Ticket' : 'Concluir Venda & Cupom')}</span>
             </button>
           </div>
         </div>

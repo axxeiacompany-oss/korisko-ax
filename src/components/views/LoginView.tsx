@@ -20,7 +20,7 @@ import { StorageService } from '../../services/storageService';
 import { listUsuarios } from '../../lib/db';
 
 interface Props {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (rememberMe: boolean) => void;
 }
 
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
@@ -29,6 +29,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -115,7 +116,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
         switchUser(matchedEmp.id);
         setIsLoading(false);
-        onLoginSuccess();
+        onLoginSuccess(rememberDevice);
         return;
       }
 
@@ -128,7 +129,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       if (empByCred) {
         switchUser(empByCred.id);
         setIsLoading(false);
-        onLoginSuccess();
+        onLoginSuccess(rememberDevice);
         return;
       }
 
@@ -288,6 +289,21 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+
+              {/* Guardar Login no Dispositivo Option */}
+              <div className="pt-0.5 pb-1">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs text-neutral-300 select-none group">
+                  <input
+                    type="checkbox"
+                    checked={rememberDevice}
+                    onChange={(e) => setRememberDevice(e.target.checked)}
+                    className="w-4 h-4 rounded border-[#243048] bg-[#090D15] text-indigo-600 focus:ring-1 focus:ring-indigo-500/40 cursor-pointer accent-indigo-600 transition-all"
+                  />
+                  <span className="group-hover:text-white transition-colors">
+                    {language === 'es' ? 'Guardar inicio de sesión en este dispositivo' : 'Guardar login somente neste dispositivo'}
+                  </span>
+                </label>
               </div>
 
               {/* Submit Button with UTMify styling */}

@@ -30,7 +30,10 @@ function MainAppShell() {
   const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError, toast, clearToast } = useBakery();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      localStorage.removeItem('KORISKO_AUTH_SESSION');
+      const isDeviceRemembered = localStorage.getItem('KORISKO_REMEMBER_DEVICE') === 'true';
+      if (isDeviceRemembered && localStorage.getItem('KORISKO_AUTH_SESSION') === 'true') {
+        return true;
+      }
       const sessionSaved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
       return sessionSaved === 'true';
     } catch {
@@ -49,15 +52,22 @@ function MainAppShell() {
     try {
       sessionStorage.removeItem('KORISKO_AUTH_SESSION');
       localStorage.removeItem('KORISKO_AUTH_SESSION');
+      localStorage.removeItem('KORISKO_REMEMBER_DEVICE');
       localStorage.removeItem('KORISKO_CURRENT_USER_ID');
     } catch {}
   };
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (rememberDevice: boolean = false) => {
     setIsAuthenticated(true);
     try {
       sessionStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-      localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+      if (rememberDevice) {
+        localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
+        localStorage.setItem('KORISKO_REMEMBER_DEVICE', 'true');
+      } else {
+        localStorage.removeItem('KORISKO_AUTH_SESSION');
+        localStorage.removeItem('KORISKO_REMEMBER_DEVICE');
+      }
     } catch {}
   };
 

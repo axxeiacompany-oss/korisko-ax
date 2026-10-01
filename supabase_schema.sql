@@ -352,6 +352,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Executar a sincronização padrão de fábrica inicial
-SELECT public.korisko_reset_factory_zero();
+-- Opcional: Se desejar zerar completamente o banco para padrão de fábrica, descomente a linha abaixo:
+-- SELECT public.korisko_reset_factory_zero();
 
