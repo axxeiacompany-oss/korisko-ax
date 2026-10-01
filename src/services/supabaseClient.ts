@@ -62,7 +62,7 @@ VALUES
     '9APG_47z-EgF4yz',
     '9APG_47z-EgF4yz',
     'bg-indigo-600',
-    '["dashboard","pdv","venda_direta","estoque","fichas_tecnicas","crm","caixa","mais_vendidos","metas","cambio","backup","afiliados"]'::jsonb,
+    '["dashboard","pdv","venda_direta","loja","estoque","fichas_tecnicas","crm","caixa","mais_vendidos","metas","cambio","backup","afiliados","portal_afiliado"]'::jsonb,
     true
   ),
   (
@@ -73,7 +73,7 @@ VALUES
     '446183',
     '446183',
     'bg-emerald-600',
-    '["dashboard","pdv","venda_direta","crm"]'::jsonb,
+    '["dashboard","pdv","venda_direta","loja","crm"]'::jsonb,
     true
   )
 ON CONFLICT (id) DO UPDATE SET
@@ -98,6 +98,11 @@ CREATE TABLE IF NOT EXISTS public.produtos (
   min_stock NUMERIC(12, 3) DEFAULT 0.000,
   unit TEXT NOT NULL DEFAULT 'un',
   active BOOLEAN NOT NULL DEFAULT true,
+  image_url TEXT,
+  description TEXT,
+  slug TEXT,
+  compare_at_price NUMERIC(12, 2),
+  featured BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -108,15 +113,72 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   name TEXT NOT NULL,
   phone TEXT,
   email TEXT,
+  document_cpf TEXT,
+  address TEXT,
+  category TEXT DEFAULT 'varejo',
   credit_limit_brl NUMERIC(12, 2) DEFAULT 0.00,
   outstanding_balance_brl NUMERIC(12, 2) DEFAULT 0.00,
   loyalty_points INTEGER DEFAULT 0,
+  total_spent_brl NUMERIC(14, 2) DEFAULT 0.00,
+  purchase_count INTEGER DEFAULT 0,
+  last_purchase_date TIMESTAMPTZ,
+  birthday TEXT,
+  notes TEXT,
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABELA FUNCIONAL DE VENDAS (Table Editor -> vendas)
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS total_spent_brl NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS purchase_count INTEGER DEFAULT 0;
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS last_purchase_date TIMESTAMPTZ;
+
+-- 4. TABELA DE REGISTRO DE COMPRAS DE CADA CLIENTE (Análise Financeira Entradas x Saídas)
+CREATE TABLE IF NOT EXISTS public.registro_compras_clientes (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  sale_id TEXT,
+  comanda_number TEXT,
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  items_summary TEXT,
+  total_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+  paid_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+  fiado_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+  estimated_cost_brl NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+  payment_method TEXT NOT NULL DEFAULT 'dinheiro',
+  flow_category TEXT NOT NULL DEFAULT 'entrada_venda_avista',
+  operator_id TEXT,
+  operator_name TEXT,
+  notes TEXT,
+  purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS customer_id TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS customer_name TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS sale_id TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS comanda_number TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS items_summary TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS total_amount_brl NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS paid_amount_brl NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS fiado_amount_brl NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS estimated_cost_brl NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'dinheiro';
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS flow_category TEXT DEFAULT 'entrada_venda_avista';
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS operator_id TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS operator_name TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS purchased_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.registro_compras_clientes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_reg_compras_customer_id ON public.registro_compras_clientes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_reg_compras_purchased_at ON public.registro_compras_clientes(purchased_at DESC);
+
+-- 5. TABELA FUNCIONAL DE VENDAS (Table Editor -> vendas)
 CREATE TABLE IF NOT EXISTS public.vendas (
   id TEXT PRIMARY KEY,
   sale_number TEXT,
@@ -127,6 +189,9 @@ CREATE TABLE IF NOT EXISTS public.vendas (
   employee_name TEXT,
   customer_id TEXT,
   customer_name TEXT,
+  comanda_number TEXT,
+  setor_responsavel TEXT,
+  confirmed_by_customer BOOLEAN DEFAULT true,
   items JSONB NOT NULL DEFAULT '[]'::jsonb,
   payments JSONB NOT NULL DEFAULT '[]'::jsonb,
   change_given JSONB,
@@ -152,7 +217,69 @@ BEFORE INSERT ON public.vendas
 FOR EACH ROW
 EXECUTE FUNCTION public.set_sale_number();
 
--- 5. TABELA FUNCIONAL DE SESSÕES DE CAIXA (Table Editor -> caixa_sessoes)
+-- 6. TABELA DE COMANDAS & SETORES (Panificação, Confeitaria, Balcão, Loja)
+CREATE TABLE IF NOT EXISTS public.comandas (
+  id TEXT PRIMARY KEY,
+  number TEXT NOT NULL,
+  customer_name TEXT,
+  customer_id TEXT,
+  table_or_note TEXT,
+  status TEXT NOT NULL DEFAULT 'aberta',
+  setor_responsavel TEXT DEFAULT 'panificacao',
+  setores_envolvidos JSONB DEFAULT '["panificacao"]'::jsonb,
+  confirmed_by_customer BOOLEAN DEFAULT true,
+  confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  subtotal_brl NUMERIC(12, 2) DEFAULT 0.00,
+  created_by TEXT,
+  source TEXT DEFAULT 'pdv',
+  delivery_address TEXT,
+  customer_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'pdv';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS delivery_address TEXT;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS setor_responsavel TEXT DEFAULT 'panificacao';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS setores_envolvidos JSONB DEFAULT '["panificacao"]'::jsonb;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN DEFAULT true;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ DEFAULT NOW();
+
+-- 7. TABELA DE LANÇAMENTOS FIADO / CADERNETA
+CREATE TABLE IF NOT EXISTS public.lancamentos_fiado (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  customer_name TEXT,
+  type TEXT NOT NULL DEFAULT 'debito_venda',
+  amount_brl NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  description TEXT,
+  sale_id TEXT,
+  comanda_number TEXT,
+  payment_method TEXT,
+  setor_responsavel TEXT,
+  operator_name TEXT,
+  confirmed_by_customer BOOLEAN DEFAULT true,
+  balance_after_brl NUMERIC(12, 2) DEFAULT 0.00,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. TABELA DE AUDITORIA DE LOGINS & SEGURANÇA
+CREATE TABLE IF NOT EXISTS public.auditoria_logins (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  identifier TEXT NOT NULL,
+  user_id TEXT,
+  user_name TEXT,
+  user_role TEXT,
+  success BOOLEAN NOT NULL DEFAULT false,
+  details TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. TABELA FUNCIONAL DE SESSÕES DE CAIXA (Table Editor -> caixa_sessoes)
 CREATE TABLE IF NOT EXISTS public.caixa_sessoes (
   id TEXT PRIMARY KEY,
   opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -165,30 +292,7 @@ CREATE TABLE IF NOT EXISTS public.caixa_sessoes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. TABELA EM TEMPO REAL DE COMANDAS & PEDIDOS CONFIRMADOS POR SETOR (Table Editor -> comandas_pedidos)
--- Quando o cliente confirma o pedido ou o caixa abre uma comanda, aparece instantaneamente para o Setor Responsável e Admin (Acesso Total).
-CREATE TABLE IF NOT EXISTS public.comandas_pedidos (
-  id TEXT PRIMARY KEY,
-  number TEXT NOT NULL,
-  order_number TEXT,
-  customer_name TEXT,
-  customer_phone TEXT,
-  sector TEXT NOT NULL DEFAULT 'panificacao', -- 'panificacao', 'confeitaria', 'salgados', 'cafeteria', 'expedicao', 'geral'
-  sectors JSONB DEFAULT '["panificacao"]'::jsonb,
-  status TEXT NOT NULL DEFAULT 'confirmado', -- 'confirmado', 'em_preparo', 'pronto', 'entregue'
-  order_type TEXT DEFAULT 'mesa', -- 'mesa', 'balcao', 'entrega'
-  items JSONB NOT NULL DEFAULT '[]'::jsonb,
-  shipping_address JSONB DEFAULT '{}'::jsonb,
-  payment_method TEXT,
-  notes TEXT,
-  source TEXT DEFAULT 'loja_online', -- 'loja_online', 'pdv'
-  total_brl NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  opened_by TEXT DEFAULT 'Cliente Online',
-  opened_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 7. TABELAS DE ESTADO GLOBAL E BACKUP (Sincronização em tempo real do Frontend)
+-- 10. TABELAS DE ESTADO GLOBAL E BACKUP
 CREATE TABLE IF NOT EXISTS public.korisko_system_state (
   id TEXT PRIMARY KEY,
   data JSONB NOT NULL,
@@ -201,17 +305,20 @@ CREATE TABLE IF NOT EXISTS public.korisko_backup_points (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 8. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
+-- 11. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.registro_compras_clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comandas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lancamentos_fiado ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auditoria_logins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.caixa_sessoes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.comandas_pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_system_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_backup_points ENABLE ROW LEVEL SECURITY;
 
--- 9. POLÍTICAS DE ACESSO E PERMISSÕES RLS (ADMIN COM ACESSO TOTAL E SETORES EM TEMPO REAL)
+-- 12. POLÍTICAS DE ACESSO E PERMISSÕES RLS
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'usuarios' AND policyname = 'Allow public access usuarios') THEN
@@ -226,16 +333,28 @@ BEGIN
     CREATE POLICY "Allow public access clientes" ON public.clientes FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'registro_compras_clientes' AND policyname = 'Allow public access registro_compras_clientes') THEN
+    CREATE POLICY "Allow public access registro_compras_clientes" ON public.registro_compras_clientes FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'vendas' AND policyname = 'Allow public access vendas') THEN
     CREATE POLICY "Allow public access vendas" ON public.vendas FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'caixa_sessoes' AND policyname = 'Allow public access caixa_sessoes') THEN
-    CREATE POLICY "Allow public access caixa_sessoes" ON public.caixa_sessoes FOR ALL USING (true) WITH CHECK (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'comandas' AND policyname = 'Allow public access comandas') THEN
+    CREATE POLICY "Allow public access comandas" ON public.comandas FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'comandas_pedidos' AND policyname = 'Allow public access comandas_pedidos') THEN
-    CREATE POLICY "Allow public access comandas_pedidos" ON public.comandas_pedidos FOR ALL USING (true) WITH CHECK (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lancamentos_fiado' AND policyname = 'Allow public access lancamentos_fiado') THEN
+    CREATE POLICY "Allow public access lancamentos_fiado" ON public.lancamentos_fiado FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'auditoria_logins' AND policyname = 'Allow public access auditoria_logins') THEN
+    CREATE POLICY "Allow public access auditoria_logins" ON public.auditoria_logins FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'caixa_sessoes' AND policyname = 'Allow public access caixa_sessoes') THEN
+    CREATE POLICY "Allow public access caixa_sessoes" ON public.caixa_sessoes FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'korisko_system_state' AND policyname = 'Allow public access korisko_system_state') THEN
@@ -251,23 +370,19 @@ END $$;
 GRANT ALL ON TABLE public.usuarios TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.clientes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.registro_compras_clientes TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.vendas TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.comandas TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.lancamentos_fiado TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.auditoria_logins TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.caixa_sessoes TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.comandas_pedidos TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_system_state TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_backup_points TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 10. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
--- Qualquer confirmação de comanda/pedido, venda, caixa, estoque ou usuário é transmitida instantaneamente
--- via WebSockets para todos os setores responsáveis e Admin.
+-- 13. HABILITAR SINCRONIZAÇÃO MULTI-DISPOSITIVOS (SUPABASE REALTIME)
 DO $$
 BEGIN
-  BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.comandas_pedidos;
-  EXCEPTION WHEN duplicate_object THEN NULL;
-  END;
-
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_system_state;
   EXCEPTION WHEN duplicate_object THEN NULL;
@@ -294,6 +409,21 @@ BEGIN
   END;
 
   BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.registro_compras_clientes;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.comandas;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.lancamentos_fiado;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.caixa_sessoes;
   EXCEPTION WHEN duplicate_object THEN NULL;
   END;
@@ -304,13 +434,15 @@ BEGIN
   END;
 END $$;
 
--- 11. REPLICA IDENTITY FULL (Permite receber os dados completos no payload de tempo real)
-ALTER TABLE public.comandas_pedidos REPLICA IDENTITY FULL;
+-- 14. REPLICA IDENTITY FULL
 ALTER TABLE public.korisko_system_state REPLICA IDENTITY FULL;
 ALTER TABLE public.usuarios REPLICA IDENTITY FULL;
 ALTER TABLE public.produtos REPLICA IDENTITY FULL;
 ALTER TABLE public.vendas REPLICA IDENTITY FULL;
 ALTER TABLE public.clientes REPLICA IDENTITY FULL;
+ALTER TABLE public.registro_compras_clientes REPLICA IDENTITY FULL;
+ALTER TABLE public.comandas REPLICA IDENTITY FULL;
+ALTER TABLE public.lancamentos_fiado REPLICA IDENTITY FULL;
 ALTER TABLE public.caixa_sessoes REPLICA IDENTITY FULL;
 
 -- 11. FUNÇÕES RPC (BAIXA DE ESTOQUE E AJUSTE DE SALDO DE CLIENTE)

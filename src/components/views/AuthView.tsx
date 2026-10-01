@@ -590,16 +590,6 @@ export const AuthView: React.FC<Props> = ({
 
             </form>
 
-            {/* Selo de Blindagem de Login */}
-            <div className="mt-5 pt-3.5 border-t border-[#C89B6E]/15 flex items-center justify-center gap-2 text-[10px] text-neutral-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>
-                {language === 'es'
-                  ? 'Acceso protegido: Cifrado SHA-256 • Bloqueo Anti-Fuerza Bruta • Auditoría en Tiempo Real'
-                  : 'Acesso blindado: Criptografia SHA-256 • Bloqueio Anti-Força Bruta • Auditoria em Tempo Real'}
-              </span>
-            </div>
-
           </div>
 
         </div>
