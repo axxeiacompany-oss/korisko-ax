@@ -61,11 +61,11 @@ export const GoalSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {/* Target Revenue */}
           <div>
             <label className="text-xs font-medium text-neutral-300 block mb-1">
-              Meta de Faturamento Mensal (R$)
+              Meta de Faturamento Mensal (₲ Guaraní)
             </label>
             <input
               type="number"
-              step="1000"
+              step="1000000"
               required
               value={targetRev}
               onChange={(e) => {
@@ -81,11 +81,11 @@ export const GoalSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {/* Daily average target */}
           <div>
             <label className="text-xs font-medium text-neutral-300 block mb-1">
-              Meta Diária Média (R$)
+              Meta Diária Média (₲ Guaraní)
             </label>
             <input
               type="number"
-              step="100"
+              step="50000"
               required
               value={targetDaily}
               onChange={(e) => setTargetDaily(e.target.value)}
@@ -112,11 +112,11 @@ export const GoalSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {/* Target Ticket */}
             <div>
               <label className="text-xs font-medium text-neutral-300 block mb-1">
-                Ticket Médio (R$)
+                Ticket Médio (₲ Guaraní)
               </label>
               <input
                 type="number"
-                step="0.50"
+                step="500"
                 required
                 value={targetTicket}
                 onChange={(e) => setTargetTicket(e.target.value)}

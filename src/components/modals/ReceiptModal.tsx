@@ -127,9 +127,8 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
           
           {/* Header */}
           <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
-            <h3 className="text-base font-bold tracking-tight uppercase">KORIZKO</h3>
-            <p className="text-[10px] text-neutral-500">Câmbio Multi-Moeda BRL · PYG · USD</p>
-            <p className="text-[10px] text-neutral-500">CNPJ: 12.345.678/0001-90</p>
+            <h3 className="text-base font-bold tracking-tight uppercase">PADARIA KORISKO</h3>
+            <p className="text-[10px] text-neutral-500">Comprobante de Venta • Guaraní (₲ PYG)</p>
           </div>
 
           {/* Sale details */}
@@ -180,10 +179,10 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
                     </div>
                     <div className="flex justify-between text-[11px] text-neutral-600">
                       <span>
-                        {item.quantity} {unit} × {formatCurrency(unitPrice, 'BRL')}
+                        {item.quantity} {unit} × {formatCurrency(unitPrice, 'PYG')}
                       </span>
                       <span className="font-bold text-neutral-900">
-                        {formatCurrency(subtotal, 'BRL')}
+                        {formatCurrency(subtotal, 'PYG')}
                       </span>
                     </div>
                   </div>
@@ -198,21 +197,21 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
               <>
                 <div className="flex justify-between text-[11px] text-neutral-600">
                   <span>SUBTOTAL:</span>
-                  <span>{formatCurrency(sale.subtotalBrl || (sale.totalBrl + (sale.discountBrl || 0)), 'BRL')}</span>
+                  <span>{formatCurrency(sale.subtotalBrl || (sale.totalBrl + (sale.discountBrl || 0)), 'PYG')}</span>
                 </div>
                 <div className="flex justify-between text-[11px] text-emerald-700 font-semibold">
                   <span>DESCONTO / CORTESIA:</span>
-                  <span>- {formatCurrency(sale.discountBrl || 0, 'BRL')}</span>
+                  <span>- {formatCurrency(sale.discountBrl || 0, 'PYG')}</span>
                 </div>
               </>
             )}
             <div className="flex justify-between text-sm font-bold pt-0.5">
-              <span>TOTAL (BRL):</span>
-              <span>{formatCurrency(sale.totalBrl, 'BRL')}</span>
+              <span>TOTAL (₲):</span>
+              <span>{formatCurrency(sale.totalBrl, 'PYG')}</span>
             </div>
           </div>
 
-          {/* Multi-Currency Payments breakdown */}
+          {/* Payments breakdown */}
           <div className="py-3 border-b border-dashed border-neutral-300 text-[11px] space-y-1">
             <span className="text-[10px] uppercase font-bold text-neutral-500 block">
               FORMA DE PAGAMENTO RECEBIDA:
@@ -220,15 +219,10 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
             {sale.payments.map((p, idx) => (
               <div key={idx} className="flex justify-between">
                 <span className="capitalize">
-                  {p.currency} ({p.method.replace('_', ' ')}):
+                  {p.method.replace('_', ' ')}:
                 </span>
                 <span className="font-bold">
-                  {formatCurrency(p.amountReceived, p.currency)}
-                  {p.currency !== 'BRL' && (
-                    <span className="text-[10px] text-neutral-500 font-normal ml-1">
-                      (R$ {p.equivalentBrl.toFixed(2)})
-                    </span>
-                  )}
+                  {formatCurrency(p.amountReceived, 'PYG')}
                 </span>
               </div>
             ))}
@@ -237,7 +231,7 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
               <div className="flex justify-between pt-1 border-t border-dotted border-neutral-200 font-bold text-neutral-800">
                 <span>TROCO ENTREGUE:</span>
                 <span>
-                  {formatCurrency(sale.changeGiven.amount, sale.changeGiven.currency)}
+                  {formatCurrency(sale.changeGiven.amount, 'PYG')}
                 </span>
               </div>
             )}

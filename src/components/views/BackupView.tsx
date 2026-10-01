@@ -26,6 +26,7 @@ import {
   DEFAULT_SUPABASE_ANON_KEY,
   testSupabaseReadWrite
 } from '../../services/supabaseClient';
+import { SECURITY_SQL_SCRIPT } from '../../utils/security';
 import { ConfirmModal } from '../modals/ConfirmModal';
 
 export const BackupView: React.FC = () => {
@@ -54,6 +55,19 @@ export const BackupView: React.FC = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; latencyMs: number; message: string } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlCode, setShowSqlCode] = useState(false);
+  const [copiedSecuritySql, setCopiedSecuritySql] = useState(false);
+  const [showSecuritySql, setShowSecuritySql] = useState(false);
+
+  const handleCopySecuritySql = () => {
+    navigator.clipboard.writeText(SECURITY_SQL_SCRIPT);
+    setCopiedSecuritySql(true);
+    setTimeout(() => setCopiedSecuritySql(false), 3000);
+    showNotification(
+      language === 'es' 
+        ? '¡Script SQL de Seguridad (RLS) copiado con éxito!' 
+        : 'Script SQL de Segurança (RLS) copiado com sucesso!'
+    );
+  };
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -621,6 +635,77 @@ export const BackupView: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* SQL de Segurança & Blindagem Anti-F12 Card */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-neutral-900 border border-indigo-900/40 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <ShieldCheck className="w-4 h-4" />
+              </span>
+              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+                <span>{language === 'es' ? 'SQL de Seguridad & Blindaje Anti-F12' : 'SQL de Segurança & Blindagem Anti-F12'}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {language === 'es' ? 'BLINDAJE ACTIVO' : 'BLINDAGEM ATIVA'}
+                </span>
+              </h3>
+            </div>
+            <p className="text-xs text-neutral-400 max-w-2xl">
+              {language === 'es' 
+                ? 'El sistema bloquea automáticamente la tecla F12, atajos de inspección y limpia los registros de consola. Para el banco de datos Supabase, este script activa Row Level Security (RLS) para que cualquier intento de inspección retorne vacío ("nada aparece").' 
+                : 'O sistema bloqueia nativamente o F12, atalhos de desenvolvedor (Ctrl+Shift+I/J/C) e limpa logs. Este script SQL ativa Row Level Security (RLS) no Supabase para que qualquer consulta não autorizada retorne vazio ("nada aparece").'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowSecuritySql(!showSecuritySql)}
+              className="px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              {showSecuritySql 
+                ? (language === 'es' ? 'Ocultar SQL' : 'Ocultar SQL') 
+                : (language === 'es' ? 'Ver SQL de Seguridad' : 'Ver SQL de Segurança')}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopySecuritySql}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 cursor-pointer active:scale-95"
+            >
+              {copiedSecuritySql ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedSecuritySql ? (language === 'es' ? '¡Copiado!' : 'Copiado!') : (language === 'es' ? 'Copiar SQL de Seguridad' : 'Copiar SQL de Segurança')}</span>
+            </button>
+          </div>
+        </div>
+
+        {showSecuritySql && (
+          <div className="mt-3 space-y-3 animate-in fade-in">
+            <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-800/30 text-xs text-indigo-300 flex items-center justify-between gap-2">
+              <span className="text-[11px]">
+                {language === 'es'
+                  ? 'Pegue y ejecute este script en el SQL Editor de Supabase para activar RLS y bloquear lecturas no autorizadas.'
+                  : 'Cole e execute este script no SQL Editor do Supabase para ativar RLS e blindar suas tabelas contra F12.'}
+              </span>
+              <a
+                href="https://supabase.com/dashboard/project/lmbpvdpmrdfxfqednwxd/sql/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-300 hover:text-white font-semibold inline-flex items-center gap-1 shrink-0"
+              >
+                <span>SQL Editor</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <div className="relative">
+              <pre className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] text-indigo-300/90 font-mono overflow-x-auto max-h-72 leading-relaxed select-all">
+                {SECURITY_SQL_SCRIPT}
+              </pre>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2-Column: Backup Operations + Snapshots History */}

@@ -152,20 +152,14 @@ export const TopNav: React.FC<Props> = ({
           {/* Language Selector Switcher (ES / PT) */}
           <LanguageSwitcher />
 
-          {/* Real-time Exchange Rates Ticker Pill */}
-          <button
-            type="button"
-            onClick={() => setIsRatesOpen(true)}
-            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-[#1E273A] bg-[#0E1422] hover:bg-[#151D30] text-xs text-neutral-300 transition-colors items-center gap-2 font-mono-nums"
-            title={t.ratesTicker}
+          {/* Moeda Oficial Guaraní (PYG) Pill */}
+          <div
+            className="hidden sm:flex px-2.5 py-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs text-amber-300 items-center gap-1.5 font-mono-nums"
+            title="Moeda Oficial: Guaraní (₲ PYG)"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-amber-400">1 R$ = {exchangeRates.BRL_TO_PYG.toLocaleString('pt-BR')} ₲</span>
-              <span className="text-neutral-600 hidden xl:inline">·</span>
-              <span className="text-emerald-400 hidden xl:inline">US$ = R$ {exchangeRates.USD_TO_BRL.toFixed(2)}</span>
-            </div>
-          </button>
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="font-bold text-[11px]">₲ PYG (Guaraní)</span>
+          </div>
 
           {/* Live Sales Stream Continuous Button - hidden on small mobile, visible sm+ */}
           <button
@@ -284,7 +278,7 @@ export const TopNav: React.FC<Props> = ({
                           className="flex items-center justify-between p-2 rounded-xl hover:bg-[#141B2B] cursor-pointer text-xs"
                         >
                           <span className="text-neutral-200 font-medium">{p.name} ({p.code})</span>
-                          <span className="text-amber-400 font-mono-nums font-semibold">{formatCurrency(p.priceBrl, 'BRL')} / {p.unit}</span>
+                          <span className="text-amber-400 font-mono-nums font-semibold">{formatCurrency(p.priceBrl, 'PYG')} / {p.unit}</span>
                         </div>
                       ))}
                     </div>

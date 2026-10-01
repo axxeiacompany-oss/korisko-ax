@@ -241,7 +241,7 @@ export const LiveSalesStream: React.FC<Props> = ({
               {language === 'es' ? 'Total Facturado' : 'Total Faturado'}
             </span>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg font-bold text-emerald-400 font-mono-nums">{formatCurrency(totalRevenue, 'BRL')}</span>
+              <span className="text-lg font-bold text-amber-400 font-mono-nums">{formatCurrency(totalRevenue, 'PYG')}</span>
             </div>
           </div>
 
@@ -250,7 +250,7 @@ export const LiveSalesStream: React.FC<Props> = ({
               Ticket Médio
             </span>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg font-bold text-neutral-200 font-mono-nums">{formatCurrency(ticketMedio, 'BRL')}</span>
+              <span className="text-lg font-bold text-neutral-200 font-mono-nums">{formatCurrency(ticketMedio, 'PYG')}</span>
             </div>
           </div>
         </div>
@@ -286,15 +286,11 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
           ) : (
             streamSales.map((sale, idx) => {
-              const payment = sale.payments[0] || { method: 'dinheiro', currency: 'BRL', amountReceived: sale.totalBrl };
+              const payment = sale.payments[0] || { method: 'dinheiro', currency: 'PYG', amountReceived: sale.totalBrl };
               const badge = getPaymentBadge(payment.method);
               const BadgeIcon = badge.icon;
               const relativeTime = getRelativeTime(sale.timestamp);
               const isRecent = idx === 0;
-
-              // Currency conversions
-              const pygValue = fromBrl(sale.totalBrl, 'PYG', exchangeRates);
-              const usdValue = fromBrl(sale.totalBrl, 'USD', exchangeRates);
 
               return (
                 <div
@@ -335,7 +331,7 @@ export const LiveSalesStream: React.FC<Props> = ({
                             key={itemIdx} 
                             className="inline-flex items-center px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300"
                           >
-                            <strong className="text-emerald-400 mr-1 font-mono-nums">{item.quantity}x</strong> 
+                            <strong className="text-amber-400 mr-1 font-mono-nums">{item.quantity}x</strong> 
                             {item.product.name}
                           </span>
                         ))}
@@ -343,16 +339,11 @@ export const LiveSalesStream: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Right Column: Multi-Currency Total & Action */}
+                  {/* Right Column: Guaraní Total & Action */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-850">
                     <div className="text-right">
-                      <div className="text-sm font-bold text-neutral-100 font-mono-nums">
-                        {formatCurrency(sale.totalBrl, 'BRL')}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono-nums justify-end">
-                        <span>₲ {Math.round(pygValue).toLocaleString('es-PY')}</span>
-                        <span>•</span>
-                        <span>$ {usdValue.toFixed(2)}</span>
+                      <div className="text-base font-bold text-amber-400 font-mono-nums">
+                        {formatCurrency(sale.totalBrl, 'PYG')}
                       </div>
                     </div>
 

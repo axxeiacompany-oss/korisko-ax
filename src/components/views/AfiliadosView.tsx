@@ -120,11 +120,11 @@ const AVAILABLE_FEATURES: Array<{
   },
   {
     id: 'cambio',
-    label: 'Cotação & Multi-Moedas',
+    label: 'Moeda Oficial (₲ PYG)',
     category: 'Financeiro',
-    description: 'Cotações ao vivo de BRL, Guaraní (PYG) e Dólar (USD)',
+    description: 'Operações financeiras e consolidação em Guaraní (₲ PYG)',
     icon: Coins,
-    color: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
+    color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   },
   {
     id: 'backup',

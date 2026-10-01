@@ -8,20 +8,19 @@ interface Props {
 }
 
 export const OpenRegisterModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  const { openRegister, currentUser } = useBakery();
+  const { openRegister, currentUser, language } = useBakery();
 
-  const [floatBrl, setFloatBrl] = useState('300.00');
   const [floatPyg, setFloatPyg] = useState('500000');
-  const [floatUsd, setFloatUsd] = useState('50.00');
 
   if (!isOpen) return null;
 
   const handleOpen = (e: React.FormEvent) => {
     e.preventDefault();
+    const pygVal = parseFloat(floatPyg) || 0;
     openRegister({
-      brl: parseFloat(floatBrl) || 0,
-      pyg: parseFloat(floatPyg) || 0,
-      usd: parseFloat(floatUsd) || 0,
+      brl: pygVal, // 1:1 internal
+      pyg: pygVal,
+      usd: 0,
     });
     onClose();
   };
@@ -40,8 +39,12 @@ export const OpenRegisterModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <Unlock className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-neutral-100">Abrir Novo Turno de Caixa</h2>
-              <p className="text-xs text-neutral-400">Defina o fundo de troco inicial para cada moeda</p>
+              <h2 className="text-base font-semibold text-neutral-100">
+                {language === 'es' ? 'Abrir Turno de Caja' : 'Abrir Turno de Caixa'}
+              </h2>
+              <p className="text-xs text-neutral-400">
+                {language === 'es' ? 'Fondo de cambio inicial en Guaraníes (₲)' : 'Fundo de troco inicial em Guaranis (₲)'}
+              </p>
             </div>
           </div>
           <button
@@ -55,69 +58,58 @@ export const OpenRegisterModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Form */}
         <form onSubmit={handleOpen} className="p-6 space-y-4">
           <div className="text-xs text-neutral-400 pb-1">
-            Operador de abertura: <strong className="text-neutral-200">{currentUser.name}</strong>
-          </div>
-
-          {/* Initial float BRL */}
-          <div>
-            <label className="text-xs font-medium text-neutral-300 block mb-1">
-              Fundo de Troco Inicial em Real (R$)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              required
-              value={floatBrl}
-              onChange={(e) => setFloatBrl(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm font-mono-nums font-semibold text-neutral-100 focus:outline-none focus:border-emerald-500"
-            />
+            {language === 'es' ? 'Operador de apertura:' : 'Operador de abertura:'} <strong className="text-neutral-200">{currentUser.name}</strong>
           </div>
 
           {/* Initial float PYG */}
           <div>
-            <label className="text-xs font-medium text-neutral-300 block mb-1">
-              Fundo de Troco Inicial em Guaraní (₲)
+            <label className="text-xs font-semibold text-neutral-300 block mb-1.5">
+              {language === 'es' ? 'Fondo de Cambio Inicial (₲ Guaraní)' : 'Fundo de Troco Inicial (₲ Guaraní)'}
             </label>
-            <input
-              type="number"
-              step="10000"
-              required
-              value={floatPyg}
-              onChange={(e) => setFloatPyg(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm font-mono-nums font-semibold text-amber-400 focus:outline-none focus:border-emerald-500"
-            />
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-400 font-mono">
+                ₲
+              </span>
+              <input
+                type="number"
+                step="10000"
+                required
+                value={floatPyg}
+                onChange={(e) => setFloatPyg(e.target.value)}
+                placeholder="500000"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-4 py-3 text-lg font-mono-nums font-bold text-amber-400 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
           </div>
 
-          {/* Initial float USD */}
-          <div>
-            <label className="text-xs font-medium text-neutral-300 block mb-1">
-              Fundo de Troco Inicial em Dólar ($)
-            </label>
-            <input
-              type="number"
-              step="1"
-              required
-              value={floatUsd}
-              onChange={(e) => setFloatUsd(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm font-mono-nums font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500"
-            />
+          {/* Quick presets */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            {[200000, 300000, 500000, 1000000].map(val => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setFloatPyg(val.toString())}
+                className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-mono font-bold transition-all cursor-pointer"
+              >
+                ₲ {val.toLocaleString('es-PY')}
+              </button>
+            ))}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+          <div className="flex items-center justify-end gap-2 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
             >
-              Cancelar
+              {language === 'es' ? 'Cancelar' : 'Cancelar'}
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-1.5"
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <Check className="w-4 h-4 stroke-[2.5]" />
-              Iniciar Turno / Abrir Caixa
+              <Check className="w-4 h-4" />
+              <span>{language === 'es' ? 'Abrir Caja' : 'Abrir Caixa'}</span>
             </button>
           </div>
         </form>

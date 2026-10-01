@@ -196,29 +196,31 @@ export const NewProductModal: React.FC<Props> = ({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Price BRL */}
+            {/* Price Guaraní */}
             <div>
               <label className="text-xs font-medium text-neutral-300 block mb-1">
-                Preço Venda (R$)
+                Preço Venda (₲ PYG) *
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="100"
                 required
+                placeholder="15000"
                 value={priceBrl}
                 onChange={(e) => setPriceBrl(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs font-mono-nums font-semibold text-emerald-400 focus:outline-none focus:border-amber-500"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs font-mono-nums font-semibold text-amber-400 focus:outline-none focus:border-amber-500"
               />
             </div>
 
             {/* Cost Price */}
             <div>
               <label className="text-xs font-medium text-neutral-300 block mb-1">
-                Custo (R$)
+                Custo (₲ PYG)
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="100"
+                placeholder="8000"
                 value={costPriceBrl}
                 onChange={(e) => setCostPriceBrl(e.target.value)}
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs font-mono-nums text-neutral-400 focus:outline-none focus:border-amber-500"

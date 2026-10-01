@@ -70,9 +70,6 @@ export const DeleteSaleModal: React.FC<Props> = ({
     }
   );
 
-  const pygTotal = fromBrl(sale.totalBrl, 'PYG', exchangeRates);
-  const usdTotal = fromBrl(sale.totalBrl, 'USD', exchangeRates);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -180,7 +177,7 @@ export const DeleteSaleModal: React.FC<Props> = ({
                           {it.product.name}
                         </span>
                         <span className="font-mono-nums text-neutral-400">
-                          {formatCurrency(it.subtotalBrl, 'BRL')}
+                          {formatCurrency(it.subtotalBrl, 'PYG')}
                         </span>
                       </div>
                     ))}
@@ -193,11 +190,8 @@ export const DeleteSaleModal: React.FC<Props> = ({
                     {language === 'es' ? 'Total de la Venta:' : 'Total da Venda:'}
                   </span>
                   <div className="text-right">
-                    <div className="text-base font-bold text-neutral-100 font-mono-nums">
-                      {formatCurrency(sale.totalBrl, 'BRL')}
-                    </div>
-                    <div className="text-[10px] text-neutral-400 font-mono-nums">
-                      ₲ {Math.round(pygTotal).toLocaleString('es-PY')} · $ {usdTotal.toFixed(2)}
+                    <div className="text-base font-bold text-amber-400 font-mono-nums">
+                      {formatCurrency(sale.totalBrl, 'PYG')}
                     </div>
                   </div>
                 </div>

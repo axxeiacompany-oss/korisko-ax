@@ -48,7 +48,7 @@ export const SangriaSuprimentoModal: React.FC<Props> = ({
   const categories = isSaida ? SAIDA_CATEGORIES : ENTRADA_CATEGORIES;
 
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<Currency>('BRL');
+  const currency: Currency = 'PYG';
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [reason, setReason] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -63,9 +63,9 @@ export const SangriaSuprimentoModal: React.FC<Props> = ({
     const finalReason = reason.trim() ? reason.trim() : selectedCategory;
 
     if (isSaida) {
-      recordSaidaCaixa(val, currency, finalReason, selectedCategory, documentNumber);
+      recordSaidaCaixa(val, 'PYG', finalReason, selectedCategory, documentNumber);
     } else {
-      recordEntradaCaixa(val, currency, finalReason, selectedCategory, documentNumber);
+      recordEntradaCaixa(val, 'PYG', finalReason, selectedCategory, documentNumber);
     }
 
     // Reset and close
@@ -126,56 +126,44 @@ export const SangriaSuprimentoModal: React.FC<Props> = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
-          {/* Currency selection */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-              <DollarSign className="w-3.5 h-3.5 text-neutral-400" />
-              {language === 'es' ? 'Moeda da Operação' : 'Moeda da Operação'}
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['BRL', 'PYG', 'USD'] as const).map(cur => (
-                <button
-                  key={cur}
-                  type="button"
-                  onClick={() => setCurrency(cur)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    currency === cur
-                      ? isSaida 
-                        ? 'border-rose-500 bg-rose-500/15 text-rose-300 shadow-md shadow-rose-950/30' 
-                        : 'border-emerald-500 bg-emerald-500/15 text-emerald-300 shadow-md shadow-emerald-950/30'
-                      : 'border-[#1F273A] bg-[#0A0E18] text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
-                  }`}
-                >
-                  <span>{cur === 'BRL' ? 'Real (R$)' : cur === 'PYG' ? 'Guaraní (₲)' : 'Dólar ($)'}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Amount */}
+          {/* Amount in Guaraní */}
           <div className="space-y-1.5">
             <label htmlFor="cash-movement-amount" className="text-xs font-semibold text-neutral-300 block">
               {language === 'es' 
-                ? `Valor da ${isSaida ? 'Salida' : 'Entrada'} (${currency})` 
-                : `Valor da ${isSaida ? 'Saída' : 'Entrada'} (${currency})`} <span className="text-rose-400">*</span>
+                ? `Monto de la ${isSaida ? 'Salida' : 'Entrada'} (₲ Guaraní)` 
+                : `Valor da ${isSaida ? 'Saída' : 'Entrada'} (₲ Guaraní)`} <span className="text-rose-400">*</span>
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400 font-mono font-bold text-sm">
-                {currency === 'BRL' ? 'R$' : currency === 'PYG' ? '₲' : '$'}
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-400 font-mono font-bold text-sm">
+                ₲
               </div>
               <input
                 id="cash-movement-amount"
                 name="amount"
                 type="number"
-                step={currency === 'PYG' ? '500' : '0.01'}
-                min="0.01"
+                step="1000"
+                min="1000"
                 required
                 autoFocus
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                className="w-full bg-[#0A0E18] border border-[#1F273A] rounded-xl pl-12 pr-4 py-3 text-lg font-mono-nums font-bold text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 placeholder-neutral-600 transition-all"
+                placeholder="50000"
+                className="w-full bg-[#0A0E18] border border-[#1F273A] rounded-xl pl-10 pr-4 py-3 text-lg font-mono-nums font-bold text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 placeholder-neutral-600 transition-all"
               />
+            </div>
+
+            {/* Quick chips in Guaraní */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              {[20000, 50000, 100000, 200000, 500000].map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setAmount(val.toString())}
+                  className="px-2.5 py-1 rounded-lg bg-[#141B2B] hover:bg-neutral-800 text-neutral-300 text-xs font-mono font-semibold border border-[#222E46] transition-all cursor-pointer"
+                >
+                  +{val.toLocaleString('es-PY')}
+                </button>
+              ))}
             </div>
           </div>
 

@@ -52,38 +52,32 @@ export const PaymentModal: React.FC<Props> = ({
     return Math.min(rawSubtotalBrl, Math.round((baseDiscount + loyaltyDiscountBrl) * 100) / 100);
   }, [discountType, discountValue, loyaltyDiscountBrl, rawSubtotalBrl]);
 
-  const totalBrl = Math.max(0, Math.round((rawSubtotalBrl - discountBrl) * 100) / 100);
+  const totalBrl = Math.max(0, Math.round(rawSubtotalBrl - discountBrl));
 
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
   
-  // Current input for adding a payment entry
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency>('BRL');
+  // Current input for adding a payment entry (Moeda única oficial: Guaraní ₲)
+  const selectedCurrency: Currency = 'PYG';
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('dinheiro');
   const [inputAmount, setInputAmount] = useState<string>('');
   
-  // Preferred currency for change
-  const [changeCurrency, setChangeCurrency] = useState<Currency>('BRL');
+  // Preferred currency for change (Guaraní ₲)
+  const changeCurrency: Currency = 'PYG';
 
-  // Calculate total paid so far in BRL
+  // Calculate total paid so far in Guaraní
   const totalPaidBrl = useMemo(() => {
     return payments.reduce((acc, p) => acc + p.equivalentBrl, 0);
   }, [payments]);
 
-  // Remaining to pay in BRL
-  const remainingBrl = Math.max(0, Math.round((totalBrl - totalPaidBrl) * 100) / 100);
+  // Remaining to pay in Guaraní
+  const remainingBrl = Math.max(0, Math.round(totalBrl - totalPaidBrl));
 
-  // Change amount in BRL
-  const changeBrl = Math.max(0, Math.round((totalPaidBrl - totalBrl) * 100) / 100);
+  // Change amount in Guaraní
+  const changeBrl = Math.max(0, Math.round(totalPaidBrl - totalBrl));
+  const changeInSelectedCurrency = changeBrl;
 
-  // Change converted to customer's preferred change currency
-  const changeInSelectedCurrency = fromBrl(changeBrl, changeCurrency, exchangeRates);
-
-  // Suggested amount in selected currency for remaining balance
-  const suggestedAmountForSelectedCur = useMemo(() => {
-    if (remainingBrl <= 0) return 0;
-    const converted = fromBrl(remainingBrl, selectedCurrency, exchangeRates);
-    return selectedCurrency === 'PYG' ? Math.round(converted) : Math.round(converted * 100) / 100;
-  }, [remainingBrl, selectedCurrency, exchangeRates]);
+  // Suggested amount in Guaraní
+  const suggestedAmountForSelectedCur = remainingBrl;
 
   if (!isOpen) return null;
 
@@ -121,26 +115,12 @@ export const PaymentModal: React.FC<Props> = ({
       return;
     }
 
-    let eqBrl = 0;
-    let rateUsed = 1;
-
-    if (selectedCurrency === 'BRL') {
-      eqBrl = val;
-      rateUsed = 1;
-    } else if (selectedCurrency === 'USD') {
-      eqBrl = Math.round(val * exchangeRates.USD_TO_BRL * 100) / 100;
-      rateUsed = exchangeRates.USD_TO_BRL;
-    } else if (selectedCurrency === 'PYG') {
-      eqBrl = Math.round((val / exchangeRates.BRL_TO_PYG) * 100) / 100;
-      rateUsed = 1 / exchangeRates.BRL_TO_PYG;
-    }
-
     const newPayment: PaymentEntry = {
       id: `pay-${Date.now()}-${Math.random()}`,
-      currency: selectedCurrency,
+      currency: 'PYG',
       amountReceived: val,
-      exchangeRateUsed: rateUsed,
-      equivalentBrl: eqBrl,
+      exchangeRateUsed: 1,
+      equivalentBrl: val,
       method: selectedMethod,
     };
 
@@ -153,34 +133,18 @@ export const PaymentModal: React.FC<Props> = ({
   };
 
   const handleSetExactRemaining = () => {
-    setInputAmount(suggestedAmountForSelectedCur.toString());
+    setInputAmount(remainingBrl.toString());
   };
 
-  const handlePayFullInCurrency = (cur: Currency) => {
+  const handlePayFullInCurrency = (_cur?: Currency) => {
     if (remainingBrl <= 0) return;
-    const converted = fromBrl(remainingBrl, cur, exchangeRates);
-    const amountVal = cur === 'PYG' ? Math.round(converted) : Math.round(converted * 100) / 100;
-    
-    let eqBrl = 0;
-    let rateUsed = 1;
-
-    if (cur === 'BRL') {
-      eqBrl = remainingBrl;
-      rateUsed = 1;
-    } else if (cur === 'USD') {
-      eqBrl = remainingBrl;
-      rateUsed = exchangeRates.USD_TO_BRL;
-    } else if (cur === 'PYG') {
-      eqBrl = remainingBrl;
-      rateUsed = 1 / (exchangeRates.BRL_TO_PYG || 1380);
-    }
 
     const newPayment: PaymentEntry = {
       id: `pay-${Date.now()}-${Math.random()}`,
-      currency: cur,
-      amountReceived: amountVal,
-      exchangeRateUsed: rateUsed,
-      equivalentBrl: eqBrl,
+      currency: 'PYG',
+      amountReceived: remainingBrl,
+      exchangeRateUsed: 1,
+      equivalentBrl: remainingBrl,
       method: selectedMethod,
     };
 
@@ -232,12 +196,8 @@ export const PaymentModal: React.FC<Props> = ({
     }
   };
 
-  // Quick bills based on selected currency
-  const quickBills = selectedCurrency === 'BRL'
-    ? [10, 20, 50, 100, 200]
-    : selectedCurrency === 'PYG'
-    ? [20000, 50000, 100000, 200000]
-    : [5, 10, 20, 50, 100];
+  // Quick bills in Guaraní (₲)
+  const quickBills = [5000, 10000, 20000, 50000, 100000, 200000];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm sm:p-4 overflow-y-auto">
@@ -296,7 +256,7 @@ export const PaymentModal: React.FC<Props> = ({
                 <option value="">Cliente Avulso (Não cadastrado)</option>
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.category}) — Fiado: {formatCurrency(c.outstandingBalanceBrl, 'BRL')}
+                    {c.name} ({c.category}) — Fiado: {formatCurrency(c.outstandingBalanceBrl, 'PYG')}
                   </option>
                 ))}
               </select>
@@ -314,11 +274,11 @@ export const PaymentModal: React.FC<Props> = ({
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] border-t border-neutral-800/80">
                 <div className="flex items-center gap-3">
                   <span className="text-neutral-400">
-                    Limite: <strong className="text-neutral-200 font-mono-nums">{formatCurrency(selectedCustomer.creditLimitBrl, 'BRL')}</strong>
+                    Limite: <strong className="text-neutral-200 font-mono-nums">{formatCurrency(selectedCustomer.creditLimitBrl, 'PYG')}</strong>
                   </span>
                   <span className="text-neutral-400">
                     Fiado Atual: <strong className={selectedCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400 font-mono-nums' : 'text-emerald-400 font-mono-nums'}>
-                      {formatCurrency(selectedCustomer.outstandingBalanceBrl, 'BRL')}
+                      {formatCurrency(selectedCustomer.outstandingBalanceBrl, 'PYG')}
                     </strong>
                   </span>
                 </div>
@@ -335,7 +295,7 @@ export const PaymentModal: React.FC<Props> = ({
                 )}
                 {loyaltyDiscountBrl > 0 && (
                   <span className="text-emerald-400 font-semibold">
-                    ✓ Desconto de Fidelidade Aplicado: -{formatCurrency(loyaltyDiscountBrl, 'BRL')}
+                    ✓ Desconto de Fidelidade Aplicado: -{formatCurrency(loyaltyDiscountBrl, 'PYG')}
                   </span>
                 )}
               </div>
@@ -370,10 +330,10 @@ export const PaymentModal: React.FC<Props> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDiscountType('fixed'); setDiscountValue('2'); }}
+                  onClick={() => { setDiscountType('fixed'); setDiscountValue('5000'); }}
                   className={`px-2 py-1 rounded text-[11px] ${discountType === 'fixed' ? 'bg-amber-500/20 text-amber-300 font-semibold' : 'text-neutral-500 hover:text-neutral-300'}`}
                 >
-                  R$ Fixo
+                  ₲ Fixo
                 </button>
               </div>
             </div>
@@ -386,111 +346,65 @@ export const PaymentModal: React.FC<Props> = ({
                   min="0"
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
-                  placeholder={discountType === 'percent' ? '%' : 'R$'}
-                  className="w-16 bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-xs text-neutral-100 font-mono-nums text-center"
+                  placeholder={discountType === 'percent' ? '%' : '₲'}
+                  className="w-20 bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-xs text-neutral-100 font-mono-nums text-center"
                 />
                 <span className="text-emerald-400 font-semibold font-mono-nums text-xs">
-                  - {formatCurrency(discountBrl, 'BRL')}
+                  - {formatCurrency(discountBrl, 'PYG')}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Total Overview in 3 Currencies */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-neutral-950 border border-neutral-800">
+          {/* Total Overview in Guaraní */}
+          <div className="p-3 sm:p-4 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
             <div className="text-left min-w-0">
-              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Total BRL</span>
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className="text-base sm:text-lg font-bold text-neutral-100 font-mono-nums">
-                  {formatCurrency(totalBrl, 'BRL')}
+              <span className="text-xs font-semibold text-neutral-400 flex items-center gap-1.5">
+                <span className="text-amber-400 font-bold">🇵🇾 ₲</span>
+                <span>{language === 'es' ? 'Total a Pagar (Guaraníes)' : 'Total a Pagar (Guaranis)'}</span>
+              </span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl sm:text-3xl font-black text-amber-400 font-mono-nums">
+                  {formatCurrency(totalBrl, 'PYG')}
                 </span>
                 {discountBrl > 0 && (
-                  <span className="text-[10px] text-neutral-500 line-through font-mono-nums">
-                    {formatCurrency(rawSubtotalBrl, 'BRL')}
+                  <span className="text-xs text-neutral-500 line-through font-mono-nums">
+                    {formatCurrency(rawSubtotalBrl, 'PYG')}
                   </span>
                 )}
               </div>
             </div>
-            <div className="text-left border-l border-neutral-800 pl-2 sm:pl-3 min-w-0">
-              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Guaranis (PYG)</span>
-              <span className="text-base sm:text-lg font-bold text-amber-400 font-mono-nums block truncate">
-                {formatCurrency(fromBrl(totalBrl, 'PYG', exchangeRates), 'PYG')}
+            {discountBrl > 0 && (
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-mono-nums">
+                - {formatCurrency(discountBrl, 'PYG')}
               </span>
-            </div>
-            <div className="text-left border-l border-neutral-800 pl-2 sm:pl-3 min-w-0">
-              <span className="text-[10px] sm:text-[11px] font-medium text-neutral-400 block truncate">Dólares (USD)</span>
-              <span className="text-base sm:text-lg font-bold text-emerald-400 font-mono-nums block truncate">
-                {formatCurrency(fromBrl(totalBrl, 'USD', exchangeRates), 'USD')}
-              </span>
-            </div>
+            )}
           </div>
 
           {/* Payment Input Area */}
           <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/40 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-neutral-300">Receber Pagamento</span>
+              <span className="text-xs font-semibold text-neutral-300">Receber Pagamento (₲)</span>
               <span className="text-xs text-neutral-400">
-                Faltando: <strong className="text-amber-400 font-mono-nums">{formatCurrency(remainingBrl, 'BRL')}</strong>
+                Faltando: <strong className="text-amber-400 font-mono-nums">{formatCurrency(remainingBrl, 'PYG')}</strong>
               </span>
             </div>
 
-            {/* Currency selector tabs with live converted values */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
-                  {language === 'es' ? 'Seleccione la moneda a pagar:' : 'Escolha a moeda que o cliente vai pagar:'}
-                </span>
-                <span className="text-[10px] text-neutral-400 font-mono-nums">
-                  1 R$ = ₲ {exchangeRates.BRL_TO_PYG?.toLocaleString() || '1.380'}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {(['BRL', 'PYG', 'USD'] as const).map(cur => {
-                  const remInCur = fromBrl(remainingBrl, cur, exchangeRates);
-                  const isSelected = selectedCurrency === cur;
-                  return (
-                    <button
-                      key={cur}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCurrency(cur);
-                        setInputAmount(cur === 'PYG' ? Math.round(remInCur).toString() : remInCur.toFixed(2));
-                      }}
-                      className={`py-2 px-2 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 ${
-                        isSelected
-                          ? 'border-amber-400 bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/40 shadow-sm'
-                          : 'border-neutral-800 bg-neutral-900/90 text-neutral-400 hover:text-neutral-200'
-                      }`}
-                    >
-                      <span className="font-bold flex items-center gap-1">
-                        <span>{cur === 'BRL' ? '🇧🇷 Real' : cur === 'PYG' ? '🇵🇾 Guaraní' : '🇺🇸 Dólar'}</span>
-                      </span>
-                      <span className="text-[11px] font-mono-nums font-bold text-neutral-200">
-                        {formatCurrency(remInCur, cur)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick 1-click Pay Remaining Full in Selected Currency */}
+            {/* Quick 1-click Pay Remaining Full in Guaraní */}
             {remainingBrl > 0 && (
               <button
                 type="button"
-                onClick={() => handlePayFullInCurrency(selectedCurrency)}
+                onClick={() => handlePayFullInCurrency('PYG')}
                 className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-emerald-500/15 border border-amber-500/30 hover:border-amber-500/50 text-amber-300 text-xs font-bold transition-all flex items-center justify-between cursor-pointer active:scale-98"
               >
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />
                   <span>
-                    {language === 'es' 
-                      ? `Pagar Todo en ${selectedCurrency === 'BRL' ? 'Reales (BRL)' : selectedCurrency === 'PYG' ? 'Guaraníes (PYG)' : 'Dólares (USD)'}` 
-                      : `Pagar Total em ${selectedCurrency === 'BRL' ? 'Reais (BRL)' : selectedCurrency === 'PYG' ? 'Guaranis (PYG)' : 'Dólares (USD)'}`}
+                    {language === 'es' ? 'Pagar Total en Guaraníes (₲)' : 'Pagar Total em Guaranis (₲)'}
                   </span>
                 </div>
                 <span className="font-mono-nums text-white font-black">
-                  {formatCurrency(suggestedAmountForSelectedCur, selectedCurrency)}
+                  {formatCurrency(remainingBrl, 'PYG')}
                 </span>
               </button>
             )}
@@ -539,28 +453,26 @@ export const PaymentModal: React.FC<Props> = ({
             <div className="space-y-2">
               <div className="flex gap-2">
                 <div className="relative flex-1">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-400 font-mono">
+                    ₲
+                  </span>
                   <input
                     type="number"
-                    step={selectedCurrency === 'PYG' ? '1000' : '0.01'}
+                    step="1000"
                     value={inputAmount}
                     onChange={(e) => setInputAmount(e.target.value)}
-                    placeholder={`Valor recebido em ${selectedCurrency}...`}
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-base font-mono-nums font-semibold text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                    placeholder={language === 'es' ? 'Monto recibido en Guaraníes (₲)...' : 'Valor recebido em Guaranis (₲)...'}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl pl-9 pr-4 py-2.5 text-base font-mono-nums font-semibold text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                   />
-                  {selectedCurrency !== 'BRL' && inputAmount && parseFloat(inputAmount) > 0 && (
-                    <span className="absolute right-3 top-3 text-xs text-neutral-400 font-mono-nums">
-                      ≈ {formatCurrency(toBrl(parseFloat(inputAmount), selectedCurrency, exchangeRates), 'BRL')}
-                    </span>
-                  )}
                 </div>
                 <button
                   type="button"
                   onClick={handleAddPayment}
                   disabled={!inputAmount || parseFloat(inputAmount) <= 0}
-                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[2.5]" />
-                  Adicionar
+                  {language === 'es' ? 'Agregar' : 'Adicionar'}
                 </button>
               </div>
 
@@ -569,18 +481,18 @@ export const PaymentModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleSetExactRemaining}
-                  className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-amber-300 text-xs font-medium border border-neutral-700 transition-colors"
+                  className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-300 text-xs font-medium border border-neutral-700 transition-colors cursor-pointer"
                 >
-                  Valor Exato Restante ({suggestedAmountForSelectedCur})
+                  {language === 'es' ? 'Valor Exacto' : 'Valor Exato'} ({formatCurrency(remainingBrl, 'PYG')})
                 </button>
                 {quickBills.map(b => (
                   <button
                     key={b}
                     type="button"
                     onClick={() => handleQuickAddBill(b)}
-                    className="px-2 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-mono-nums border border-neutral-800 transition-colors"
+                    className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-mono-nums font-semibold border border-neutral-800 transition-colors cursor-pointer"
                   >
-                    +{b}
+                    +{b.toLocaleString('es-PY')}
                   </button>
                 ))}
               </div>
@@ -591,7 +503,7 @@ export const PaymentModal: React.FC<Props> = ({
           {payments.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider block">
-                Pagamentos Registrados ({payments.length})
+                {language === 'es' ? `Pagos Registrados (${payments.length})` : `Pagamentos Registrados (${payments.length})`}
               </span>
               <div className="space-y-1.5">
                 {payments.map(p => (
@@ -600,20 +512,15 @@ export const PaymentModal: React.FC<Props> = ({
                     className="flex items-center justify-between p-2.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-neutral-200 uppercase font-mono-nums">
-                        {formatCurrency(p.amountReceived, p.currency)}
+                      <span className="font-bold text-amber-400 uppercase font-mono-nums">
+                        {formatCurrency(p.amountReceived, 'PYG')}
                       </span>
-                      <span className="text-neutral-500 font-medium">({p.method.replace('_', ' ')})</span>
-                      {p.currency !== 'BRL' && (
-                        <span className="text-neutral-400 text-[11px] font-mono-nums">
-                          → {formatCurrency(p.equivalentBrl, 'BRL')}
-                        </span>
-                      )}
+                      <span className="text-neutral-400 font-medium">({p.method.replace('_', ' ')})</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemovePayment(p.id)}
-                      className="text-neutral-500 hover:text-rose-400 p-1 transition-colors"
+                      className="text-neutral-500 hover:text-rose-400 p-1 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -624,36 +531,13 @@ export const PaymentModal: React.FC<Props> = ({
           )}
 
           {/* Change (Troco) */}
-          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-neutral-400">Troco a Devolver</span>
-              <div className="flex items-center gap-1">
-                {(['BRL', 'PYG', 'USD'] as const).map(cur => (
-                  <button
-                    key={cur}
-                    type="button"
-                    onClick={() => setChangeCurrency(cur)}
-                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                      changeCurrency === cur
-                        ? 'bg-amber-500 text-neutral-950'
-                        : 'bg-neutral-800 text-neutral-400'
-                    }`}
-                  >
-                    {cur}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-base font-bold text-amber-400 font-mono-nums">
-                {formatCurrency(changeInSelectedCurrency, changeCurrency)}
-              </span>
-              {changeCurrency !== 'BRL' && changeBrl > 0 && (
-                <span className="text-xs text-neutral-500 font-mono-nums">
-                  (Eqv. {formatCurrency(changeBrl, 'BRL')})
-                </span>
-              )}
-            </div>
+          <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+            <span className="text-xs font-medium text-neutral-400">
+              {language === 'es' ? 'Vuelto a Entregar (₲)' : 'Troco a Devolver (₲)'}
+            </span>
+            <span className="text-lg font-black text-amber-400 font-mono-nums">
+              {formatCurrency(changeBrl, 'PYG')}
+            </span>
           </div>
 
         </div>
@@ -663,7 +547,7 @@ export const PaymentModal: React.FC<Props> = ({
           <div className="flex items-center justify-between sm:block">
             <span className="text-[11px] sm:text-xs text-neutral-400 block">Total da Venda</span>
             <span className="text-base sm:text-sm font-bold text-neutral-100 font-mono-nums">
-              {formatCurrency(totalBrl, 'BRL')}
+              {formatCurrency(totalBrl, 'PYG')}
             </span>
           </div>
 

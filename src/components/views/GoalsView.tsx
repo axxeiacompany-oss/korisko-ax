@@ -118,9 +118,9 @@ export const GoalsView: React.FC = () => {
               Progresso do Faturamento ({now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})
             </span>
             <div className="text-3xl font-bold text-neutral-100 font-mono-nums mt-1">
-              {formatCurrency(monthRevenueBrl, 'BRL')}
+              {formatCurrency(monthRevenueBrl, 'PYG')}
               <span className="text-sm font-normal text-neutral-500 ml-2">
-                de {formatCurrency(currentGoal.targetRevenueBrl, 'BRL')}
+                de {formatCurrency(currentGoal.targetRevenueBrl, 'PYG')}
               </span>
             </div>
           </div>
@@ -144,7 +144,7 @@ export const GoalsView: React.FC = () => {
           
           <div className="flex justify-between text-xs text-neutral-500 font-mono-nums">
             <span>Dia {dayOfMonth} de {daysInMonth}</span>
-            <span>Faltam {formatCurrency(remainingToGoal, 'BRL')}</span>
+            <span>Faltam {formatCurrency(remainingToGoal, 'PYG')}</span>
           </div>
         </div>
 
@@ -153,17 +153,17 @@ export const GoalsView: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-850 space-y-1">
             <span className="text-xs text-neutral-500">Média Diária Realizada</span>
             <div className="text-base font-bold text-neutral-200 font-mono-nums">
-              {formatCurrency(currentDailyAverage, 'BRL')}
+              {formatCurrency(currentDailyAverage, 'PYG')}
             </div>
             <span className="text-[11px] text-neutral-500 font-mono-nums">
-              Meta diária: {formatCurrency(currentGoal.targetDailyAverageBrl, 'BRL')}
+              Meta diária: {formatCurrency(currentGoal.targetDailyAverageBrl, 'PYG')}
             </span>
           </div>
 
           <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-850 space-y-1">
             <span className="text-xs text-neutral-500">Projeção até o Fim do Mês</span>
             <div className="text-base font-bold text-emerald-400 font-mono-nums">
-              {formatCurrency(projectedRevenue, 'BRL')}
+              {formatCurrency(projectedRevenue, 'PYG')}
             </div>
             <span className="text-[11px] text-neutral-500">
               {projectedRevenue >= currentGoal.targetRevenueBrl ? '🎯 Meta será superada!' : '⚠️ Necessário acelerar'}
@@ -173,7 +173,7 @@ export const GoalsView: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-850 space-y-1">
             <span className="text-xs text-neutral-500">Meta Diária Restante</span>
             <div className="text-base font-bold text-amber-400 font-mono-nums">
-              {formatCurrency(requiredDailyToHit, 'BRL')}/dia
+              {formatCurrency(requiredDailyToHit, 'PYG')}/dia
             </div>
             <span className="text-[11px] text-neutral-500">
               Nos {remainingDays} dias restantes
@@ -240,10 +240,10 @@ export const GoalsView: React.FC = () => {
           <div>
             <div className="flex items-baseline justify-between">
               <span className="text-2xl font-bold text-neutral-100 font-mono-nums">
-                {formatCurrency(actualTicketMedio, 'BRL')}
+                {formatCurrency(actualTicketMedio, 'PYG')}
               </span>
               <span className="text-xs text-neutral-400 font-mono-nums">
-                Meta: {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
+                Meta: {formatCurrency(currentGoal.targetTicketMedioBrl, 'PYG')}
               </span>
             </div>
 
@@ -296,7 +296,7 @@ export const GoalsView: React.FC = () => {
                 <div>
                   <span className="text-[10px] text-neutral-500 block">Faturamento</span>
                   <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-                    {formatCurrency(item.totalBrl, 'BRL')}
+                    {formatCurrency(item.totalBrl, 'PYG')}
                   </span>
                 </div>
                 <div className="text-right">

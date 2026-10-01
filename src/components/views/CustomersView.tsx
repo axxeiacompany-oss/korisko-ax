@@ -2133,18 +2133,15 @@ export const CustomersView: React.FC = () => {
           <div className="grid grid-cols-3 gap-2 border border-black p-2 text-center text-xs mb-4">
             <div>
               <div className="font-semibold text-neutral-700">Total Comprado</div>
-              <div className="font-bold text-sm">{formatCurrency(statementTotals.totalDebits, 'BRL')}</div>
+              <div className="font-bold text-sm">{formatCurrency(statementTotals.totalDebits, 'PYG')}</div>
             </div>
             <div>
               <div className="font-semibold text-neutral-700">Total Amortizado</div>
-              <div className="font-bold text-sm">{formatCurrency(statementTotals.totalAmortized, 'BRL')}</div>
+              <div className="font-bold text-sm">{formatCurrency(statementTotals.totalAmortized, 'PYG')}</div>
             </div>
             <div>
               <div className="font-semibold text-neutral-700">Saldo Devedor Atual</div>
-              <div className="font-black text-sm">{formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}</div>
-              <div className="text-[10px] text-neutral-600">
-                ≈ ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')}
-              </div>
+              <div className="font-black text-sm">{formatCurrency(statementCustomer.outstandingBalanceBrl, 'PYG')}</div>
             </div>
           </div>
 

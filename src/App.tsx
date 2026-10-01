@@ -220,9 +220,7 @@ function MainAppShell() {
             {t.appName} — {t.systemDescription}
           </p>
           <div className="flex items-center gap-3 text-[11px] font-mono-nums">
-            <span>🇧🇷 BRL</span>
-            <span>🇵🇾 PYG</span>
-            <span>🇺🇸 USD</span>
+            <span className="text-amber-400 font-semibold">🇵🇾 Moeda Oficial: Guaraní (₲ PYG)</span>
             <span className="text-neutral-600">|</span>
             <span className="text-emerald-400">● {language === 'es' ? 'Backup Automático Activo' : 'Backup Automático Ativo'}</span>
           </div>

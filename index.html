@@ -7,14 +7,61 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Korisko - Sistema de Gestão para Padaria</title>
-    <meta name="description" content="Sistema completo para a Padaria Korisko com controle de estoque, comandas, fornadas quentes, PDV multi-moeda (BRL, PYG, USD), fechamento de caixa cego, metas mensais e backup em nuvem." />
+    <meta name="description" content="Sistema de gestão da Padaria Korisko operando exclusivamente em Guaranis (₲ PYG) com PDV ágil, controle de estoque, comandas, fornadas quentes, caixa cego e proteção de segurança blindada." />
     <meta property="og:title" content="Korisko - Sistema de Gestão para Padaria" />
-    <meta property="og:description" content="Sistema completo para a Padaria Korisko com controle de estoque, comandas, fornadas quentes, PDV multi-moeda (BRL, PYG, USD), fechamento de caixa cego, metas mensais e backup em nuvem." />
+    <meta property="og:description" content="Sistema de gestão da Padaria Korisko operando exclusivamente em Guaranis (₲ PYG) com PDV ágil, controle de estoque, comandas, fornadas quentes, caixa cego e proteção de segurança blindada." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        // Bloqueio imediato de F12 e atalhos de desenvolvedor
+        window.addEventListener('keydown', function(e) {
+          if (e.key === 'F12' || e.keyCode === 123) {
+            e.preventDefault(); e.stopPropagation();
+            try { console.clear(); } catch(err) {}
+            return false;
+          }
+          var c = e.ctrlKey || e.metaKey;
+          var k = (e.key || '').toUpperCase();
+          if (c && e.shiftKey && (k === 'I' || k === 'J' || k === 'C' || k === 'K')) {
+            e.preventDefault(); e.stopPropagation();
+            try { console.clear(); } catch(err) {}
+            return false;
+          }
+          if (c && e.altKey && (k === 'I' || k === 'J' || k === 'C')) {
+            e.preventDefault(); e.stopPropagation();
+            try { console.clear(); } catch(err) {}
+            return false;
+          }
+          if (c && (k === 'U' || k === 'S')) {
+            e.preventDefault(); e.stopPropagation();
+            return false;
+          }
+        }, { capture: true, passive: false });
+
+        // Bloqueio de botão direito do mouse (inspecionar elemento)
+        window.addEventListener('contextmenu', function(e) {
+          var t = e.target;
+          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+          e.preventDefault(); e.stopPropagation();
+          return false;
+        }, { capture: true, passive: false });
+
+        // Limpeza de logs
+        try {
+          var noop = function() {};
+          window.console.log = noop;
+          window.console.info = noop;
+          window.console.warn = noop;
+          window.console.debug = noop;
+          window.console.table = noop;
+          window.console.clear();
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body class="bg-neutral-900 text-neutral-100 antialiased selection:bg-amber-500/30 selection:text-amber-200">
     <div id="root"></div>

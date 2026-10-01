@@ -147,13 +147,6 @@ export const Sidebar: React.FC<Props> = ({
           badge: null,
         },
         {
-          id: 'cambio' as TabType,
-          label: t.tabCurrency,
-          icon: Coins,
-          badge: 'BRL/PYG/USD',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300',
-        },
-        {
           id: 'backup' as TabType,
           label: t.tabBackup,
           icon: Cloud,

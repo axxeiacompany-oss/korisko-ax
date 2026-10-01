@@ -228,7 +228,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
 
     // Tab Subtitles
     subDashboard: 'Visión general consolidada en tiempo real del negocio',
-    subPdv: 'Frente de caja, pesaje y cobro multi-moneda (BRL / PYG / USD)',
+    subPdv: 'Frente de caja, pesaje y cobro en Guaraníes (₲ PYG)',
     subDirectSale: 'Cobro rápido ingresando solo el monto y confirmando',
     subInventory: 'Insumos, productos terminados y alertas de vencimiento',
     subRecipes: 'Recetario maestro, márgenes y órdenes de horneada',
@@ -236,7 +236,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     subCashRegister: 'Arqueo ciego, control de sangrías, reposiciones y vuelto',
     subTopProducts: 'Curva ABC y ranking de rotación diaria y mensual',
     subGoals: 'Seguimiento del objetivo financiero del mes',
-    subCurrency: 'Cotizaciones en tiempo real (Real, Guaraní, Dólar)',
+    subCurrency: 'Operaciones exclusivas en Guaraníes (₲ PYG)',
     subBackup: 'Base de datos en la nube (PostgreSQL Railway) y copias locales',
     subAffiliates: 'Gestión de colaboradores, credenciales y control de permisos',
 
@@ -257,7 +257,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     lockSession: 'Bloquear Sesión / Salir',
     switchOperator: 'Cambiar',
     logout: 'Salir',
-    ratesTicker: 'Cotizaciones en tiempo real: BRL, PYG, USD',
+    ratesTicker: 'Moneda Oficial: Guaraní (₲ PYG)',
     close: 'Cerrar',
     save: 'Guardar',
     cancel: 'Cancelar',
@@ -322,7 +322,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     pdvUnit: 'Unidad',
     pdvPrice: 'Precio',
     pdvQuantity: 'Cantidad',
-    pdvMultiCurrencyAccepted: 'Acepta Reales (R$), Guaraníes (₲) y Dólares (US$)',
+    pdvMultiCurrencyAccepted: 'Moneda Oficial: Guaraní (₲ PYG)',
 
     // Direct Sale
     directSaleTitle: 'Venta Directa Exprés',
@@ -429,7 +429,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     subCashRegister: 'Conferência de entradas, saídas e trocos',
     subTopProducts: 'Ranking de giro diário e mensal',
     subGoals: 'Acompanhamento do objetivo financeiro do mês',
-    subCurrency: 'Flutuação cambial em tempo real (Real, Guaraní, Dólar)',
+    subCurrency: 'Operações exclusivas em Guaranis (₲ PYG)',
     subBackup: 'Pontos de restauração e cópia local',
     subAffiliates: 'Gestão de colaboradores, controle de senhas e liberação de funções',
 
@@ -450,7 +450,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     lockSession: 'Bloquear Sessão / Sair',
     switchOperator: 'Trocar',
     logout: 'Sair',
-    ratesTicker: 'Cotações em tempo real: BRL, PYG, USD',
+    ratesTicker: 'Moeda Oficial: Guaraní (₲ PYG)',
     close: 'Fechar',
     save: 'Salvar',
     cancel: 'Cancelar',
@@ -515,7 +515,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     pdvUnit: 'Unidade',
     pdvPrice: 'Preço',
     pdvQuantity: 'Quantidade',
-    pdvMultiCurrencyAccepted: 'Aceita Real (R$), Guaraní (₲) e Dólar (US$)',
+    pdvMultiCurrencyAccepted: 'Moeda Oficial: Guaraní (₲ PYG)',
 
     // Direct Sale
     directSaleTitle: 'Venda Direta Expressa',

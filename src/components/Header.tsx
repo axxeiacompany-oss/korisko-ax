@@ -112,20 +112,16 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
           {/* Language Switcher */}
           <LanguageSwitcher compact />
           
-          {/* Multi-Currency Ticker Button */}
-          <button
-            type="button"
-            onClick={() => setIsRatesOpen(true)}
-            title="Clique para configurar as cotações de câmbio"
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-800 bg-neutral-900/80 hover:bg-neutral-800/80 transition-colors text-xs"
+          {/* Official Currency Badge (₲ Guaraní) */}
+          <div
+            title="Moeda Oficial do Sistema: Guaraní (₲ PYG)"
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-xs"
           >
-            <Coins className="w-3.5 h-3.5 text-emerald-400" />
-            <div className="flex items-center gap-2 font-mono-nums text-[11px] text-neutral-300">
-              <span>$ 1 = R$ {exchangeRates.USD_TO_BRL.toFixed(2)}</span>
-              <span className="text-neutral-600" aria-hidden="true">·</span>
-              <span>R$ 1 = ₲ {exchangeRates.BRL_TO_PYG.toLocaleString('es-PY')}</span>
-            </div>
-          </button>
+            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-mono-nums font-bold text-[11px] text-amber-300">
+              ₲ Guaraní (PYG)
+            </span>
+          </div>
 
           {/* Cloud / Database Sync Status Indicator */}
           <button

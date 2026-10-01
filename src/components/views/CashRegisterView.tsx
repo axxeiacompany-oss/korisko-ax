@@ -42,11 +42,9 @@ export const CashRegisterView: React.FC = () => {
     return sales.filter(s => s.registerSessionId === currentSession.id && s.status === 'completed');
   }, [sales, currentSession.id]);
 
-  // Compute live money in drawer per currency
+  // Compute live money in drawer in Guaraní
   const drawerBalances = useMemo(() => {
-    let brlCash = currentSession.initialFloat.brl;
-    let pygCash = currentSession.initialFloat.pyg;
-    let usdCash = currentSession.initialFloat.usd;
+    let pygCash = currentSession.initialFloat.pyg || currentSession.initialFloat.brl || 0;
 
     let totalPix = 0;
     let totalDebito = 0;
@@ -54,38 +52,33 @@ export const CashRegisterView: React.FC = () => {
 
     currentSessionSales.forEach(s => {
       s.payments.forEach(p => {
+        const val = p.amountReceived || p.equivalentBrl || 0;
         if (p.method === 'dinheiro') {
-          if (p.currency === 'BRL') brlCash += p.amountReceived;
-          if (p.currency === 'PYG') pygCash += p.amountReceived;
-          if (p.currency === 'USD') usdCash += p.amountReceived;
+          pygCash += val;
         } else if (p.method === 'pix') {
-          totalPix += p.equivalentBrl;
+          totalPix += val;
         } else if (p.method === 'cartao_debito') {
-          totalDebito += p.equivalentBrl;
+          totalDebito += val;
         } else if (p.method === 'cartao_credito') {
-          totalCredito += p.equivalentBrl;
+          totalCredito += val;
         }
       });
 
       if (s.changeGiven && s.changeGiven.amount > 0) {
-        if (s.changeGiven.currency === 'BRL') brlCash -= s.changeGiven.amount;
-        if (s.changeGiven.currency === 'PYG') pygCash -= s.changeGiven.amount;
-        if (s.changeGiven.currency === 'USD') usdCash -= s.changeGiven.amount;
+        pygCash -= s.changeGiven.amount;
       }
     });
 
     currentSession.transactions.forEach(t => {
       const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
       const mult = isEntrada ? 1 : -1;
-      if (t.currency === 'BRL') brlCash += mult * t.amount;
-      if (t.currency === 'PYG') pygCash += mult * t.amount;
-      if (t.currency === 'USD') usdCash += mult * t.amount;
+      pygCash += mult * (t.amount || 0);
     });
 
     return {
-      brl: Math.round(brlCash * 100) / 100,
+      brl: Math.round(pygCash),
       pyg: Math.round(pygCash),
-      usd: Math.round(usdCash * 100) / 100,
+      usd: 0,
       totalPix,
       totalDebito,
       totalCredito,
@@ -98,22 +91,18 @@ export const CashRegisterView: React.FC = () => {
     let saidasBrl = 0;
     currentSession.transactions.forEach(t => {
       const isEntrada = t.type === 'suprimento' || (t.type as string) === 'entrada';
-      const valBrl = t.currency === 'USD' 
-        ? t.amount * (exchangeRates.USD_TO_BRL || 5.62) 
-        : t.currency === 'PYG' 
-        ? (exchangeRates.BRL_TO_PYG ? t.amount / exchangeRates.BRL_TO_PYG : t.amount / 1400) 
-        : t.amount;
+      const val = t.amount || 0;
       if (isEntrada) {
-        entradasBrl += valBrl;
+        entradasBrl += val;
       } else {
-        saidasBrl += valBrl;
+        saidasBrl += val;
       }
     });
     return {
       entradasBrl,
       saidasBrl,
     };
-  }, [currentSession.transactions, exchangeRates]);
+  }, [currentSession.transactions]);
 
   const isRegisterOpen = currentSession.status === 'aberto';
 
@@ -197,60 +186,53 @@ export const CashRegisterView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Physical Cash Drawer Balances */}
+      {/* Physical Cash Drawer Balance (Guaraní) */}
       <div className="space-y-2">
         <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
-          {language === 'es' ? 'Dinero Físico Actual en Gaveta (Por Moneda)' : 'Dinheiro Físico Atual na Gaveta (Por Moeda)'}
+          {language === 'es' ? 'Dinero Físico en Gaveta (₲ Guaraní)' : 'Dinheiro Físico na Gaveta (₲ Guaraní)'}
         </label>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* BRL Cash */}
-          <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+          {/* Main Guaraní Cash Card */}
+          <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium">Real Brasileño (BRL)</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
-                R$
+              <span className="text-xs text-neutral-300 font-bold flex items-center gap-1.5">
+                <span className="text-amber-400 font-black">🇵🇾 ₲</span>
+                <span>{language === 'es' ? 'Efectivo en Guaraníes' : 'Dinheiro Físico em Guaranis'}</span>
+              </span>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
+                PYG (₲)
               </span>
             </div>
-            <div className="text-2xl font-bold text-neutral-100 font-mono-nums">
-              {formatCurrency(drawerBalances.brl, 'BRL')}
-            </div>
-            <p className="text-[11px] text-neutral-500 font-mono-nums">
-              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.brl, 'BRL')}
-            </p>
-          </div>
-
-          {/* PYG Cash */}
-          <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium">Guaraní Paraguayo (PYG)</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                ₲
-              </span>
-            </div>
-            <div className="text-2xl font-bold text-amber-400 font-mono-nums">
+            <div className="text-3xl sm:text-4xl font-black text-amber-400 font-mono-nums">
               {formatCurrency(drawerBalances.pyg, 'PYG')}
             </div>
-            <p className="text-[11px] text-neutral-500 font-mono-nums">
-              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.pyg, 'PYG')}
-            </p>
+            <div className="flex items-center justify-between text-xs text-neutral-400 pt-2 border-t border-neutral-800 font-mono-nums">
+              <span>{language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'}</span>
+              <strong className="text-neutral-200">{formatCurrency(currentSession.initialFloat.pyg, 'PYG')}</strong>
+            </div>
           </div>
 
-          {/* USD Cash */}
-          <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-neutral-400 font-medium">Dólar Americano (USD)</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                $
-              </span>
+          {/* Quick Cash Flow Summary */}
+          <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col justify-between space-y-3">
+            <span className="text-xs font-bold text-neutral-300">
+              {language === 'es' ? 'Flujo de Caja del Turno' : 'Fluxo de Caixa do Turno'}
+            </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
+                <span className="text-[11px] text-emerald-400 block font-medium">+ Entradas</span>
+                <span className="text-base font-bold text-emerald-300 font-mono-nums">
+                  {formatCurrency(transactionTotals.entradasBrl, 'PYG')}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/20">
+                <span className="text-[11px] text-rose-400 block font-medium">- Salidas</span>
+                <span className="text-base font-bold text-rose-300 font-mono-nums">
+                  {formatCurrency(transactionTotals.saidasBrl, 'PYG')}
+                </span>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400 font-mono-nums">
-              {formatCurrency(drawerBalances.usd, 'USD')}
-            </div>
-            <p className="text-[11px] text-neutral-500 font-mono-nums">
-              {language === 'es' ? 'Fondo inicial:' : 'Fundo inicial:'} {formatCurrency(currentSession.initialFloat.usd, 'USD')}
-            </p>
           </div>
 
         </div>
@@ -259,21 +241,21 @@ export const CashRegisterView: React.FC = () => {
       {/* Other Payment Methods (Electronic / Digital) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Pix / QR:</span>
+          <span className="text-xs text-neutral-400">Transferencia / QR:</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-            {formatCurrency(drawerBalances.totalPix, 'BRL')}
+            {formatCurrency(drawerBalances.totalPix, 'PYG')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
           <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Débito:' : 'Cartão de Débito:'}</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-            {formatCurrency(drawerBalances.totalDebito, 'BRL')}
+            {formatCurrency(drawerBalances.totalDebito, 'PYG')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
           <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Crédito:' : 'Cartão de Crédito:'}</span>
           <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-            {formatCurrency(drawerBalances.totalCredito, 'BRL')}
+            {formatCurrency(drawerBalances.totalCredito, 'PYG')}
           </span>
         </div>
       </div>

@@ -20,7 +20,7 @@ import {
   Zap,
   ShieldCheck
 } from 'lucide-react';
-import { formatCurrency, fromBrl } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 import { Sale } from '../../types';
 import { ReceiptModal } from '../modals/ReceiptModal';
 import { TabType } from '../Header';
@@ -230,13 +230,11 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
           <div>
-            <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
-              {formatCurrency(todayRevenueBrl, 'BRL')}
+            <div className="text-xl sm:text-2xl font-bold text-amber-400 font-mono-nums">
+              {formatCurrency(todayRevenueBrl, 'PYG')}
             </div>
             <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-neutral-400 mt-1 font-mono-nums truncate">
-              <span>₲ {fromBrl(todayRevenueBrl, 'PYG', exchangeRates).toLocaleString('es-PY')}</span>
-              <span aria-hidden="true">·</span>
-              <span>$ {fromBrl(todayRevenueBrl, 'USD', exchangeRates).toFixed(2)}</span>
+              <span>🇵🇾 Moeda Oficial: ₲ (PYG)</span>
             </div>
           </div>
         </div>
@@ -273,10 +271,10 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </div>
           <div>
             <div className="text-xl sm:text-2xl font-bold text-neutral-100 font-mono-nums">
-              {formatCurrency(ticketMedio, 'BRL')}
+              {formatCurrency(ticketMedio, 'PYG')}
             </div>
             <div className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 truncate">
-              Meta: {formatCurrency(currentGoal.targetTicketMedioBrl, 'BRL')}
+              Meta: {formatCurrency(currentGoal.targetTicketMedioBrl, 'PYG')}
             </div>
           </div>
         </div>
@@ -293,7 +291,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           </div>
           <div>
             <div className="text-xl sm:text-2xl font-bold text-purple-300 font-mono-nums">
-              {formatCurrency(todayGrossProfit, 'BRL')}
+              {formatCurrency(todayGrossProfit, 'PYG')}
             </div>
             <div className="text-[10px] sm:text-[11px] text-neutral-400 mt-1 truncate">
               Margem: <strong className="text-emerald-400">{profitMarginPercent}%</strong>
@@ -303,54 +301,26 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
 
       </div>
 
-      {/* Multi-Currency Cash Drawer Breakdown Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        {/* Real */}
-        <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
+      {/* Resumo Consolidado de Faturamento em Guaraní */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <Coins className="w-5 h-5" />
+          </div>
           <div>
             <span className="text-xs text-neutral-400 block font-medium">
-              {language === 'es' ? 'Cobrado Hoy en Real' : 'Recebido Hoje em Real'}
+              {language === 'es' ? 'Total Cobrado en Turno (Moneda Oficial)' : 'Total Faturado no Turno (Moeda Oficial)'}
             </span>
-            <span className="text-lg font-bold text-neutral-100 font-mono-nums">
-              {formatCurrency(currencyBreakdown.brlTotal, 'BRL')}
-            </span>
-          </div>
-          <span className="text-xs font-semibold px-2 py-1 rounded bg-neutral-800 text-neutral-300">
-            🇧🇷 BRL
-          </span>
-        </div>
-
-        {/* Guaraní */}
-        <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-neutral-400 block font-medium">
-              {language === 'es' ? 'Cobrado Hoy en Guaraní' : 'Recebido Hoje em Guaraní'}
-            </span>
-            <span className="text-lg font-bold text-amber-400 font-mono-nums">
-              {formatCurrency(currencyBreakdown.pygTotal, 'PYG')}
+            <span className="text-2xl sm:text-3xl font-black text-amber-400 font-mono-nums">
+              {formatCurrency(todayRevenueBrl, 'PYG')}
             </span>
           </div>
-          <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-            🇵🇾 PYG
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
+            🇵🇾 Guaraní Paraguayo (₲ PYG)
           </span>
         </div>
-
-        {/* Dólar */}
-        <div className="p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-neutral-400 block font-medium">
-              {language === 'es' ? 'Cobrado Hoy en Dólar' : 'Recebido Hoje em Dólar'}
-            </span>
-            <span className="text-lg font-bold text-emerald-400 font-mono-nums">
-              {formatCurrency(currencyBreakdown.usdTotal, 'USD')}
-            </span>
-          </div>
-          <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-            🇺🇸 USD
-          </span>
-        </div>
-
       </div>
 
       {/* Operational Highlights: Fornadas, Comandas, Fichas Técnicas & CRM */}
@@ -403,7 +373,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-0.5 font-mono-nums">
-                {language === 'es' ? 'Consumo:' : 'Consumo:'} {formatCurrency(openComandasTotalBrl, 'BRL')}
+                {language === 'es' ? 'Consumo:' : 'Consumo:'} {formatCurrency(openComandasTotalBrl, 'PYG')}
               </p>
             </div>
           </div>
@@ -467,7 +437,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                   </div>
                   <p className="text-[11px] text-neutral-400 mt-0.5 font-mono-nums">
                     {totalDebt > 0 
-                      ? formatCurrency(totalDebt, 'BRL') 
+                      ? formatCurrency(totalDebt, 'PYG') 
                       : (language === 'es' ? `${customers.length} clientes al día` : `${customers.length} clientes em dia`)}
                   </p>
                 </div>
@@ -517,7 +487,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
                     >
                       {/* Tooltip on hover */}
                       <div className="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:block bg-neutral-950 border border-neutral-800 text-[10px] text-white px-1.5 py-0.5 rounded font-mono-nums whitespace-nowrap z-10">
-                        {formatCurrency(d.total, 'BRL')}
+                        {formatCurrency(d.total, 'PYG')}
                       </div>
                     </div>
                   </div>
@@ -550,10 +520,10 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
             <div className="mt-3">
               <div className="flex items-baseline justify-between">
                 <span className="text-xl font-bold text-neutral-100 font-mono-nums">
-                  {formatCurrency(monthRevenueBrl, 'BRL')}
+                  {formatCurrency(monthRevenueBrl, 'PYG')}
                 </span>
                 <span className="text-xs text-neutral-400 font-mono-nums">
-                  {language === 'es' ? 'de' : 'de'} {formatCurrency(currentGoal.targetRevenueBrl, 'BRL')}
+                  {language === 'es' ? 'de' : 'de'} {formatCurrency(currentGoal.targetRevenueBrl, 'PYG')}
                 </span>
               </div>
 
@@ -567,7 +537,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
 
               <div className="flex items-center justify-between text-xs text-neutral-400 mt-2 font-mono-nums">
                 <span>{goalPercent}% {language === 'es' ? 'alcanzado' : 'alcançado'}</span>
-                <span>{language === 'es' ? 'Faltan' : 'Faltam'} {formatCurrency(Math.max(0, currentGoal.targetRevenueBrl - monthRevenueBrl), 'BRL')}</span>
+                <span>{language === 'es' ? 'Faltan' : 'Faltam'} {formatCurrency(Math.max(0, currentGoal.targetRevenueBrl - monthRevenueBrl), 'PYG')}</span>
               </div>
             </div>
 
@@ -575,7 +545,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
               <div className="flex justify-between text-neutral-400">
                 <span>{language === 'es' ? 'Promedio diario esperado:' : 'Média diária esperada:'}</span>
                 <strong className="text-neutral-200 font-mono-nums">
-                  {formatCurrency(currentGoal.targetDailyAverageBrl, 'BRL')}
+                  {formatCurrency(currentGoal.targetDailyAverageBrl, 'PYG')}
                 </strong>
               </div>
               <div className="flex justify-between text-neutral-400">

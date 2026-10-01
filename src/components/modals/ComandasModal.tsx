@@ -118,7 +118,7 @@ export const ComandasModal: React.FC<Props> = ({
           <div className="text-xs text-neutral-400">
             {currentCartItems.length > 0 ? (
               <span>
-                Carrinho com <strong className="text-neutral-200">{currentCartItems.length} itens</strong> ({formatCurrency(currentCartTotalBrl, 'BRL')})
+                Carrinho com <strong className="text-neutral-200">{currentCartItems.length} itens</strong> ({formatCurrency(currentCartTotalBrl, 'PYG')})
               </span>
             ) : (
               <span>Selecione uma comanda abaixo para pagar ou adicionar novos itens.</span>
@@ -224,8 +224,6 @@ export const ComandasModal: React.FC<Props> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {openComandas.map((cmd) => {
                 const totalBrl = calculateComandaTotal(cmd);
-                const totalPyg = fromBrl(totalBrl, 'PYG', exchangeRates);
-                const totalUsd = fromBrl(totalBrl, 'USD', exchangeRates);
                 const elapsedMin = Math.max(1, Math.round((Date.now() - new Date(cmd.openedAt).getTime()) / 60000));
 
                 return (
@@ -278,7 +276,7 @@ export const ComandasModal: React.FC<Props> = ({
                             <span className="truncate max-w-[180px]">
                               {it.quantity}x {it.product.name}
                             </span>
-                            <span className="font-mono-nums">{formatCurrency(it.subtotalBrl, 'BRL')}</span>
+                            <span className="font-mono-nums">{formatCurrency(it.subtotalBrl, 'PYG')}</span>
                           </div>
                         ))}
                         {cmd.items.length > 3 && (
@@ -292,13 +290,8 @@ export const ComandasModal: React.FC<Props> = ({
                     {/* Footer of card */}
                     <div className="pt-2 border-t border-neutral-850 flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-bold font-mono-nums text-neutral-100">
-                          {formatCurrency(totalBrl, 'BRL')}
-                        </div>
-                        <div className="text-[10px] text-neutral-500 font-mono-nums flex items-center gap-1.5">
-                          <span>{formatCurrency(totalPyg, 'PYG')}</span>
-                          <span>·</span>
-                          <span>{formatCurrency(totalUsd, 'USD')}</span>
+                        <div className="text-base font-bold font-mono-nums text-amber-400">
+                          {formatCurrency(totalBrl, 'PYG')}
                         </div>
                       </div>
 

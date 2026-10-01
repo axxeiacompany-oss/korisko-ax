@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { Product, ProductCategory, CartItem, Sale, Comanda } from '../../types';
-import { formatCurrency, fromBrl } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 import { 
   Search, 
   ShoppingBag, 
@@ -76,9 +76,6 @@ export const PdvView: React.FC = () => {
   const cartTotalBrl = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.subtotalBrl, 0);
   }, [cart]);
-
-  const cartTotalPyg = fromBrl(cartTotalBrl, 'PYG', exchangeRates);
-  const cartTotalUsd = fromBrl(cartTotalBrl, 'USD', exchangeRates);
 
   // Fast lookup of quantity in cart for badges
   const cartQuantityByProduct = useMemo(() => {
@@ -353,17 +350,10 @@ export const PdvView: React.FC = () => {
 
                   <div className="mt-2.5 pt-2 border-t border-neutral-800/80">
                     <div className="flex items-baseline justify-between">
-                      <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-                        {formatCurrency(p.priceBrl, 'BRL')}
-                        <span className="text-[10px] font-normal text-neutral-500 ml-0.5">/{p.unit}</span>
+                      <span className="text-base font-bold text-amber-400 font-mono-nums">
+                        {formatCurrency(p.priceBrl, 'PYG')}
+                        <span className="text-[10px] font-normal text-neutral-400 ml-0.5">/{p.unit}</span>
                       </span>
-                    </div>
-
-                    {/* Dual currency preview for foreign customers */}
-                    <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono-nums mt-0.5">
-                      <span>₲ {fromBrl(p.priceBrl, 'PYG', exchangeRates).toLocaleString('es-PY')}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>$ {fromBrl(p.priceBrl, 'USD', exchangeRates).toFixed(2)}</span>
                     </div>
                   </div>
                 </button>
@@ -459,7 +449,7 @@ export const PdvView: React.FC = () => {
                       {item.product.name}
                     </h5>
                     <span className="text-[11px] text-neutral-400 font-mono-nums">
-                      {formatCurrency(item.unitPriceBrl, 'BRL')} / {item.product.unit}
+                      {formatCurrency(item.unitPriceBrl, 'PYG')} / {item.product.unit}
                     </span>
                   </div>
                   <button
@@ -499,7 +489,7 @@ export const PdvView: React.FC = () => {
                   {/* Subtotal */}
                   <div className="text-right">
                     <span className="text-xs font-bold text-neutral-100 font-mono-nums">
-                      {formatCurrency(item.subtotalBrl, 'BRL')}
+                      {formatCurrency(item.subtotalBrl, 'PYG')}
                     </span>
                   </div>
                 </div>
@@ -511,21 +501,14 @@ export const PdvView: React.FC = () => {
         {/* Cart Bottom Summary & Checkout Button */}
         <div className="p-4 border-t border-neutral-800 bg-neutral-950/80 space-y-3 pb-24 lg:pb-4">
           
-          {/* Multi-currency breakdown preview */}
-          <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-medium text-neutral-400">
-                {language === 'es' ? 'Total a Cobrar (BRL)' : 'Total a Pagar (BRL)'}
-              </span>
-              <span className="text-lg font-bold text-neutral-100 font-mono-nums">
-                {formatCurrency(cartTotalBrl, 'BRL')}
-              </span>
-            </div>
-            
-            <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono-nums pt-1 border-t border-neutral-800">
-              <span>🇵🇾 PYG: <strong className="text-amber-400">{formatCurrency(cartTotalPyg, 'PYG')}</strong></span>
-              <span>🇺🇸 USD: <strong className="text-emerald-400">{formatCurrency(cartTotalUsd, 'USD')}</strong></span>
-            </div>
+          {/* Guaraní Total Summary */}
+          <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between">
+            <span className="text-xs font-semibold text-neutral-400">
+              {language === 'es' ? 'Total a Cobrar' : 'Total a Pagar'}
+            </span>
+            <span className="text-xl font-black text-amber-400 font-mono-nums">
+              {formatCurrency(cartTotalBrl, 'PYG')}
+            </span>
           </div>
 
           {/* Checkout & Comanda action buttons */}
@@ -547,7 +530,7 @@ export const PdvView: React.FC = () => {
               className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <CreditCard className="w-4 h-4 stroke-[2.5]" />
-              {language === 'es' ? 'Cobrar Venta (Multi-Moneda)' : 'Finalizar Venda (Multi-Moeda)'}
+              {language === 'es' ? 'Cobrar Venta' : 'Finalizar Venda'}
             </button>
           </div>
 
@@ -573,10 +556,7 @@ export const PdvView: React.FC = () => {
                 </p>
                 <div className="flex items-baseline gap-1.5 flex-wrap">
                   <span className="text-base font-black font-mono-nums leading-none text-neutral-950 mt-0.5">
-                    {formatCurrency(cartTotalBrl, 'BRL')}
-                  </span>
-                  <span className="text-[11px] font-bold font-mono-nums text-neutral-800">
-                    ({formatCurrency(cartTotalPyg, 'PYG')})
+                    {formatCurrency(cartTotalBrl, 'PYG')}
                   </span>
                 </div>
               </div>
@@ -618,7 +598,7 @@ export const PdvView: React.FC = () => {
             <div>
               <p className="text-xs text-neutral-300 font-medium">{weightProduct.name}</p>
               <p className="text-[11px] text-neutral-500 font-mono-nums">
-                {language === 'es' ? 'Precio:' : 'Preço:'} {formatCurrency(weightProduct.priceBrl, 'BRL')} / kg
+                {language === 'es' ? 'Precio:' : 'Preço:'} {formatCurrency(weightProduct.priceBrl, 'PYG')} / kg
               </p>
             </div>
 
@@ -657,7 +637,7 @@ export const PdvView: React.FC = () => {
                   {language === 'es' ? 'Subtotal estimado:' : 'Subtotal estimado:'}
                 </span>
                 <strong className="text-neutral-100 font-bold">
-                  {formatCurrency((parseFloat(customWeightInput) || 0) * weightProduct.priceBrl, 'BRL')}
+                  {formatCurrency((parseFloat(customWeightInput) || 0) * weightProduct.priceBrl, 'PYG')}
                 </strong>
               </div>
 

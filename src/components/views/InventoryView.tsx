@@ -302,11 +302,11 @@ export const InventoryView: React.FC = () => {
                       <div className="text-right">
                         <span className="text-neutral-400 text-[11px] block">Preço de Venda:</span>
                         <span className="font-bold text-amber-400 font-mono-nums text-sm">
-                          {formatCurrency(p.priceBrl, 'BRL')}
+                          {formatCurrency(p.priceBrl, 'PYG')}
                         </span>
                         {p.costPriceBrl && (
                           <span className="text-[10px] text-neutral-500 font-mono-nums block">
-                            Custo: {formatCurrency(p.costPriceBrl, 'BRL')}
+                            Custo: {formatCurrency(p.costPriceBrl, 'PYG')}
                           </span>
                         )}
                       </div>
@@ -391,11 +391,11 @@ export const InventoryView: React.FC = () => {
                           {p.category}
                         </td>
                         <td className="py-3 px-4 text-right font-mono-nums font-bold text-neutral-100">
-                          {formatCurrency(p.priceBrl, 'BRL')}
+                          {formatCurrency(p.priceBrl, 'PYG')}
                           <span className="text-[10px] font-normal text-neutral-500 ml-0.5">/{p.unit}</span>
                         </td>
                         <td className="py-3 px-4 text-right font-mono-nums text-neutral-400">
-                          {formatCurrency(p.costPriceBrl, 'BRL')}
+                          {formatCurrency(p.costPriceBrl, 'PYG')}
                         </td>
                         <td className="py-3 px-4 text-center font-mono-nums font-bold text-neutral-100">
                           {p.stock} {p.unit}
