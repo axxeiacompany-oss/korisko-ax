@@ -20,6 +20,7 @@ import {
   FichaTecnica,
   Customer,
   CustomerAccountEntry,
+  ActiveCheckoutSession,
   LiveRateStatus,
   PaymentMethod,
   AppFeature,
@@ -60,7 +61,14 @@ import {
   deleteComandaDb,
   rowToComanda,
   resolveSetoresFromItems,
-  formatSetorName
+  formatSetorName,
+  listLancamentosFiado,
+  upsertLancamentoFiadoDb,
+  rowToFiadoEntry,
+  listFluxoCobrancas,
+  upsertFluxoCobrancaDb,
+  deleteFluxoCobrancaDb,
+  rowToCheckoutSession
 } from '../lib/db';
 
 interface BakeryContextType {
@@ -134,9 +142,12 @@ interface BakeryContextType {
     missingIngredients?: { name: string; needed: number; unit: string; available: number }[];
   };
 
-  // CRM & Gestão de Clientes
+  // CRM & Gestão de Clientes + Fluxo de Cobrança e Fiado em Tempo Real
   customers: Customer[];
   customerEntries: CustomerAccountEntry[];
+  activeCheckouts: ActiveCheckoutSession[];
+  broadcastCheckoutSession: (session: Omit<ActiveCheckoutSession, 'updatedAt' | 'operatorId' | 'operatorName'>) => void;
+  clearCheckoutSession: (sessionId: string) => void;
   addCustomer: (cust: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>) => Promise<Customer>;
   updateCustomer: (cust: Customer) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
@@ -255,6 +266,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // REQUIREMENT 3: Initial cache on opening, replaced by database data
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
   const [isLoadingDb, setIsLoadingDb] = useState<boolean>(true);
+  const realtimeChannelRef = React.useRef<any>(null);
 
   const [currentUser, setCurrentUser] = useState<Employee>(() => {
     try {
@@ -361,6 +373,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           dbSessions, 
           dbUsers, 
           dbComandas,
+          dbFiadoEntries,
+          dbCheckouts,
           dbExtra
         ] = await Promise.all([
           listProdutos().catch(err => { console.warn('Produtos load notice:', err); return []; }),
@@ -369,13 +383,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           listCaixaSessoes().catch(err => { console.warn('Caixa load notice:', err); return []; }),
           listUsuarios().catch(err => { console.warn('Usuarios load notice:', err); return []; }),
           listComandas().catch(() => []),
+          listLancamentosFiado().catch(() => []),
+          listFluxoCobrancas().catch(() => []),
           fetchSystemStateDoc().catch(() => null),
         ]);
 
         if (!isMounted) return;
 
         let serverFallback: SystemBackupData | null = null;
-        if (dbProducts.length === 0 && (!dbExtra || !dbExtra.products || dbExtra.products.length === 0)) {
+        if (dbProducts.length === 0 && (!dbExtra || !dbExtra.products || dbExtra.products.length > 0 === false)) {
           try {
             serverFallback = await StorageService.fetchServerState();
           } catch {}
@@ -426,6 +442,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           dbComandas.forEach(c => comandasMap.set(c.id || c.number, c));
           const mergedComandas = Array.from(comandasMap.values()).filter(c => c.status !== 'pago' && c.status !== 'cancelado');
 
+          // Merge real-time fiado entries from lancamentos_fiado table + korisko_system_state
+          const extraEntries: CustomerAccountEntry[] = Array.isArray(dbExtra?.customerEntries) ? dbExtra.customerEntries : (prev.customerEntries ?? []);
+          const entriesMap = new Map<string, CustomerAccountEntry>();
+          extraEntries.forEach(e => entriesMap.set(e.id, e));
+          dbFiadoEntries.forEach(e => entriesMap.set(e.id, e));
+          const mergedEntries = Array.from(entriesMap.values()).sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+
+          // Merge real-time active checkouts from fluxo_cobrancas_tempo_real table + korisko_system_state
+          const extraCheckouts: ActiveCheckoutSession[] = Array.isArray(dbExtra?.activeCheckouts) ? dbExtra.activeCheckouts : (prev.activeCheckouts ?? []);
+          const checkoutsMap = new Map<string, ActiveCheckoutSession>();
+          extraCheckouts.forEach(s => checkoutsMap.set(s.id, s));
+          dbCheckouts.forEach(s => checkoutsMap.set(s.id, s));
+          const nowMs = Date.now();
+          const mergedCheckouts = Array.from(checkoutsMap.values())
+            .filter(s => s.status !== 'cancelado' && (nowMs - new Date(s.updatedAt).getTime() < 24 * 60 * 60 * 1000))
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+            .slice(0, 40);
+
           const newState: SystemBackupData = {
             ...prev,
             products,
@@ -441,7 +477,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             goals: dbExtra?.goals && dbExtra.goals.length > 0 ? dbExtra.goals : (prev.goals || INITIAL_GOALS),
             exchangeRates: dbExtra?.exchangeRates ?? prev.exchangeRates ?? DEFAULT_EXCHANGE_RATES,
             stockMovements: dbExtra?.stockMovements && dbExtra.stockMovements.length > 0 ? dbExtra.stockMovements : (prev.stockMovements ?? []),
-            customerEntries: dbExtra?.customerEntries && dbExtra.customerEntries.length > 0 ? dbExtra.customerEntries : (prev.customerEntries ?? []),
+            customerEntries: mergedEntries,
+            activeCheckouts: mergedCheckouts,
           };
 
           // Cache updated state locally for offline fallback
@@ -490,8 +527,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // ==========================================
   // REQUIREMENT 7: REALTIME MULTI-DEVICE
-  // A single channel per table (vendas, produtos, clientes, caixa_sessoes, usuarios, comandas, korisko_system_state)
-  // Created once in a useEffect with [] dependencies and cleanup
+  // A single channel per table (vendas, produtos, clientes, caixa_sessoes, usuarios, comandas, lancamentos_fiado, fluxo_cobrancas_tempo_real, korisko_system_state)
+  // Plus instant broadcast events for zero-latency live checkout & fiado protection!
   // ==========================================
   useEffect(() => {
     let activeChannel: any = null;
@@ -502,6 +539,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           const ch = activeChannel;
           activeChannel = null;
+          realtimeChannelRef.current = null;
           isSubscribed = false;
           supabase.removeChannel(ch).catch?.(() => {});
         } catch {}
@@ -638,6 +676,96 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }));
           }
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos_fiado' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const entry = rowToFiadoEntry(payload.new);
+            setData(prev => {
+              const exists = (prev.customerEntries || []).some(e => e.id === entry.id);
+              const nextEntries = exists
+                ? (prev.customerEntries || []).map(e => e.id === entry.id ? entry : e)
+                : [entry, ...(prev.customerEntries || [])];
+              const nextCustomers = entry.resultingBalanceBrl !== undefined
+                ? (prev.customers || []).map(c => c.id === entry.customerId ? { ...c, outstandingBalanceBrl: entry.resultingBalanceBrl! } : c)
+                : prev.customers;
+              return {
+                ...prev,
+                customers: nextCustomers,
+                customerEntries: nextEntries,
+              };
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              customerEntries: (prev.customerEntries || []).filter(e => e.id !== oldId),
+            }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fluxo_cobrancas_tempo_real' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const session = rowToCheckoutSession(payload.new);
+            setData(prev => {
+              if (session.status === 'cancelado') {
+                return {
+                  ...prev,
+                  activeCheckouts: (prev.activeCheckouts || []).filter(s => s.id !== session.id),
+                };
+              }
+              const exists = (prev.activeCheckouts || []).some(s => s.id === session.id);
+              const nextList = exists
+                ? (prev.activeCheckouts || []).map(s => s.id === session.id ? session : s)
+                : [session, ...(prev.activeCheckouts || [])];
+              return {
+                ...prev,
+                activeCheckouts: nextList.slice(0, 40),
+              };
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              activeCheckouts: (prev.activeCheckouts || []).filter(s => s.id !== oldId),
+            }));
+          }
+        })
+        .on('broadcast', { event: 'live_checkout_update' }, ({ payload }) => {
+          if (!payload || !payload.id) return;
+          const session = payload as ActiveCheckoutSession;
+          setData(prev => {
+            if (session.status === 'cancelado') {
+              return {
+                ...prev,
+                activeCheckouts: (prev.activeCheckouts || []).filter(s => s.id !== session.id),
+              };
+            }
+            const exists = (prev.activeCheckouts || []).some(s => s.id === session.id);
+            const nextList = exists
+              ? (prev.activeCheckouts || []).map(s => s.id === session.id ? session : s)
+              : [session, ...(prev.activeCheckouts || [])];
+            return {
+              ...prev,
+              activeCheckouts: nextList.slice(0, 40),
+            };
+          });
+        })
+        .on('broadcast', { event: 'live_fiado_entry' }, ({ payload }) => {
+          if (!payload || !payload.id) return;
+          const entry = payload as CustomerAccountEntry;
+          setData(prev => {
+            const exists = (prev.customerEntries || []).some(e => e.id === entry.id);
+            const nextEntries = exists
+              ? (prev.customerEntries || []).map(e => e.id === entry.id ? entry : e)
+              : [entry, ...(prev.customerEntries || [])];
+            const nextCustomers = entry.resultingBalanceBrl !== undefined
+              ? (prev.customers || []).map(c => c.id === entry.customerId ? { ...c, outstandingBalanceBrl: entry.resultingBalanceBrl! } : c)
+              : prev.customers;
+            return {
+              ...prev,
+              customers: nextCustomers,
+              customerEntries: nextEntries,
+            };
+          });
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'korisko_system_state' }, (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const remoteData = (payload.new as any)?.data;
@@ -646,12 +774,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ...prev,
                 openComandas: Array.isArray(remoteData.openComandas) ? remoteData.openComandas : prev.openComandas,
                 customerEntries: Array.isArray(remoteData.customerEntries) ? remoteData.customerEntries : prev.customerEntries,
+                activeCheckouts: Array.isArray(remoteData.activeCheckouts) ? remoteData.activeCheckouts : prev.activeCheckouts,
+                customers: Array.isArray(remoteData.customers) && remoteData.customers.length > 0 ? remoteData.customers : prev.customers,
                 fornadas: Array.isArray(remoteData.fornadas) ? remoteData.fornadas : prev.fornadas,
               }));
             }
           }
         });
 
+        realtimeChannelRef.current = activeChannel;
         activeChannel.subscribe((status: string, err?: any) => {
           if (status === 'SUBSCRIBED') {
             isSubscribed = true;
@@ -1444,7 +1575,72 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  // CRM - Record Debt (Fiado/Faturamento) via REQUIREMENT 6 RPC
+  // Live Checkout Broadcast & Persistence ("Na hora de cobrar e colocar Fiado ou outro método")
+  const broadcastCheckoutSession = useCallback((
+    sessionInput: Omit<ActiveCheckoutSession, 'updatedAt' | 'operatorId' | 'operatorName'>
+  ) => {
+    const nowIso = new Date().toISOString();
+    const fullSession: ActiveCheckoutSession = {
+      ...sessionInput,
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      updatedAt: nowIso,
+    };
+
+    // 1. Persist to Supabase fluxo_cobrancas_tempo_real table
+    upsertFluxoCobrancaDb(fullSession).catch(() => {});
+
+    // 2. Broadcast instantaneously over Supabase Realtime channel
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_checkout_update',
+          payload: fullSession,
+        }).catch?.(() => {});
+      }
+    } catch {}
+
+    // 3. Update local & system state immediately
+    setData(prev => {
+      const filtered = (prev.activeCheckouts || []).filter(s => s.id !== fullSession.id);
+      const nextCheckouts = fullSession.status === 'cancelado'
+        ? filtered
+        : [fullSession, ...filtered].slice(0, 40);
+      const next = {
+        ...prev,
+        activeCheckouts: nextCheckouts,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+  }, [currentUser.id, currentUser.name]);
+
+  const clearCheckoutSession = useCallback((sessionId: string) => {
+    deleteFluxoCobrancaDb(sessionId).catch(() => {});
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_checkout_update',
+          payload: { id: sessionId, status: 'cancelado' },
+        }).catch?.(() => {});
+      }
+    } catch {}
+
+    setData(prev => {
+      const next = {
+        ...prev,
+        activeCheckouts: (prev.activeCheckouts || []).filter(s => s.id !== sessionId),
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+  }, []);
+
+  // CRM - Record Debt (Fiado/Faturamento) via REQUIREMENT 6 RPC + Real-Time lancamentos_fiado
   const recordCustomerDebt = useCallback(async (
     customerId: string,
     amountBrl: number,
@@ -1455,24 +1651,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ) => {
     const nowIso = new Date().toISOString();
     const resolvedSetor = setorResponsavel || 'Panificação & Confeitaria Artesanal';
-    const entry: CustomerAccountEntry = {
-      id: `entry-${Date.now()}`,
-      customerId,
-      date: nowIso,
-      type: 'debito_compra',
-      amountBrl: Math.round(amountBrl * 100) / 100,
-      description,
-      saleId,
-      comandaNumber,
-      setorResponsavel: resolvedSetor,
-      confirmedByCustomer: true,
-      recordedBy: currentUser.name,
-    };
-
     const currentCustomer = (data.customers || []).find(c => c.id === customerId);
-    let newBal = (currentCustomer?.outstandingBalanceBrl || 0) + amountBrl;
+    const previousBal = currentCustomer?.outstandingBalanceBrl || 0;
+    const cleanAmount = Math.round(amountBrl * 100) / 100;
+
+    let newBal = previousBal + cleanAmount;
     try {
-      newBal = await rpcAjustarSaldoCliente(customerId, amountBrl);
+      newBal = await rpcAjustarSaldoCliente(customerId, cleanAmount);
     } catch (err: any) {
       console.warn('RPC ajustar_saldo_cliente fallback:', err);
       if (currentCustomer) {
@@ -1482,38 +1667,77 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    entry.resultingBalanceBrl = newBal;
+    const entry: CustomerAccountEntry = {
+      id: `entry-${Date.now()}`,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Fiado',
+      date: nowIso,
+      type: 'debito_compra',
+      amountBrl: cleanAmount,
+      previousBalanceBrl: previousBal,
+      resultingBalanceBrl: newBal,
+      paymentMethod: 'fiado',
+      description,
+      saleId,
+      comandaNumber,
+      setorResponsavel: resolvedSetor,
+      confirmedByCustomer: true,
+      recordedBy: currentUser.name,
+    };
+
+    // Save to dedicated SQL table lancamentos_fiado + broadcast in real time
+    upsertLancamentoFiadoDb(entry).catch(() => {});
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_fiado_entry',
+          payload: entry,
+        }).catch?.(() => {});
+      }
+    } catch {}
+
+    // Record in real-time checkout flow
+    const liveFlow: ActiveCheckoutSession = {
+      id: `chk-debt-${Date.now()}`,
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Fiado',
+      comandaNumber,
+      setorResponsavel: resolvedSetor,
+      paymentMethod: 'fiado',
+      amountBrl: cleanAmount,
+      previousDebtBrl: previousBal,
+      projectedDebtBrl: newBal,
+      status: 'confirmado_fiado',
+      itemsSummary: description,
+      saleId,
+      updatedAt: nowIso,
+    };
+    upsertFluxoCobrancaDb(liveFlow).catch(() => {});
+
     setData(prev => {
       const next = {
         ...prev,
         customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-        customerEntries: [entry, ...(prev.customerEntries || [])],
+        customerEntries: [entry, ...(prev.customerEntries || []).filter(e => e.id !== entry.id)],
+        activeCheckouts: [liveFlow, ...(prev.activeCheckouts || [])].slice(0, 40),
       };
       StorageService.saveState(next);
       saveSystemStateDoc(next);
       return next;
     });
-  }, [currentUser.name, data.customers]);
+  }, [currentUser.id, currentUser.name, data.customers]);
 
-  // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC
+  // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC + Real-Time lancamentos_fiado
   const recordCustomerPayment = useCallback(async (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => {
     const nowIso = new Date().toISOString();
     const cleanAmount = Math.round(amountBrl * 100) / 100;
-    const entry: CustomerAccountEntry = {
-      id: `entry-${Date.now()}`,
-      customerId,
-      date: nowIso,
-      type: 'pagamento_amortizacao',
-      amountBrl: cleanAmount,
-      description: `Amortização de fiado via ${method.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
-      paymentMethod: method,
-      setorResponsavel: 'Caixa & Expedição',
-      confirmedByCustomer: true,
-      recordedBy: currentUser.name,
-    };
-
     const currentCustomer = (data.customers || []).find(c => c.id === customerId);
-    let newBal = Math.max(0, (currentCustomer?.outstandingBalanceBrl || 0) - cleanAmount);
+    const previousBal = currentCustomer?.outstandingBalanceBrl || 0;
+    let newBal = Math.max(0, previousBal - cleanAmount);
+
     try {
       newBal = await rpcAjustarSaldoCliente(customerId, -cleanAmount);
     } catch (err: any) {
@@ -1525,18 +1749,64 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    entry.resultingBalanceBrl = newBal;
+    const entry: CustomerAccountEntry = {
+      id: `entry-${Date.now()}`,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Cadastrado',
+      date: nowIso,
+      type: 'pagamento_amortizacao',
+      amountBrl: cleanAmount,
+      previousBalanceBrl: previousBal,
+      resultingBalanceBrl: newBal,
+      description: `Amortização de fiado via ${method.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
+      paymentMethod: method,
+      setorResponsavel: 'Caixa & Expedição',
+      confirmedByCustomer: true,
+      recordedBy: currentUser.name,
+    };
+
+    // Save to dedicated SQL table lancamentos_fiado + broadcast in real time
+    upsertLancamentoFiadoDb(entry).catch(() => {});
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_fiado_entry',
+          payload: entry,
+        }).catch?.(() => {});
+      }
+    } catch {}
+
+    // Record in real-time checkout flow
+    const liveFlow: ActiveCheckoutSession = {
+      id: `chk-pay-${Date.now()}`,
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Cadastrado',
+      setorResponsavel: 'Caixa & Expedição',
+      paymentMethod: method,
+      amountBrl: cleanAmount,
+      previousDebtBrl: previousBal,
+      projectedDebtBrl: newBal,
+      status: 'pago',
+      itemsSummary: entry.description,
+      updatedAt: nowIso,
+    };
+    upsertFluxoCobrancaDb(liveFlow).catch(() => {});
+
     setData(prev => {
       const next = {
         ...prev,
         customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-        customerEntries: [entry, ...(prev.customerEntries || [])],
+        customerEntries: [entry, ...(prev.customerEntries || []).filter(e => e.id !== entry.id)],
+        activeCheckouts: [liveFlow, ...(prev.activeCheckouts || [])].slice(0, 40),
       };
       StorageService.saveState(next);
       saveSystemStateDoc(next);
       return next;
     });
-  }, [currentUser.name, data.customers]);
+  }, [currentUser.id, currentUser.name, data.customers]);
 
   // CRM - Redeem Loyalty Points
   const redeemCustomerPoints = useCallback((customerId: string, points: number): number => {
@@ -1561,6 +1831,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   //    Uses supabase.from('vendas').insert(venda).select().single().
   // 6. Deducts stock via supabase.rpc('baixar_estoque', { p_id, p_qtd }).
   //    Adjusts balance via supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor }).
+  //    Writes fiado entry to public.lancamentos_fiado and live payment flow to public.fluxo_cobrancas_tempo_real!
   // ==========================================
   const completeSale = useCallback(async (
     items: CartItem[],
@@ -1579,10 +1850,45 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const fiadoPayments = payments.filter(p => p.method === 'fiado');
     const fiadoAmountBrl = fiadoPayments.reduce((acc, p) => acc + p.equivalentBrl, 0);
+    const primaryMethod: PaymentMethod = fiadoAmountBrl > 0
+      ? 'fiado'
+      : (payments[0]?.method || 'dinheiro');
 
-    const resolvedCustomerName = customerName || (customerId 
-      ? (data.customers || []).find(c => c.id === customerId)?.name 
-      : undefined);
+    // Anti-loss protection: If fiado is selected and customerId wasn't passed, match by name or auto-create customer!
+    let targetCustomerId = customerId;
+    let targetCustomer = targetCustomerId
+      ? (data.customers || []).find(c => c.id === targetCustomerId)
+      : undefined;
+
+    if (!targetCustomer && customerName?.trim()) {
+      const cleanName = customerName.trim().toLowerCase();
+      targetCustomer = (data.customers || []).find(c => c.name.trim().toLowerCase() === cleanName);
+      if (targetCustomer) {
+        targetCustomerId = targetCustomer.id;
+      } else if (fiadoAmountBrl > 0) {
+        // Auto-create customer record so Fiado is NEVER lost!
+        const autoCust: Customer = {
+          id: `cust-${Date.now()}`,
+          name: customerName.trim(),
+          phone: '',
+          category: 'varejo',
+          creditLimitBrl: Math.max(500000, fiadoAmountBrl * 2),
+          outstandingBalanceBrl: 0,
+          loyaltyPoints: 0,
+          totalSpentBrl: 0,
+          purchaseCount: 0,
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          targetCustomer = await upsertCliente(autoCust);
+        } catch {
+          targetCustomer = autoCust;
+        }
+        targetCustomerId = targetCustomer.id;
+      }
+    }
+
+    const resolvedCustomerName = customerName?.trim() || targetCustomer?.name || undefined;
 
     const nowIso = new Date().toISOString();
     const tempId = `sale-${Date.now()}`;
@@ -1601,7 +1907,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       totalBrl: finalTotalBrl,
       payments,
       changeGiven,
-      customerId,
+      customerId: targetCustomerId,
       customerName: resolvedCustomerName,
       comandaNumber: resolvedComandaNumber,
       setorResponsavel: sectorInfo.label,
@@ -1617,6 +1923,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       persistedSale = await insertVenda(salePayload);
       persistedSale = {
         ...persistedSale,
+        customerId: persistedSale.customerId || targetCustomerId,
+        customerName: persistedSale.customerName || resolvedCustomerName,
         comandaNumber: persistedSale.comandaNumber || resolvedComandaNumber,
         setorResponsavel: persistedSale.setorResponsavel || sectorInfo.label,
         confirmedByCustomer: true,
@@ -1658,69 +1966,145 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
     );
 
-    // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente
+    // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente + insert into lancamentos_fiado
+    let previousCustomerBal = targetCustomer?.outstandingBalanceBrl || 0;
     let newCustomerBal: number | undefined;
     let fiadoAccountEntry: CustomerAccountEntry | undefined;
-    if (customerId && fiadoAmountBrl > 0) {
-      const currentCust = (data.customers || []).find(c => c.id === customerId);
-      newCustomerBal = (currentCust?.outstandingBalanceBrl || 0) + fiadoAmountBrl;
+    const itemsSummary = (items || []).map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).slice(0, 3).join(', ');
+
+    if (targetCustomerId && fiadoAmountBrl > 0) {
+      newCustomerBal = previousCustomerBal + fiadoAmountBrl;
       try {
-        newCustomerBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
+        newCustomerBal = await rpcAjustarSaldoCliente(targetCustomerId, fiadoAmountBrl);
       } catch (rpcBalErr: any) {
         console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
-        if (currentCust) {
+        if (targetCustomer) {
           try {
-            await upsertCliente({ ...currentCust, outstandingBalanceBrl: newCustomerBal });
+            await upsertCliente({
+              ...targetCustomer,
+              outstandingBalanceBrl: newCustomerBal,
+              totalSpentBrl: (targetCustomer.totalSpentBrl || 0) + finalTotalBrl,
+              purchaseCount: (targetCustomer.purchaseCount || 0) + 1,
+              lastPurchaseDate: nowIso,
+            });
           } catch {}
         }
       }
 
-      const itemsSummary = (items || []).map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).slice(0, 3).join(', ');
       fiadoAccountEntry = {
         id: `entry-${Date.now()}`,
-        customerId,
-        date: new Date().toISOString(),
+        customerId: targetCustomerId,
+        customerName: resolvedCustomerName || 'Cliente Fiado',
+        date: nowIso,
         type: 'debito_compra',
         amountBrl: fiadoAmountBrl,
+        previousBalanceBrl: previousCustomerBal,
+        resultingBalanceBrl: newCustomerBal,
+        paymentMethod: 'fiado',
         description: `Venda #${persistedSale.saleNumber || 'PDV'} • Comanda #${resolvedComandaNumber} • Setor: ${sectorInfo.label}${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
         saleId: persistedSale.id,
         comandaNumber: resolvedComandaNumber,
         setorResponsavel: sectorInfo.label,
         confirmedByCustomer: true,
-        resultingBalanceBrl: newCustomerBal,
         recordedBy: currentUser.name,
       };
+
+      // Save to SQL table lancamentos_fiado and broadcast immediately
+      upsertLancamentoFiadoDb(fiadoAccountEntry).catch(() => {});
+      try {
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_fiado_entry',
+            payload: fiadoAccountEntry,
+          }).catch?.(() => {});
+        }
+      } catch {}
     }
+
+    // Record finalized payment in real-time checkout flow (fluxo_cobrancas_tempo_real)
+    const completedCheckoutFlow: ActiveCheckoutSession = {
+      id: `chk-sale-${persistedSale.id}`,
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      customerId: targetCustomerId,
+      customerName: resolvedCustomerName || 'Cliente Balcão',
+      comandaNumber: resolvedComandaNumber,
+      setorResponsavel: sectorInfo.label,
+      paymentMethod: primaryMethod,
+      amountBrl: finalTotalBrl,
+      previousDebtBrl: previousCustomerBal,
+      projectedDebtBrl: newCustomerBal ?? previousCustomerBal,
+      status: fiadoAmountBrl > 0 ? 'confirmado_fiado' : 'pago',
+      itemsSummary: itemsSummary || `Venda #${persistedSale.saleNumber}`,
+      saleId: persistedSale.id,
+      updatedAt: nowIso,
+    };
+    upsertFluxoCobrancaDb(completedCheckoutFlow).catch(() => {});
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_checkout_update',
+          payload: completedCheckoutFlow,
+        }).catch?.(() => {});
+      }
+    } catch {}
 
     // Close comanda if attached
     if (comandaNumber) {
       removeComanda(comandaNumber);
     }
 
-    // Single atomic state update for stock, customer balance, and sales list
+    // Single atomic state update for stock, customer balance, fiado ledger, live checkouts, and sales list
     setData(prev => {
-      const nextState = {
+      const existingCustomers = prev.customers || [];
+      const hasTargetCustomer = targetCustomerId ? existingCustomers.some(c => c.id === targetCustomerId) : true;
+      const baseCustomers = (!hasTargetCustomer && targetCustomer)
+        ? [targetCustomer, ...existingCustomers]
+        : existingCustomers;
+
+      const updatedCustomers = targetCustomerId
+        ? baseCustomers.map(c => {
+            if (c.id !== targetCustomerId) return c;
+            return {
+              ...c,
+              outstandingBalanceBrl: newCustomerBal !== undefined ? newCustomerBal : c.outstandingBalanceBrl,
+              totalSpentBrl: (c.totalSpentBrl || 0) + finalTotalBrl,
+              purchaseCount: (c.purchaseCount || 0) + 1,
+              lastPurchaseDate: nowIso,
+            };
+          })
+        : baseCustomers;
+
+      const filteredCheckouts = (prev.activeCheckouts || []).filter(
+        s => s.status !== 'em_cobranca' || (s.comandaNumber !== comandaNumber && s.operatorId !== currentUser.id)
+      );
+
+      const nextState: SystemBackupData = {
         ...prev,
         products: stockUpdates.size > 0
           ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
           : prev.products,
-        customers: newCustomerBal !== undefined
-          ? (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newCustomerBal! } : c)
-          : prev.customers,
+        customers: updatedCustomers,
         customerEntries: fiadoAccountEntry
-          ? [fiadoAccountEntry, ...(prev.customerEntries || [])]
+          ? [fiadoAccountEntry, ...(prev.customerEntries || []).filter(e => e.id !== fiadoAccountEntry!.id)]
           : prev.customerEntries,
+        activeCheckouts: [completedCheckoutFlow, ...filteredCheckouts].slice(0, 40),
         sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
       };
       StorageService.saveState(nextState);
-      if (fiadoAccountEntry) {
-        saveSystemStateDoc(nextState);
-      }
+      saveSystemStateDoc(nextState);
       return nextState;
     });
 
     if (syncedToCloud) {
-      showToast(language === 'es' ? '¡Venta registrada con éxito en Supabase!' : 'Venda registrada com sucesso no Supabase!', 'success');
+      showToast(
+        fiadoAmountBrl > 0
+          ? (language === 'es' ? '¡Venta en FIADO registrada en tiempo real en Supabase!' : `Venda no FIADO registrada em tempo real para ${resolvedCustomerName || 'Cliente'}!`)
+          : (language === 'es' ? '¡Venta registrada con éxito en Supabase!' : 'Venda registrada com sucesso em tempo real no Supabase!'),
+        'success'
+      );
     } else {
       showToast(language === 'es' ? 'Venta registrada con éxito en el caja local (guardada en el dispositivo).' : 'Venda registrada com sucesso no caixa local (salva no dispositivo)!', 'info');
     }
@@ -2105,6 +2489,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         fornadas: [],
         customers: [],
         customerEntries: [],
+        activeCheckouts: [],
         employees: [adminAx],
         currentSession: {
           id: `sess-${Date.now()}`,
@@ -2171,6 +2556,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     executeProductionFromRecipe,
     customers: data.customers || [],
     customerEntries: data.customerEntries || [],
+    activeCheckouts: data.activeCheckouts || [],
+    broadcastCheckoutSession,
+    clearCheckoutSession,
     addCustomer,
     updateCustomer,
     deleteCustomer,
@@ -2217,7 +2605,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     registerDirectSale, updateExchangeRates, liveRateStatus, fetchLiveRates,
     toggleAutoRateRefresh, addProduct, updateProduct, deleteProduct, adjustStock,
     registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,
-    executeProductionFromRecipe, addCustomer, updateCustomer, deleteCustomer,
+    executeProductionFromRecipe, broadcastCheckoutSession, clearCheckoutSession,
+    addCustomer, updateCustomer, deleteCustomer,
     recordCustomerDebt, recordCustomerPayment, redeemCustomerPoints,
     saveComanda, updateComandaStatus, removeComanda, completeSale, deleteSale,
     openRegister, closeRegister, recordSaidaCaixa, recordEntradaCaixa,

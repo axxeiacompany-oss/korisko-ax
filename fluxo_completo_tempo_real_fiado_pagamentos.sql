@@ -159,15 +159,6 @@ ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS comanda_number TEXT;
 ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal';
 ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN DEFAULT true;
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'orders') THEN
-    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS comanda_number TEXT;
-    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal';
-    ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN DEFAULT true;
-  END IF;
-END $$;
-
 -- =================================================================================
 -- 5. TRIGGER AUTOMÁTICA: QUANDO UMA VENDA COM PAGAMENTO EM FIADO ENTRA EM public.vendas,
 -- GERA AUTOMATICAMENTE O REGISTRO NA TABELA public.lancamentos_fiado SE AINDA NÃO EXISTIR
@@ -245,75 +236,7 @@ AFTER INSERT ON public.vendas
 FOR EACH ROW EXECUTE FUNCTION public.fn_auto_registrar_fiado_da_venda();
 
 -- =================================================================================
--- 6. TRIGGER AUTOMÁTICA: PEDIDOS DA LOJA ONLINE -> COMANDAS POR SETOR EM TEMPO REAL
--- =================================================================================
-CREATE OR REPLACE FUNCTION public.fn_sync_order_to_comanda()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_comanda_num TEXT;
-BEGIN
-  IF NEW.status IN ('confirmed', 'paid', 'preparing') THEN
-    v_comanda_num := COALESCE(NEW.comanda_number, 'CMD-' || COALESCE(NEW.order_number, substring(NEW.id::text from 1 for 6)));
-    INSERT INTO public.comandas (
-      id,
-      number,
-      customer_id,
-      customer_name,
-      notes,
-      status,
-      setor_responsavel,
-      confirmed_by_customer,
-      confirmed_at,
-      opened_by,
-      opened_at,
-      updated_at,
-      total_brl,
-      forma_pagamento,
-      source
-    ) VALUES (
-      'cmd-' || NEW.id::text,
-      v_comanda_num,
-      NEW.user_id::text,
-      COALESCE((NEW.shipping_address->>'recipientName'), 'Cliente Loja Online'),
-      NEW.notes,
-      CASE
-        WHEN NEW.status = 'preparing' THEN 'em_preparo'
-        ELSE 'confirmado'
-      END,
-      COALESCE(NEW.setor_responsavel, 'todos'),
-      true,
-      now(),
-      'Cliente Loja Online',
-      COALESCE(NEW.created_at, now()),
-      now(),
-      COALESCE(NEW.total, 0),
-      COALESCE(NEW.payment_method, 'aguardando'),
-      'loja_online'
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      status = EXCLUDED.status,
-      forma_pagamento = EXCLUDED.forma_pagamento,
-      updated_at = now();
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'orders') THEN
-    DROP TRIGGER IF EXISTS trg_sync_order_to_comanda ON public.orders;
-    CREATE TRIGGER trg_sync_order_to_comanda
-    AFTER INSERT OR UPDATE ON public.orders
-    FOR EACH ROW EXECUTE FUNCTION public.fn_sync_order_to_comanda();
-  END IF;
-END $$;
-
--- =================================================================================
--- 7. PERMISSÕES E POLÍTICAS RLS (ACESSO TOTAL ADMIN + OPERAÇÃO EM TEMPO REAL)
+-- 6. PERMISSÕES E POLÍTICAS RLS + SUPABASE REALTIME
 -- =================================================================================
 ALTER TABLE public.comandas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lancamentos_fiado ENABLE ROW LEVEL SECURITY;
@@ -335,9 +258,6 @@ GRANT ALL ON public.comandas TO anon, authenticated, service_role;
 GRANT ALL ON public.lancamentos_fiado TO anon, authenticated, service_role;
 GRANT ALL ON public.fluxo_cobrancas_tempo_real TO anon, authenticated, service_role;
 
--- =================================================================================
--- 8. ATIVAR SUPABASE REALTIME EM TODAS AS TABELAS DO FLUXO COMPLETO
--- =================================================================================
 ALTER TABLE public.comandas REPLICA IDENTITY FULL;
 ALTER TABLE public.lancamentos_fiado REPLICA IDENTITY FULL;
 ALTER TABLE public.fluxo_cobrancas_tempo_real REPLICA IDENTITY FULL;

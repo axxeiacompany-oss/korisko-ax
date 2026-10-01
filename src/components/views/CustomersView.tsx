@@ -37,7 +37,9 @@ import {
   ChevronRight,
   Info,
   RotateCcw,
-  ShieldCheck
+  ShieldCheck,
+  Radio,
+  BookOpen
 } from 'lucide-react';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { ReceiptModal } from '../modals/ReceiptModal';
@@ -46,6 +48,7 @@ export const CustomersView: React.FC = () => {
   const { 
     customers, 
     customerEntries, 
+    activeCheckouts,
     sales,
     currentUser,
     addCustomer, 
@@ -610,18 +613,17 @@ export const CustomersView: React.FC = () => {
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
-                {language === 'es' ? 'Gestión de Clientes & Crédito' : 'CRM & Gestão de Clientes'}
+                {language === 'es' ? 'Gestión de Clientes & Fiado en Tiempo Real' : 'CRM, Fiado & Extrato em Tempo Real'}
               </h1>
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider hidden sm:inline-block">
-                {language === 'es' ? 'Fiado & Fidelidad' : 'Fiado & Fidelidade'}
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                <Radio className="w-2.5 h-2.5 animate-pulse" />
+                Tempo Real Anti-Perda
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-0.5 truncate">
-              {language === 'es' 
-                ? 'Control de cuentas por cobrar multi-moneda, límites de crédito y lealtad' 
-                : 'Controle de contas a receber multi-moeda, limites de crédito e fidelidade'}
+              Korizko • Panificação confeitaria artesanal — Todo Fiado ou pagamento aparece na hora no Extrato
             </p>
           </div>
         </div>
@@ -638,6 +640,90 @@ export const CustomersView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Live Checkout & Fiado Real-Time Feed ("apareca na hr principalmente se for em fiado para nao ter percas") */}
+      {((activeCheckouts && activeCheckouts.length > 0) || (customerEntries && customerEntries.length > 0)) && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#111728] via-[#0D121E] to-[#161224] border border-rose-500/30 space-y-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+              <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-rose-400" />
+                <span>Fluxo ao Vivo de Cobranças & Lançamentos de Fiado (Na Hora)</span>
+              </h2>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+              Sincronizado com public.lancamentos_fiado & public.fluxo_cobrancas_tempo_real
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {(activeCheckouts || []).slice(0, 3).map(chk => {
+              const isFiado = chk.paymentMethod === 'fiado';
+              const isChargingNow = chk.status === 'em_cobranca';
+              const linkedCust = customers.find(c => c.id === chk.customerId || c.name.toLowerCase() === chk.customerName.toLowerCase());
+              return (
+                <div
+                  key={chk.id}
+                  className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
+                    isChargingNow
+                      ? isFiado
+                        ? 'bg-rose-950/40 border-rose-500/60 shadow-md shadow-rose-950/30'
+                        : 'bg-amber-950/30 border-amber-500/50'
+                      : isFiado
+                        ? 'bg-rose-950/20 border-rose-500/30'
+                        : 'bg-[#090D16] border-[#1E273A]'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        isChargingNow
+                          ? 'bg-amber-500 text-neutral-950 animate-pulse'
+                          : isFiado
+                            ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                      }`}>
+                        {isChargingNow
+                          ? `COBRANDO AGORA: ${chk.paymentMethod.toUpperCase()}`
+                          : isFiado
+                            ? 'FIADO CONFIRMADO'
+                            : `PAGO (${chk.paymentMethod.toUpperCase()})`}
+                      </span>
+                      <span className="font-mono-nums font-black text-sm text-amber-400">
+                        {formatCurrency(chk.amountBrl, 'PYG')}
+                      </span>
+                    </div>
+
+                    <div className="font-bold text-white truncate">
+                      Cliente: {chk.customerName}
+                    </div>
+
+                    {isFiado && (
+                      <div className="text-[11px] text-rose-200 font-mono-nums">
+                        Anterior: {formatCurrency(chk.previousDebtBrl || 0, 'PYG')} → Novo Saldo: <strong>{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[10px] text-neutral-400">
+                    <span>Op: {chk.operatorName} {chk.comandaNumber ? `• #${chk.comandaNumber}` : ''}</span>
+                    {linkedCust && (
+                      <button
+                        type="button"
+                        onClick={() => setStatementCustomer(linkedCust)}
+                        className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                      >
+                        Abrir Extrato
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards - 2 cols on mobile */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">

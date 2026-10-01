@@ -127,6 +127,7 @@ export interface Comanda {
   status?: ComandaStatus;
   confirmedByCustomer?: boolean;
   confirmedAt?: string;
+  source?: 'pdv' | 'loja_online' | 'cliente_direto' | string;
   origem?: 'loja_online' | 'comanda_digital' | 'pdv_balcao';
   tipoAtendimento?: 'mesa' | 'retirada' | 'entrega';
   enderecoEntrega?: string;
@@ -213,9 +214,11 @@ export interface Customer {
 export interface CustomerAccountEntry {
   id: string;
   customerId: string;
+  customerName?: string;
   date: string;
   type: 'debito_compra' | 'pagamento_amortizacao';
   amountBrl: number;
+  previousBalanceBrl?: number;
   description: string;
   paymentMethod?: string;
   resultingBalanceBrl?: number;
@@ -225,6 +228,24 @@ export interface CustomerAccountEntry {
   setorResponsavel?: string;
   confirmedByCustomer?: boolean;
   recordedBy: string;
+}
+
+export interface ActiveCheckoutSession {
+  id: string;
+  operatorId: string;
+  operatorName: string;
+  customerId?: string;
+  customerName: string;
+  comandaNumber?: string;
+  setorResponsavel?: string;
+  paymentMethod: PaymentMethod;
+  amountBrl: number;
+  previousDebtBrl?: number;
+  projectedDebtBrl?: number;
+  status: 'em_cobranca' | 'confirmado_fiado' | 'pago' | 'cancelado';
+  itemsSummary?: string;
+  saleId?: string;
+  updatedAt: string;
 }
 
 export interface LiveRateStatus {
@@ -333,6 +354,7 @@ export interface SystemBackupData {
   fichasTecnicas?: FichaTecnica[];
   customers?: Customer[];
   customerEntries?: CustomerAccountEntry[];
+  activeCheckouts?: ActiveCheckoutSession[];
 }
 
 // =============================================================

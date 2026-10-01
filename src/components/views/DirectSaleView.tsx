@@ -1,26 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { 
   Zap, 
   UserPlus, 
   Check, 
-  DollarSign, 
   CreditCard, 
   QrCode, 
   Banknote, 
   BookOpen, 
   CheckCircle2, 
-  AlertCircle,
   X,
   User,
-  ArrowRight,
-  Sparkles,
-  Receipt,
-  RotateCcw,
-  Plus
+  Plus,
+  Radio,
+  ShieldCheck,
+  AlertTriangle,
+  Landmark
 } from 'lucide-react';
 import { PaymentMethod, Currency } from '../../types';
-import { formatCurrency, toBrl, fromBrl } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 
 interface Props {
   onSaleCompleted?: () => void;
@@ -32,11 +30,13 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
     customers, 
     addCustomer, 
     currentSession, 
-    exchangeRates,
-    currentUser,
+    broadcastCheckoutSession,
+    clearCheckoutSession,
     t,
     language 
   } = useBakery();
+
+  const directSessionIdRef = useRef<string>(`chk-vd-${Date.now()}`);
 
   // Sale form states (Moeda única oficial: Guaraní ₲)
   const selectedCurrency: Currency = 'PYG';
@@ -79,6 +79,27 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
   const amountBrl = rawInputNumber;
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const previousDebtBrl = selectedCustomer?.outstandingBalanceBrl || 0;
+  const projectedDebtBrl = paymentMethod === 'fiado' ? previousDebtBrl + amountBrl : previousDebtBrl;
+
+  // Broadcast live charging state in real time whenever amount > 0
+  useEffect(() => {
+    if (amountBrl <= 0) {
+      return;
+    }
+    broadcastCheckoutSession({
+      id: directSessionIdRef.current,
+      customerId: selectedCustomer?.id || undefined,
+      customerName: selectedCustomer?.name || (paymentMethod === 'fiado' ? 'Selecionando Cliente Fiado...' : 'Cliente Venda Direta'),
+      setorResponsavel: 'Balcão & Venda Direta',
+      paymentMethod,
+      amountBrl,
+      previousDebtBrl,
+      projectedDebtBrl,
+      status: 'em_cobranca',
+      itemsSummary: description.trim() || 'Venda Direta Balcão',
+    });
+  }, [amountBrl, paymentMethod, selectedCustomer, previousDebtBrl, projectedDebtBrl, description, broadcastCheckoutSession]);
 
   // Quick preset amount additions in Guaranís (₲)
   const addPreset = (val: number) => {
@@ -110,7 +131,6 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
 
   // Quick presets in Guaraní bills
   const quickPresets = [5000, 10000, 20000, 50000, 100000, 200000];
-  const currencySymbol = '₲';
 
   // Handle Quick Add Customer
   const handleSaveCustomer = async (e: React.FormEvent) => {
@@ -124,7 +144,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       const created = await addCustomer({
         name: newCustName.trim(),
         phone: newCustPhone.trim(),
-        creditLimitBrl: parseFloat(newCustLimit) || 150,
+        creditLimitBrl: parseFloat(newCustLimit) || 500000,
         category: 'varejo',
       });
 
@@ -132,7 +152,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       setIsAddingCustomer(false);
       setNewCustName('');
       setNewCustPhone('');
-      showNotice(`Cliente "${created.name}" cadastrado com sucesso!`, 'success');
+      showNotice(`Cliente "${created.name}" cadastrado e vinculado em tempo real!`, 'success');
     } catch (err: any) {
       showNotice(`Erro ao cadastrar cliente: ${err.message}`, 'error');
     }
@@ -151,13 +171,14 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
       if (!selectedCustomer) {
         showNotice(language === 'es' 
           ? 'Para registrar como Crédito / Fiado, por favor seleccione o agregue un cliente.' 
-          : 'Para registrar como Fiado / Caderneta, selecione ou adicione um cliente.', 'error');
+          : 'Para registrar como Fiado / Caderneta sem perdas, selecione ou adicione um cliente.', 'error');
         return;
       }
     }
 
     setIsSubmittingDirect(true);
     try {
+      clearCheckoutSession(directSessionIdRef.current);
       const sale = await registerDirectSale(
         amountBrl,
         description.trim() || (language === 'es' ? 'Venta Directa Mostrador' : 'Venda Direta Balcão'),
@@ -176,12 +197,14 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
           : paymentMethod === 'pix' ? 'Pix / QR'
           : paymentMethod === 'cartao_debito' ? (language === 'es' ? 'Débito' : 'Débito')
           : paymentMethod === 'cartao_credito' ? (language === 'es' ? 'Crédito' : 'Crédito')
+          : paymentMethod === 'transferencia' ? 'Transferência'
           : (language === 'es' ? 'Crédito / Fiado' : 'Fiado / Caderneta'),
         customerName: sale.customerName || (language === 'es' ? 'Cliente Casual' : 'Cliente Avulso'),
         timestamp: new Date().toLocaleTimeString(language === 'es' ? 'es-PY' : 'pt-BR'),
       });
 
       // Reset fields for next fast sale
+      directSessionIdRef.current = `chk-vd-${Date.now()}`;
       setAmountStr('');
       setDescription('');
       setSelectedCustomerId('');
@@ -222,16 +245,17 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-base sm:text-xl font-black text-white tracking-tight">
                 {t.directSaleTitle}
               </h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
-                {language === 'es' ? '1 Clic' : '1 Clique'}
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                <Radio className="w-2.5 h-2.5 animate-pulse" />
+                Tempo Real
               </span>
             </div>
             <p className="text-xs text-neutral-400">
-              {t.directSaleSubtitle}
+              Korizko • Panificação confeitaria artesanal — Cobrança e Fiado sincronizados na hora
             </p>
           </div>
         </div>
@@ -280,7 +304,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               </div>
             </div>
 
-            {/* Quick value chips - Smooth swipe on mobile */}
+            {/* Quick value chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
               <span className="text-[11px] text-neutral-500 shrink-0 mr-0.5">
                 {language === 'es' ? 'Billetes:' : 'Notas:'}
@@ -297,14 +321,17 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               ))}
               <button
                 type="button"
-                onClick={() => setAmountStr('')}
+                onClick={() => {
+                  setAmountStr('');
+                  clearCheckoutSession(directSessionIdRef.current);
+                }}
                 className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 border border-rose-500/20 text-xs font-medium shrink-0 ml-auto cursor-pointer"
               >
                 {language === 'es' ? 'Borrar' : 'Limpar'}
               </button>
             </div>
 
-            {/* Touch Numerical Keypad with ergonomic thumb height and 000 */}
+            {/* Touch Numerical Keypad */}
             <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', '000', '0', '⌫'].map(key => (
                 <button
@@ -346,19 +373,27 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
         <div className="lg:col-span-5 space-y-4">
           
           {/* Customer Selection or Quick Add */}
-          <div className="p-5 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-3">
+          <div className={`p-5 rounded-2xl border shadow-xl space-y-3 transition-all ${
+            paymentMethod === 'fiado'
+              ? 'bg-rose-950/20 border-rose-500/40'
+              : 'bg-[#0F1524] border-[#1E283D]'
+          }`}>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{language === 'es' ? 'Cliente (Opcional)' : 'Cliente (Opcional)'}</span>
+                <User className={`w-3.5 h-3.5 ${paymentMethod === 'fiado' ? 'text-rose-400' : 'text-indigo-400'}`} />
+                <span>
+                  {paymentMethod === 'fiado'
+                    ? 'Cliente do Fiado (Obrigatório Anti-Perda)'
+                    : (language === 'es' ? 'Cliente (Opcional)' : 'Cliente (Opcional)')}
+                </span>
               </label>
               <button
                 type="button"
                 onClick={() => setIsAddingCustomer(true)}
-                className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{language === 'es' ? 'Nuevo Cliente' : 'Novo Cliente'}</span>
+                <span>{language === 'es' ? 'Nuevo Cliente' : '+ Novo Cliente'}</span>
               </button>
             </div>
 
@@ -367,10 +402,10 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               onChange={(e) => setSelectedCustomerId(e.target.value)}
               className="w-full px-3 py-2.5 bg-[#090D15] border border-[#1F273A] rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
             >
-              <option value="">{language === 'es' ? 'Cliente Ocasional (No identificado)' : 'Cliente Avulso (Não identificado)'}</option>
+              <option value="">{language === 'es' ? 'Cliente Ocasional (No identificado)' : 'Cliente Avulso (Selecione para Fiado)'}</option>
               {customers.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.name} {c.phone ? `(${c.phone})` : ''} — {language === 'es' ? 'Saldo:' : 'Saldo:'} {formatCurrency(c.outstandingBalanceBrl, 'BRL')}
+                  {c.name} {c.phone ? `(${c.phone})` : ''} — {language === 'es' ? 'Saldo:' : 'Fiado:'} {formatCurrency(c.outstandingBalanceBrl, 'PYG')}
                 </option>
               ))}
             </select>
@@ -383,9 +418,9 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                   <span className="text-[10px] text-amber-400 font-semibold">{selectedCustomer.loyaltyPoints} {language === 'es' ? 'Puntos' : 'Pontos'}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono-nums">
-                  <span>{language === 'es' ? 'Límite:' : 'Limite:'} {formatCurrency(selectedCustomer.creditLimitBrl, 'BRL')}</span>
-                  <span className={selectedCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}>
-                    {language === 'es' ? 'Pendiente:' : 'Em aberto:'} {formatCurrency(selectedCustomer.outstandingBalanceBrl, 'BRL')}
+                  <span>{language === 'es' ? 'Límite:' : 'Limite:'} {formatCurrency(selectedCustomer.creditLimitBrl, 'PYG')}</span>
+                  <span className={selectedCustomer.outstandingBalanceBrl > 0 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                    {language === 'es' ? 'Pendiente:' : 'Dívida Atual:'} {formatCurrency(selectedCustomer.outstandingBalanceBrl, 'PYG')}
                   </span>
                 </div>
               </div>
@@ -394,9 +429,15 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
 
           {/* Payment Method Selector */}
           <div className="p-5 rounded-2xl bg-[#0F1524] border border-[#1E283D] shadow-xl space-y-3">
-            <label className="text-xs font-bold text-white block">
-              {t.directSalePaymentMethod}
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-white block">
+                {t.directSalePaymentMethod}
+              </label>
+              <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                <Radio className="w-3 h-3 animate-pulse" />
+                Aparece na Hora
+              </span>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -404,7 +445,8 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                 { id: 'pix', label: 'Pix / QR', icon: QrCode, color: 'text-teal-400' },
                 { id: 'cartao_debito', label: language === 'es' ? 'Débito' : 'Débito', icon: CreditCard, color: 'text-sky-400' },
                 { id: 'cartao_credito', label: language === 'es' ? 'Crédito' : 'Crédito', icon: CreditCard, color: 'text-indigo-400' },
-                { id: 'fiado', label: language === 'es' ? 'Crédito (Fiado)' : 'Caderneta (Fiado)', icon: BookOpen, color: 'text-amber-400' },
+                { id: 'transferencia', label: 'Transferência', icon: Landmark, color: 'text-purple-400' },
+                { id: 'fiado', label: language === 'es' ? 'Crédito (Fiado)' : 'Caderneta (Fiado)', icon: BookOpen, color: 'text-rose-400' },
               ].map(pay => {
                 const Icon = pay.icon;
                 const isSelected = paymentMethod === pay.id;
@@ -416,7 +458,9 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                     onClick={() => setPaymentMethod(pay.id as PaymentMethod)}
                     className={`p-3 rounded-xl border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-500/20 text-white shadow-md'
+                        ? pay.id === 'fiado'
+                          ? 'border-rose-500 bg-rose-500/20 text-white shadow-md shadow-rose-500/10'
+                          : 'border-indigo-500 bg-indigo-500/20 text-white shadow-md'
                         : 'border-[#1C2538] bg-[#090D15] text-neutral-400 hover:text-white'
                     }`}
                   >
@@ -426,6 +470,41 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
                 );
               })}
             </div>
+
+            {/* Real-Time Fiado Protection Card */}
+            {paymentMethod === 'fiado' && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-rose-950/60 via-neutral-950 to-amber-950/40 border border-rose-500/40 space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-rose-300 uppercase flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+                    Registro de Fiado em Tempo Real
+                  </span>
+                  <span className="text-[10px] font-bold text-rose-200 bg-rose-500/20 px-2 py-0.5 rounded-full">
+                    Zero Perdas
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 p-2 rounded-lg bg-black/40 text-center">
+                  <div>
+                    <span className="text-[9px] text-neutral-400 uppercase block">Atual</span>
+                    <span className="text-xs font-bold text-neutral-200 font-mono-nums">{formatCurrency(previousDebtBrl, 'PYG')}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-rose-300 uppercase block">+ Compra</span>
+                    <span className="text-xs font-black text-rose-400 font-mono-nums">+{formatCurrency(amountBrl, 'PYG')}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-amber-300 uppercase block">= Novo Saldo</span>
+                    <span className="text-xs font-black text-amber-400 font-mono-nums">{formatCurrency(projectedDebtBrl, 'PYG')}</span>
+                  </div>
+                </div>
+                {!selectedCustomer && (
+                  <div className="text-[11px] text-amber-300 flex items-center gap-1 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Selecione ou cadastre o cliente acima para confirmar o Fiado.</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Confirm Button */}
@@ -433,13 +512,19 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
             type="button"
             onClick={handleConfirmDirectSale}
             disabled={amountBrl <= 0 || isSubmittingDirect}
-            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 disabled:opacity-40 disabled:pointer-events-none text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center gap-3 cursor-pointer group"
+            className={`w-full py-4 px-6 rounded-2xl disabled:opacity-40 disabled:pointer-events-none text-white font-black text-sm sm:text-base shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer group ${
+              paymentMethod === 'fiado'
+                ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 shadow-rose-600/30'
+                : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-600/30'
+            }`}
           >
             <Check className="w-5 h-5 stroke-[3] group-hover:scale-110 transition-transform" />
             <span>
               {isSubmittingDirect 
-                ? (language === 'es' ? 'Guardando en Supabase...' : 'Gravando no Supabase...')
-                : `${language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} (${formatCurrency(rawInputNumber, 'PYG')})`
+                ? (language === 'es' ? 'Guardando en Supabase...' : 'Gravando em Tempo Real...')
+                : paymentMethod === 'fiado'
+                  ? `Confirmar no FIADO (${formatCurrency(rawInputNumber, 'PYG')})`
+                  : `${language === 'es' ? 'Confirmar Venta' : 'Confirmar Venda'} (${formatCurrency(rawInputNumber, 'PYG')})`
               }
             </span>
           </button>
@@ -450,7 +535,7 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
               <div className="flex items-center justify-between">
                 <span className="font-bold flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
-                  {language === 'es' ? '¡Venta Registrada con Éxito!' : 'Venda Registrada com Sucesso!'}
+                  {language === 'es' ? '¡Venta Registrada en Tiempo Real!' : 'Venda & Método Registrados na Hora!'}
                 </span>
                 <span className="font-mono text-[10px] text-emerald-400">
                   {lastSaleReceipt.timestamp}

@@ -5,25 +5,21 @@ import {
   Zap, 
   Clock, 
   ShoppingBag, 
-  ArrowUpRight, 
   Eye, 
   Volume2, 
   VolumeX, 
   Radio, 
-  CheckCircle2, 
   Coins, 
   CreditCard, 
   Banknote, 
-  Layers, 
-  Flame, 
-  Filter,
   X,
-  Play,
-  Pause,
-  ExternalLink,
-  Trash2
+  Trash2,
+  BookOpen,
+  ShieldCheck,
+  UserCheck,
+  Landmark
 } from 'lucide-react';
-import { formatCurrency, fromBrl } from '../utils/currency';
+import { formatCurrency } from '../utils/currency';
 import { ReceiptModal } from './modals/ReceiptModal';
 import { DeleteSaleModal } from './modals/DeleteSaleModal';
 
@@ -38,28 +34,28 @@ export const LiveSalesStream: React.FC<Props> = ({
   onClose,
   onNavigateToPdv 
 }) => {
-  const { sales, exchangeRates, t, language, currentUser } = useBakery();
+  const { sales, activeCheckouts, customerEntries, language, currentUser } = useBakery();
   const isAdmin = currentUser.role === 'admin';
   
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [filterPeriod, setFilterPeriod] = useState<'today' | 'all'>('today');
   const [nowTime, setNowTime] = useState<number>(Date.now());
   const prevSalesLengthRef = useRef<number>(sales.length);
+  const prevEntriesLengthRef = useRef<number>((customerEntries || []).length);
 
-  // Auto-refresh relative time display every 20 seconds when visible
+  // Auto-refresh relative time display every 10 seconds when visible
   useEffect(() => {
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         setNowTime(Date.now());
       }
-    }, 20000);
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
-  // Web Audio API subtle cash chime for live sales updates
+  // Web Audio API subtle cash chime for live sales & fiado updates
   const playChime = () => {
     if (!soundEnabled) return;
     try {
@@ -84,16 +80,26 @@ export const LiveSalesStream: React.FC<Props> = ({
     } catch {}
   };
 
-  // Detect incoming new sale and trigger sound chime
+  // Detect incoming new sale or new fiado entry and trigger sound chime
   useEffect(() => {
-    if (sales.length > prevSalesLengthRef.current) {
+    if (sales.length > prevSalesLengthRef.current || (customerEntries || []).length > prevEntriesLengthRef.current) {
       playChime();
     }
     prevSalesLengthRef.current = sales.length;
-  }, [sales.length]);
+    prevEntriesLengthRef.current = (customerEntries || []).length;
+  }, [sales.length, customerEntries]);
 
   // Today string for filtering
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Active live checkouts happening right now ("na hora de cobrar")
+  const liveInProgressCheckouts = useMemo(() => {
+    return (activeCheckouts || []).filter(c => {
+      if (c.status !== 'em_cobranca') return false;
+      const ageSec = (nowTime - new Date(c.updatedAt).getTime()) / 1000;
+      return ageSec < 900; // active within last 15 min
+    });
+  }, [activeCheckouts, nowTime]);
 
   // Filtered sales stream sorted latest first
   const streamSales = useMemo(() => {
@@ -104,13 +110,30 @@ export const LiveSalesStream: React.FC<Props> = ({
     return list.slice().reverse();
   }, [sales, filterPeriod, todayStr]);
 
+  // Recent Fiado entries today
+  const recentFiadoEntries = useMemo(() => {
+    let list = customerEntries || [];
+    if (filterPeriod === 'today') {
+      list = list.filter(e => (e.date || '').startsWith(todayStr));
+    }
+    return list.slice(0, 8);
+  }, [customerEntries, filterPeriod, todayStr]);
+
   // Stream metrics
   const totalRevenue = useMemo(() => {
     return streamSales.reduce((acc, s) => acc + s.totalBrl, 0);
   }, [streamSales]);
 
+  const totalFiadoToday = useMemo(() => {
+    return streamSales.reduce((acc, s) => {
+      const fiadoPart = (s.payments || [])
+        .filter(p => p.method === 'fiado')
+        .reduce((sum, p) => sum + p.equivalentBrl, 0);
+      return acc + fiadoPart;
+    }, 0);
+  }, [streamSales]);
+
   const salesCount = streamSales.length;
-  const ticketMedio = salesCount > 0 ? totalRevenue / salesCount : 0;
 
   // Relative time helper
   const getRelativeTime = (timestamp: string) => {
@@ -138,13 +161,15 @@ export const LiveSalesStream: React.FC<Props> = ({
       case 'dinheiro':
         return { label: 'Dinheiro', icon: Banknote, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' };
       case 'pix':
-        return { label: 'PIX', icon: Zap, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20' };
+        return { label: 'PIX / QR', icon: Zap, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20' };
       case 'cartao_credito':
         return { label: 'Crédito', icon: CreditCard, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' };
       case 'cartao_debito':
         return { label: 'Débito', icon: CreditCard, color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' };
+      case 'transferencia':
+        return { label: 'Transferência', icon: Landmark, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' };
       case 'fiado':
-        return { label: 'Fiado', icon: Clock, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' };
+        return { label: 'FIADO / CADERNETA', icon: BookOpen, color: 'text-rose-300 bg-rose-500/20 border-rose-500/40 font-black' };
       default:
         return { label: method, icon: Coins, color: 'text-neutral-400 bg-neutral-800 border-neutral-700' };
     }
@@ -163,19 +188,21 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold text-neutral-100 tracking-tight flex items-center gap-2">
                   <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-                  <span>{language === 'es' ? 'Flujo Continuo de Ventas en Vivo' : 'Fluxo Contínuo de Vendas ao Vivo'}</span>
+                  <span>
+                    {language === 'es'
+                      ? 'Flujo en Tiempo Real: Cobros, Fiado & Ventas'
+                      : 'Fluxo em Tempo Real: Cobranças na Hora, Fiado & Vendas'}
+                  </span>
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono-nums font-bold tracking-wider uppercase">
-                  Realtime
+                  Ao Vivo
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400">
-                {language === 'es' 
-                  ? 'Transmisión ininterrumpida de cada venta y comanda en tiempo real' 
-                  : 'Transmissão ininterrupta de cada venda e comanda em tempo real multi-aparelhos'}
+                Korizko • Panificação confeitaria artesanal — Monitoramento instantâneo anti-perda de Fiado e métodos de pagamento
               </p>
             </div>
           </div>
@@ -204,12 +231,11 @@ export const LiveSalesStream: React.FC<Props> = ({
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
               className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${soundEnabled ? 'border-neutral-700 bg-neutral-800 text-emerald-400 hover:bg-neutral-750' : 'border-neutral-800 bg-neutral-950 text-neutral-500 hover:text-neutral-300'}`}
-              title={soundEnabled ? (language === 'es' ? 'Desactivar sonido' : 'Desativar som do fluxo') : (language === 'es' ? 'Activar sonido' : 'Ativar som do fluxo')}
+              title={soundEnabled ? 'Desativar som' : 'Ativar som'}
             >
               {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Close if in drawer mode */}
             {mode === 'drawer' && onClose && (
               <button
                 type="button"
@@ -222,6 +248,83 @@ export const LiveSalesStream: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* LIVE CHECKOUTS HAPPENING RIGHT NOW ("NA HORA DE COBRAR E COLOCAR FIADO OU OUTRO MÉTODO") */}
+        {liveInProgressCheckouts.length > 0 && (
+          <div className="mt-3.5 p-3.5 rounded-xl bg-gradient-to-r from-rose-950/50 via-neutral-950 to-amber-950/40 border border-rose-500/40 space-y-2.5 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+                <span>Sendo Cobrado Agora no Caixa / Balcão ({liveInProgressCheckouts.length})</span>
+              </span>
+              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                Aparece na Hora
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {liveInProgressCheckouts.map(chk => {
+                const badge = getPaymentBadge(chk.paymentMethod);
+                const BadgeIcon = badge.icon;
+                const isFiado = chk.paymentMethod === 'fiado';
+                return (
+                  <div
+                    key={chk.id}
+                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                      isFiado
+                        ? 'bg-rose-950/40 border-rose-500/50'
+                        : 'bg-neutral-900/90 border-amber-500/30'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
+                          <BadgeIcon className="w-3 h-3" />
+                          <span>COBRANDO EM: {badge.label}</span>
+                        </span>
+                        <span className="text-xs font-black text-white flex items-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                          {chk.customerName}
+                        </span>
+                        {chk.comandaNumber && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono-nums font-bold">
+                            Comanda #{chk.comandaNumber}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-neutral-400">
+                          Operador: <strong className="text-neutral-200">{chk.operatorName}</strong>
+                        </span>
+                      </div>
+
+                      {chk.itemsSummary && (
+                        <div className="text-[11px] text-neutral-300">
+                          Itens: {chk.itemsSummary} • Setor: <strong className="text-amber-300">{chk.setorResponsavel || 'Balcão'}</strong>
+                        </div>
+                      )}
+
+                      {isFiado && (
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-rose-200 font-mono-nums pt-0.5">
+                          <span>Dívida Anterior: <strong>{formatCurrency(chk.previousDebtBrl || 0, 'PYG')}</strong></span>
+                          <span>+ Compra: <strong className="text-rose-400">+{formatCurrency(chk.amountBrl, 'PYG')}</strong></span>
+                          <span>= Novo Saldo Extrato: <strong className="text-amber-300">{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong></span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-base font-black text-amber-400 font-mono-nums">
+                        {formatCurrency(chk.amountBrl, 'PYG')}
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-mono-nums">
+                        {getRelativeTime(chk.updatedAt)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Live Counters Banner */}
         <div className="grid grid-cols-3 gap-2.5 my-3.5">
           <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex flex-col">
@@ -231,7 +334,7 @@ export const LiveSalesStream: React.FC<Props> = ({
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-lg font-bold text-neutral-100 font-mono-nums">{salesCount}</span>
               <span className="text-[10px] text-emerald-400 font-mono-nums">
-                {salesCount > 0 ? (language === 'es' ? 'activas' : 'registradas') : (language === 'es' ? 'aguardando' : 'aguardando')}
+                {salesCount > 0 ? 'registradas' : 'aguardando'}
               </span>
             </div>
           </div>
@@ -245,15 +348,81 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex flex-col">
-            <span className="text-[10px] text-neutral-400 uppercase font-semibold tracking-wider">
-              Ticket Médio
+          <div className="p-3 rounded-xl bg-neutral-950 border border-rose-500/30 flex flex-col">
+            <span className="text-[10px] text-rose-300 uppercase font-bold tracking-wider flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-rose-400" />
+              Fiado Registrado Hoje
             </span>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg font-bold text-neutral-200 font-mono-nums">{formatCurrency(ticketMedio, 'PYG')}</span>
+              <span className="text-lg font-black text-rose-400 font-mono-nums">{formatCurrency(totalFiadoToday, 'PYG')}</span>
             </div>
           </div>
         </div>
+
+        {/* Recent Real-Time Fiado & Amortization Ledger Entries */}
+        {recentFiadoEntries.length > 0 && (
+          <div className="mb-3.5 p-3 rounded-xl bg-neutral-950/90 border border-neutral-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-rose-400" />
+                <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
+              </span>
+              <span className="text-[10px] text-neutral-400 font-mono-nums">
+                {recentFiadoEntries.length} lançamentos
+              </span>
+            </div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {recentFiadoEntries.map(entry => {
+                const isDebt = entry.type === 'debito_compra';
+                return (
+                  <div
+                    key={entry.id}
+                    className={`p-2.5 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                      isDebt
+                        ? 'bg-rose-950/20 border-rose-500/30'
+                        : 'bg-emerald-950/20 border-emerald-500/30'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
+                          isDebt ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {isDebt ? 'NOVO FIADO LANÇADO' : `PAGAMENTO (${(entry.paymentMethod || 'CAIXA').toUpperCase()})`}
+                        </span>
+                        <span className="font-bold text-white">
+                          {entry.customerName || 'Cliente Cadastrado'}
+                        </span>
+                        {entry.comandaNumber && (
+                          <span className="text-[10px] font-mono-nums text-amber-300">
+                            #{entry.comandaNumber}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-neutral-400 font-mono-nums">
+                          {getRelativeTime(entry.date)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        {entry.description}
+                      </div>
+                    </div>
+
+                    <div className="text-right font-mono-nums shrink-0">
+                      <div className={`font-black ${isDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {isDebt ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
+                      </div>
+                      {entry.resultingBalanceBrl !== undefined && (
+                        <div className="text-[10px] text-neutral-400">
+                          Saldo: <strong className="text-amber-300">{formatCurrency(entry.resultingBalanceBrl, 'PYG')}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Stream List / Timeline Feed */}
         <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[480px] pr-1 scrollbar-thin scrollbar-thumb-neutral-800">
@@ -264,12 +433,10 @@ export const LiveSalesStream: React.FC<Props> = ({
               </div>
               <div className="space-y-1 max-w-sm">
                 <h4 className="text-xs font-bold text-neutral-200">
-                  {language === 'es' ? 'Flujo Continuo Conectado y Esperando' : 'Fluxo Contínuo Conectado e Aguardando'}
+                  {language === 'es' ? 'Flujo Continuo Conectado y Esperando' : 'Fluxo Contínuo Conectado em Tempo Real'}
                 </h4>
                 <p className="text-[11px] text-neutral-400 leading-relaxed">
-                  {language === 'es'
-                    ? 'Todas las ventas y movimientos que ocurran en cualquier dispositivo se mostrarán aquí en vivo en tiempo real.'
-                    : 'Como o sistema foi zerado, cada nova venda realizada no PDV ou no celular aparecerá aqui imediatamente em tempo real.'}
+                  Toda venda, comanda ou cobrança em Fiado/PIX/Dinheiro aparecerá aqui instantaneamente na hora em que for selecionada ou confirmada.
                 </p>
               </div>
 
@@ -280,13 +447,16 @@ export const LiveSalesStream: React.FC<Props> = ({
                   className="mt-1 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-neutral-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 cursor-pointer transition-transform hover:scale-[1.02]"
                 >
                   <ShoppingBag className="w-3.5 h-3.5 text-neutral-950" />
-                  <span>{language === 'es' ? 'Realizar Primera Venta en PDV' : 'Realizar Primeira Venda no PDV'}</span>
+                  <span>{language === 'es' ? 'Ir al PDV' : 'Abrir PDV Agora'}</span>
                 </button>
               )}
             </div>
           ) : (
             streamSales.map((sale, idx) => {
-              const payment = sale.payments[0] || { method: 'dinheiro', currency: 'PYG', amountReceived: sale.totalBrl };
+              const hasFiado = (sale.payments || []).some(p => p.method === 'fiado');
+              const payment = hasFiado
+                ? sale.payments.find(p => p.method === 'fiado')!
+                : (sale.payments[0] || { method: 'dinheiro', currency: 'PYG', amountReceived: sale.totalBrl });
               const badge = getPaymentBadge(payment.method);
               const BadgeIcon = badge.icon;
               const relativeTime = getRelativeTime(sale.timestamp);
@@ -296,9 +466,11 @@ export const LiveSalesStream: React.FC<Props> = ({
                 <div
                   key={sale.id}
                   className={`p-3.5 rounded-xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isRecent 
-                      ? 'bg-neutral-950/90 border-emerald-500/40 shadow-sm shadow-emerald-500/10' 
-                      : 'bg-neutral-950/50 border-neutral-850 hover:border-neutral-750'
+                    hasFiado
+                      ? 'bg-rose-950/20 border-rose-500/40 shadow-sm shadow-rose-500/10'
+                      : isRecent 
+                        ? 'bg-neutral-950/90 border-emerald-500/40 shadow-sm shadow-emerald-500/10' 
+                        : 'bg-neutral-950/50 border-neutral-850 hover:border-neutral-750'
                   }`}
                 >
                   {/* Left Column: Number, Seller, Time, Items */}
@@ -322,6 +494,18 @@ export const LiveSalesStream: React.FC<Props> = ({
                           <BadgeIcon className="w-3 h-3" />
                           <span>{badge.label}</span>
                         </span>
+
+                        {sale.customerName && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold">
+                            Cliente: {sale.customerName}
+                          </span>
+                        )}
+
+                        {sale.comandaNumber && (
+                          <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] font-mono-nums">
+                            {sale.comandaNumber}
+                          </span>
+                        )}
                       </div>
 
                       {/* Items Preview */}
@@ -342,9 +526,14 @@ export const LiveSalesStream: React.FC<Props> = ({
                   {/* Right Column: Guaraní Total & Action */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-850">
                     <div className="text-right">
-                      <div className="text-base font-bold text-amber-400 font-mono-nums">
+                      <div className={`text-base font-bold font-mono-nums ${hasFiado ? 'text-rose-400' : 'text-amber-400'}`}>
                         {formatCurrency(sale.totalBrl, 'PYG')}
                       </div>
+                      {sale.setorResponsavel && (
+                        <div className="text-[10px] text-neutral-400">
+                          {sale.setorResponsavel}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5">

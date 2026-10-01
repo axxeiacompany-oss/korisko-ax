@@ -10,7 +10,10 @@ import {
   Comanda,
   SetorResponsavel,
   ComandaStatus,
-  CartItem
+  CartItem,
+  CustomerAccountEntry,
+  ActiveCheckoutSession,
+  PaymentMethod
 } from '../types';
 
 // ==========================================
@@ -688,4 +691,160 @@ export async function deleteComandaDb(id: string): Promise<void> {
     // fallback handled by korisko_system_state
   }
 }
+
+// ==========================================
+// DATA ACCESS LAYER: LANCAMENTOS FIADO & CONTA CORRENTE EM TEMPO REAL
+// Tabela: public.lancamentos_fiado
+// ==========================================
+
+export function fiadoEntryToRow(e: CustomerAccountEntry) {
+  return {
+    id: e.id,
+    customer_id: e.customerId,
+    customer_name: e.customerName || 'Cliente Cadastrado',
+    type: e.type || 'debito_compra',
+    amount_brl: Number(e.amountBrl) || 0,
+    previous_balance_brl: Number(e.previousBalanceBrl ?? 0),
+    resulting_balance_brl: Number(e.resultingBalanceBrl ?? e.runningBalanceBrl ?? 0),
+    payment_method: e.paymentMethod || (e.type === 'debito_compra' ? 'fiado' : 'dinheiro'),
+    description: e.description || 'Lançamento em Conta Corrente / Fiado',
+    sale_id: e.saleId || null,
+    comanda_number: e.comandaNumber || null,
+    setor_responsavel: e.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+    confirmed_by_customer: e.confirmedByCustomer !== undefined ? e.confirmedByCustomer : true,
+    recorded_by: e.recordedBy || 'Caixa',
+    date: e.date || new Date().toISOString(),
+  };
+}
+
+export function rowToFiadoEntry(r: any): CustomerAccountEntry {
+  return {
+    id: String(r.id),
+    customerId: String(r.customer_id || ''),
+    customerName: r.customer_name || undefined,
+    date: r.date || r.created_at || new Date().toISOString(),
+    type: r.type === 'pagamento_amortizacao' ? 'pagamento_amortizacao' : 'debito_compra',
+    amountBrl: Number(r.amount_brl) || 0,
+    previousBalanceBrl: r.previous_balance_brl !== undefined ? Number(r.previous_balance_brl) : undefined,
+    resultingBalanceBrl: r.resulting_balance_brl !== undefined ? Number(r.resulting_balance_brl) : undefined,
+    runningBalanceBrl: r.resulting_balance_brl !== undefined ? Number(r.resulting_balance_brl) : undefined,
+    paymentMethod: r.payment_method || (r.type === 'debito_compra' ? 'fiado' : 'dinheiro'),
+    description: String(r.description || ''),
+    saleId: r.sale_id || undefined,
+    comandaNumber: r.comanda_number || undefined,
+    setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+    confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
+    recordedBy: String(r.recorded_by || 'Caixa'),
+  };
+}
+
+export async function listLancamentosFiado(): Promise<CustomerAccountEntry[]> {
+  try {
+    const rows = await fetchAllRowsPaged<any>('lancamentos_fiado');
+    return rows
+      .map(rowToFiadoEntry)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertLancamentoFiadoDb(e: CustomerAccountEntry): Promise<CustomerAccountEntry | null> {
+  try {
+    const row = fiadoEntryToRow(e);
+    const { data, error } = await supabase
+      .from('lancamentos_fiado')
+      .upsert(row, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error || !data) return null;
+    return rowToFiadoEntry(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteLancamentoFiadoDb(id: string): Promise<void> {
+  try {
+    await supabase.from('lancamentos_fiado').delete().eq('id', id);
+  } catch {}
+}
+
+// ==========================================
+// DATA ACCESS LAYER: FLUXO DE COBRANÇAS E PAGAMENTOS EM TEMPO REAL
+// Tabela: public.fluxo_cobrancas_tempo_real
+// ==========================================
+
+export function checkoutSessionToRow(s: ActiveCheckoutSession) {
+  return {
+    id: s.id,
+    operator_id: s.operatorId || 'emp-admin-ax',
+    operator_name: s.operatorName || 'Operador',
+    customer_id: s.customerId || null,
+    customer_name: s.customerName || 'Cliente Balcão',
+    comanda_number: s.comandaNumber || null,
+    setor_responsavel: s.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+    payment_method: s.paymentMethod || 'dinheiro',
+    amount_brl: Number(s.amountBrl) || 0,
+    previous_debt_brl: Number(s.previousDebtBrl || 0),
+    projected_debt_brl: Number(s.projectedDebtBrl || 0),
+    status: s.status || 'em_cobranca',
+    items_summary: s.itemsSummary || null,
+    sale_id: s.saleId || null,
+    updated_at: s.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function rowToCheckoutSession(r: any): ActiveCheckoutSession {
+  return {
+    id: String(r.id),
+    operatorId: String(r.operator_id || ''),
+    operatorName: String(r.operator_name || 'Operador'),
+    customerId: r.customer_id || undefined,
+    customerName: String(r.customer_name || 'Cliente Balcão'),
+    comandaNumber: r.comanda_number || undefined,
+    setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+    paymentMethod: (r.payment_method as PaymentMethod) || 'dinheiro',
+    amountBrl: Number(r.amount_brl) || 0,
+    previousDebtBrl: r.previous_debt_brl !== undefined ? Number(r.previous_debt_brl) : undefined,
+    projectedDebtBrl: r.projected_debt_brl !== undefined ? Number(r.projected_debt_brl) : undefined,
+    status: r.status || 'em_cobranca',
+    itemsSummary: r.items_summary || undefined,
+    saleId: r.sale_id || undefined,
+    updatedAt: r.updated_at || r.created_at || new Date().toISOString(),
+  };
+}
+
+export async function listFluxoCobrancas(): Promise<ActiveCheckoutSession[]> {
+  try {
+    const rows = await fetchAllRowsPaged<any>('fluxo_cobrancas_tempo_real');
+    return rows
+      .map(rowToCheckoutSession)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertFluxoCobrancaDb(s: ActiveCheckoutSession): Promise<ActiveCheckoutSession | null> {
+  try {
+    const row = checkoutSessionToRow(s);
+    const { data, error } = await supabase
+      .from('fluxo_cobrancas_tempo_real')
+      .upsert(row, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error || !data) return null;
+    return rowToCheckoutSession(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteFluxoCobrancaDb(id: string): Promise<void> {
+  try {
+    await supabase.from('fluxo_cobrancas_tempo_real').delete().eq('id', id);
+  } catch {}
+}
+
 
