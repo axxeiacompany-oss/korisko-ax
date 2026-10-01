@@ -1,6 +1,6 @@
 {
-  "name": "Korisko - Sistema de Gestão para Padaria",
-  "description": "Sistema de gestão da Padaria Korisko operando exclusivamente em Guaranis (₲ PYG) com PDV ágil, controle de estoque, comandas, fornadas quentes, caixa cego e proteção de segurança blindada.",
+  "name": "Korizko",
+  "description": "Panificação confeitaria artesanal",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -17,7 +17,10 @@ import {
   LiveDebtorBalanceRecord,
   StockMovement,
   FornadaLog,
-  CashTransaction
+  CashTransaction,
+  CustomerPurchaseRecord,
+  CustomerPurchaseItem,
+  FinancialFlowCategory
 } from '../types';
 
 // ==========================================
@@ -208,6 +211,9 @@ export function customerToRow(c: Customer) {
     credit_limit_brl: Number(c.creditLimitBrl) || 0,
     outstanding_balance_brl: Number(c.outstandingBalanceBrl) || 0,
     loyalty_points: Math.round(Number(c.loyaltyPoints) || 0),
+    total_spent_brl: Number(c.totalSpentBrl) || 0,
+    purchase_count: Math.round(Number(c.purchaseCount) || 0),
+    last_purchase_date: c.lastPurchaseDate || null,
     active: true,
   };
 }
@@ -447,7 +453,23 @@ export async function upsertCliente(c: Customer): Promise<Customer> {
     .single();
 
   if (error) {
-    throw new Error(`[Erro ao salvar cliente]: ${error.message}`);
+    // Fallback if total_spent_brl / purchase_count columns were not yet added in user's DB
+    const { total_spent_brl, purchase_count, last_purchase_date, ...legacyRow } = row;
+    const { data: legacyData, error: legacyError } = await supabase
+      .from('clientes')
+      .upsert(legacyRow, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (legacyError) {
+      throw new Error(`[Erro ao salvar cliente]: ${legacyError.message}`);
+    }
+    return rowToCustomer({
+      ...legacyData,
+      total_spent_brl,
+      purchase_count,
+      last_purchase_date,
+    });
   }
   return rowToCustomer(data);
 }
@@ -1123,5 +1145,104 @@ export async function insertFornadaProducaoDb(f: FornadaLog): Promise<void> {
   } catch {}
 }
 
+// ==========================================
+// DATA ACCESS LAYER: REGISTRO DE COMPRAS DE CADA CLIENTE & ANÁLISE FINANCEIRA
+// Tabela SQL: public.registro_compras_clientes
+// ==========================================
 
+export function customerPurchaseToRow(p: CustomerPurchaseRecord) {
+  return {
+    id: p.id,
+    customer_id: p.customerId,
+    customer_name: p.customerName || 'Cliente Cadastrado',
+    customer_phone: p.customerPhone || null,
+    sale_id: p.saleId || null,
+    sale_number: p.saleNumber ?? null,
+    comanda_number: p.comandaNumber || null,
+    items: p.items || [],
+    items_summary: p.itemsSummary || '',
+    total_amount_brl: Number(p.totalAmountBrl) || 0,
+    estimated_cost_brl: Number(p.estimatedCostBrl) || 0,
+    paid_amount_brl: Number(p.paidAmountBrl) || 0,
+    fiado_amount_brl: Number(p.fiadoAmountBrl) || 0,
+    payment_method: p.paymentMethod || 'dinheiro',
+    flow_type: p.flowType || 'entrada_avista',
+    setor_responsavel: p.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+    recorded_by: p.recordedBy || 'Operador',
+    notes: p.notes || null,
+    purchase_date: p.purchaseDate || new Date().toISOString(),
+  };
+}
 
+export function rowToCustomerPurchase(r: any): CustomerPurchaseRecord {
+  const rawItems: any[] = Array.isArray(r.items) ? r.items : [];
+  const items: CustomerPurchaseItem[] = rawItems.map((it: any) => ({
+    productId: String(it.productId || it.product?.id || ''),
+    productName: String(it.productName || it.product?.name || it.name || 'Produto'),
+    category: it.category || it.product?.category || 'paes',
+    quantity: Number(it.quantity) || 1,
+    unit: String(it.unit || it.product?.unit || 'un'),
+    unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
+    costPriceBrl: Number(it.costPriceBrl ?? it.product?.costPriceBrl ?? 0),
+    subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
+  }));
+
+  const summary = r.items_summary || items.map(i => `${i.quantity}x ${i.productName}`).join(', ');
+  const totalAmount = Number(r.total_amount_brl) || 0;
+  const fiadoAmount = Number(r.fiado_amount_brl) || 0;
+  const paidAmount = r.paid_amount_brl !== undefined ? Number(r.paid_amount_brl) : Math.max(0, totalAmount - fiadoAmount);
+
+  return {
+    id: String(r.id),
+    customerId: String(r.customer_id || ''),
+    customerName: String(r.customer_name || 'Cliente'),
+    customerPhone: r.customer_phone || undefined,
+    saleId: r.sale_id || undefined,
+    saleNumber: r.sale_number !== null && r.sale_number !== undefined ? Number(r.sale_number) : undefined,
+    comandaNumber: r.comanda_number || undefined,
+    items,
+    itemsSummary: String(summary || 'Compra Registrada'),
+    totalAmountBrl: totalAmount,
+    estimatedCostBrl: Number(r.estimated_cost_brl) || 0,
+    paidAmountBrl: paidAmount,
+    fiadoAmountBrl: fiadoAmount,
+    paymentMethod: String(r.payment_method || 'dinheiro'),
+    flowType: (r.flow_type as FinancialFlowCategory) || (fiadoAmount > 0 ? 'fiado_pendente' : 'entrada_avista'),
+    setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+    recordedBy: String(r.recorded_by || 'Operador'),
+    notes: r.notes || undefined,
+    purchaseDate: r.purchase_date || r.created_at || new Date().toISOString(),
+  };
+}
+
+export async function listRegistroComprasClientes(): Promise<CustomerPurchaseRecord[]> {
+  try {
+    const rows = await fetchAllRowsPaged<any>('registro_compras_clientes');
+    return rows
+      .map(rowToCustomerPurchase)
+      .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertRegistroCompraClienteDb(p: CustomerPurchaseRecord): Promise<CustomerPurchaseRecord | null> {
+  try {
+    const row = customerPurchaseToRow(p);
+    const { data, error } = await supabase
+      .from('registro_compras_clientes')
+      .upsert(row, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error || !data) return null;
+    return rowToCustomerPurchase(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteRegistroCompraClienteDb(id: string): Promise<void> {
+  try {
+    await supabase.from('registro_compras_clientes').delete().eq('id', id);
+  } catch {}
+}

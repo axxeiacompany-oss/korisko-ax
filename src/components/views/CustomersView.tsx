@@ -39,15 +39,19 @@ import {
   RotateCcw,
   ShieldCheck,
   Radio,
-  BookOpen
+  BookOpen,
+  ShoppingBag
 } from 'lucide-react';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { ReceiptModal } from '../modals/ReceiptModal';
+import { CustomerPurchasesModal } from '../modals/CustomerPurchasesModal';
+import { FinancialPurchasesAnalytics } from '../FinancialPurchasesAnalytics';
 
 export const CustomersView: React.FC = () => {
   const { 
     customers, 
     customerEntries, 
+    customerPurchases,
     activeCheckouts,
     sales,
     currentUser,
@@ -76,6 +80,7 @@ export const CustomersView: React.FC = () => {
 
   // Statement / History Modal
   const [statementCustomer, setStatementCustomer] = useState<Customer | null>(null);
+  const [purchasesCustomer, setPurchasesCustomer] = useState<Customer | null>(null);
   const [statementViewMode, setStatementViewMode] = useState<'thermal' | 'table'>('thermal');
   const [selectedSaleForReceipt, setSelectedSaleForReceipt] = useState<Sale | null>(null);
   const [statementSearch, setStatementSearch] = useState('');
@@ -132,12 +137,45 @@ export const CustomersView: React.FC = () => {
         setDebtCustomer(fresh);
       }
     }
-  }, [customers, statementCustomer, paymentCustomer, debtCustomer]);
+    if (purchasesCustomer) {
+      const fresh = customers.find(c => c.id === purchasesCustomer.id);
+      if (fresh && (fresh.totalSpentBrl !== purchasesCustomer.totalSpentBrl || fresh.outstandingBalanceBrl !== purchasesCustomer.outstandingBalanceBrl)) {
+        setPurchasesCustomer(fresh);
+      }
+    }
+  }, [customers, statementCustomer, paymentCustomer, debtCustomer, purchasesCustomer]);
 
   const canManage = hasPermission(['admin', 'gerente', 'caixa']);
 
   // Current Month for Birthday matching
   const currentMonthNum = (new Date().getMonth() + 1).toString().padStart(2, '0');
+
+  // Map of live Total Comprado and purchase count per customer (combining SQL registro_compras_clientes + sales + fiado entries)
+  const customerPurchasesStatsMap = useMemo(() => {
+    const map = new Map<string, { totalSpent: number; count: number }>();
+    customers.forEach(c => {
+      const purchList = (customerPurchases || []).filter(p => p.customerId === c.id);
+      const sumPurch = purchList.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+      const recordedSaleIds = new Set(purchList.filter(p => p.saleId).map(p => p.saleId));
+
+      const extraSalesSum = (sales || [])
+        .filter(s => s && (s.customerId === c.id || (s.customerName && s.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) && !recordedSaleIds.has(s.id))
+        .reduce((acc, s) => acc + (Number(s.totalBrl) || 0), 0);
+
+      const finalTotalSpent = Math.max(
+        c.totalSpentBrl || 0,
+        sumPurch + extraSalesSum,
+        c.outstandingBalanceBrl || 0
+      );
+      const finalCount = Math.max(
+        c.purchaseCount || 0,
+        purchList.length,
+        finalTotalSpent > 0 ? 1 : 0
+      );
+      map.set(c.id, { totalSpent: finalTotalSpent, count: finalCount });
+    });
+    return map;
+  }, [customers, customerPurchases, sales]);
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -161,6 +199,10 @@ export const CustomersView: React.FC = () => {
     const totalDebtPyg = Math.round(totalDebtBrl);
     const debtorsCount = customers.filter(c => c.outstandingBalanceBrl > 0).length;
     const totalLoyaltyPoints = customers.reduce((acc, c) => acc + c.loyaltyPoints, 0);
+    const totalPurchasedAllBrl = customers.reduce(
+      (acc, c) => acc + (customerPurchasesStatsMap.get(c.id)?.totalSpent || c.totalSpentBrl || 0),
+      0
+    );
 
     return {
       total,
@@ -168,8 +210,9 @@ export const CustomersView: React.FC = () => {
       totalDebtPyg,
       debtorsCount,
       totalLoyaltyPoints,
+      totalPurchasedAllBrl,
     };
-  }, [customers]);
+  }, [customers, customerPurchasesStatsMap]);
 
   // Live conversion for Amortization modal
   const computedAmortizedBrl = useMemo(() => {
@@ -792,16 +835,22 @@ export const CustomersView: React.FC = () => {
 
         <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
           <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Puntos Fidelidad' : 'Pontos Fidelidade'}</span>
-            <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">{language === 'es' ? 'Total Comprado Geral' : 'Total Comprado (Clientes)'}</span>
+            <ShoppingBag className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
           <div className="text-lg sm:text-2xl font-bold text-emerald-400 font-mono-nums">
-            {stats.totalLoyaltyPoints.toLocaleString('pt-BR')}
+            {formatCurrency(stats.totalPurchasedAllBrl, 'PYG')}
           </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'Puntos acumulados' : 'Resgate em descontos'}</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">SQL: registro_compras_clientes</p>
         </div>
 
       </div>
+
+      {/* Painel & Gráfico Financeiro de Análise de Entradas e Saídas + Ranking de Compras por Cliente */}
+      <FinancialPurchasesAnalytics
+        onSelectCustomer={c => setPurchasesCustomer(c)}
+        defaultExpanded={true}
+      />
 
       {/* Toolbar / Search & Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
@@ -939,22 +988,41 @@ export const CustomersView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Loyalty & Total Spent Stats */}
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                  <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538]">
-                    <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Fidelidad' : 'Fidelidade'}</span>
-                    <span className="font-bold text-amber-400 font-mono-nums flex items-center justify-center gap-1 mt-0.5">
-                      <Award className="w-3 h-3" />
-                      {cust.loyaltyPoints} pts
-                    </span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538]">
-                    <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Total Comprado' : 'Total Comprado'}</span>
-                    <span className="font-bold text-neutral-200 font-mono-nums mt-0.5 block">
-                      {formatCurrency(cust.totalSpentBrl, 'PYG')}
-                    </span>
-                  </div>
-                </div>
+                {/* Loyalty & Total Spent Stats (Clickable Total Comprado to open Purchase History) */}
+                {(() => {
+                  const pStats = customerPurchasesStatsMap.get(cust.id) || {
+                    totalSpent: cust.totalSpentBrl || 0,
+                    count: cust.purchaseCount || 0,
+                  };
+                  return (
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538] flex flex-col justify-center">
+                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Fidelidad' : 'Fidelidade'}</span>
+                        <span className="font-bold text-amber-400 font-mono-nums flex items-center justify-center gap-1 mt-0.5">
+                          <Award className="w-3 h-3" />
+                          {cust.loyaltyPoints} pts
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPurchasesCustomer(cust)}
+                        className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all text-center cursor-pointer group"
+                        title="Clique para abrir o Registro de Compras feitas por este cliente"
+                      >
+                        <span className="text-[10px] text-amber-300 font-semibold flex items-center justify-center gap-1">
+                          <ShoppingBag className="w-3 h-3 text-amber-400" />
+                          <span>{language === 'es' ? 'Total Comprado' : 'Total Comprado'}</span>
+                        </span>
+                        <span className="font-black text-white group-hover:text-amber-300 font-mono-nums mt-0.5 block">
+                          {formatCurrency(pStats.totalSpent, 'PYG')}
+                        </span>
+                        <span className="text-[9px] text-amber-400/90 font-semibold block">
+                          {pStats.count} {pStats.count === 1 ? 'compra' : 'compras'} • Ver Registro →
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })()}
 
               </div>
 
@@ -962,7 +1030,17 @@ export const CustomersView: React.FC = () => {
               <div className="flex flex-wrap items-center justify-between gap-1.5 pt-3 mt-3 border-t border-[#1C2538]">
                 
                 {/* Left actions */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setPurchasesCustomer(cust)}
+                    className="px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Ver Registro de Compras do Cliente"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>{language === 'es' ? 'Compras' : 'Compras'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setStatementCustomer(cust)}
@@ -2446,6 +2524,13 @@ export const CustomersView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Registro de Compras & Análise Financeira do Cliente */}
+      <CustomerPurchasesModal
+        customer={purchasesCustomer}
+        onClose={() => setPurchasesCustomer(null)}
+        onInspectSale={sale => setSelectedSaleForReceipt(sale)}
+      />
 
       {/* Confirm Delete Customer Modal */}
       <ConfirmModal

@@ -358,7 +358,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   };
 
   const copyCredentials = (emp: Employee) => {
-    const credText = `*Acesso ao Sistema Korizko (Celular ou Computador)*\n🔗 Link: ${window.location.origin}\n👤 Usuário / Nome: ${emp.name}\n📧 E-mail: ${emp.email || 'Não informado'}\n🔑 Senha: ${emp.password || emp.pin}\n🔢 PIN: ${emp.pin}\n\n👉 No celular: acesse o link acima, digite seu nome (${emp.name}) ou e-mail no primeiro campo e sua senha no segundo campo!`;
+    const credText = `*Korizko*\n*Panificação confeitaria artesanal*\n🔗 Link: ${window.location.origin}\n👤 Usuário / Nome: ${emp.name}\n📧 E-mail: ${emp.email || 'Não informado'}\n🔑 Senha: ${emp.password || emp.pin}\n🔢 PIN: ${emp.pin}\n\n👉 Acesse o link acima, digite seu nome (${emp.name}) ou e-mail no primeiro campo e sua senha no segundo campo!`;
     navigator.clipboard.writeText(credText);
     setCopiedId(emp.id);
     setTimeout(() => setCopiedId(null), 2500);

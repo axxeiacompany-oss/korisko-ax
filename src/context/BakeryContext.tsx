@@ -25,7 +25,9 @@ import {
   PaymentMethod,
   AppFeature,
   AppLanguage,
-  CashTransaction
+  CashTransaction,
+  CustomerPurchaseRecord,
+  CustomerPurchaseItem
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
@@ -78,7 +80,11 @@ import {
   insertAmortizacaoFiadoDb,
   insertCaixaMovimentacaoDb,
   insertEstoqueMovimentacaoDb,
-  insertFornadaProducaoDb
+  insertFornadaProducaoDb,
+  listRegistroComprasClientes,
+  upsertRegistroCompraClienteDb,
+  deleteRegistroCompraClienteDb,
+  rowToCustomerPurchase
 } from '../lib/db';
 
 interface BakeryContextType {
@@ -152,9 +158,10 @@ interface BakeryContextType {
     missingIngredients?: { name: string; needed: number; unit: string; available: number }[];
   };
 
-  // CRM & Gestão de Clientes + Fluxo de Cobrança e Fiado em Tempo Real
+  // CRM & Gestão de Clientes + Fluxo de Cobrança, Fiado e Registro de Compras em Tempo Real
   customers: Customer[];
   customerEntries: CustomerAccountEntry[];
+  customerPurchases: CustomerPurchaseRecord[];
   activeCheckouts: ActiveCheckoutSession[];
   broadcastCheckoutSession: (session: Omit<ActiveCheckoutSession, 'updatedAt' | 'operatorId' | 'operatorName'>) => void;
   clearCheckoutSession: (sessionId: string) => void;
@@ -163,6 +170,16 @@ interface BakeryContextType {
   deleteCustomer: (id: string) => Promise<void>;
   recordCustomerDebt: (customerId: string, amountBrl: number, description: string, saleId?: string, comandaNumber?: string, setorResponsavel?: string) => Promise<void>;
   recordCustomerPayment: (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => Promise<void>;
+  recordCustomerPurchase: (params: {
+    customerId: string;
+    items: CustomerPurchaseItem[];
+    totalAmountBrl: number;
+    estimatedCostBrl?: number;
+    paymentMethod: PaymentMethod;
+    notes?: string;
+    comandaNumber?: string;
+  }) => Promise<CustomerPurchaseRecord>;
+  deleteCustomerPurchase: (purchaseId: string) => Promise<void>;
   redeemCustomerPoints: (customerId: string, points: number) => number;
 
   // Comandas & Mesas (Tempo Real por Setor Responsável + Admin Total + Saldo Devedor Imediato)
@@ -387,6 +404,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           dbFiadoEntries,
           dbCheckouts,
           dbLiveDebtorBalances,
+          dbCustomerPurchases,
           dbExtra
         ] = await Promise.all([
           listProdutos().catch(err => { console.warn('Produtos load notice:', err); return []; }),
@@ -398,6 +416,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           listLancamentosFiado().catch(() => []),
           listFluxoCobrancas().catch(() => []),
           listSaldosDevedoresTempoReal().catch(() => []),
+          listRegistroComprasClientes().catch(() => []),
           fetchSystemStateDoc().catch(() => null),
         ]);
 
@@ -499,10 +518,139 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
             .slice(0, 40);
 
+          // Merge & synthesize customer purchases (registro_compras_clientes + sales + fiado entries + open comandas)
+          const extraPurchases: CustomerPurchaseRecord[] = Array.isArray(dbExtra?.customerPurchases)
+            ? dbExtra.customerPurchases
+            : (prev.customerPurchases ?? []);
+          const purchasesMap = new Map<string, CustomerPurchaseRecord>();
+          extraPurchases.forEach(p => purchasesMap.set(p.id, p));
+          (dbCustomerPurchases || []).forEach(p => purchasesMap.set(p.id, p));
+
+          const recordedSaleIds = new Set<string>();
+          const recordedComandaNumbers = new Set<string>();
+          purchasesMap.forEach(p => {
+            if (p.saleId) recordedSaleIds.add(p.saleId);
+            if (p.comandaNumber) recordedComandaNumbers.add(p.comandaNumber.trim().toLowerCase());
+          });
+
+          // Backfill from sales linked to customers
+          (sales || []).forEach((s: Sale) => {
+            if (!s) return;
+            let matchedCust = s.customerId ? customers.find((c: Customer) => c.id === s.customerId) : undefined;
+            if (!matchedCust && s.customerName) {
+              const cleanName = s.customerName.trim().toLowerCase();
+              matchedCust = customers.find((c: Customer) => c.name.trim().toLowerCase() === cleanName);
+            }
+            if (!matchedCust) return;
+            if (recordedSaleIds.has(s.id) || purchasesMap.has(`purch-sale-${s.id}`)) return;
+
+            const itemsList: CustomerPurchaseItem[] = (s.items || []).map(it => ({
+              productId: it.product?.id || '',
+              productName: it.product?.name || (it as any).name || 'Produto',
+              category: it.product?.category || 'paes',
+              quantity: Number(it.quantity) || 1,
+              unit: it.product?.unit || 'un',
+              unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
+              costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
+              subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
+            }));
+            const estCost = itemsList.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0);
+            const fiadoAmt = (s.payments || []).filter(p => p.method === 'fiado').reduce((acc, p) => acc + (p.equivalentBrl || p.amountReceived || 0), 0);
+            const paidAmt = Math.max(0, (s.totalBrl || 0) - fiadoAmt);
+            const primaryPay = fiadoAmt > 0 ? 'fiado' : (s.payments?.[0]?.method || 'dinheiro');
+            const summary = itemsList.map(i => `${i.quantity}x ${i.productName}`).join(', ') || `Venda #${s.saleNumber || 'PDV'}`;
+
+            const rec: CustomerPurchaseRecord = {
+              id: `purch-sale-${s.id}`,
+              customerId: matchedCust.id,
+              customerName: matchedCust.name,
+              customerPhone: matchedCust.phone,
+              saleId: s.id,
+              saleNumber: s.saleNumber,
+              comandaNumber: s.comandaNumber,
+              items: itemsList,
+              itemsSummary: summary,
+              totalAmountBrl: s.totalBrl || 0,
+              estimatedCostBrl: Math.round(estCost),
+              paidAmountBrl: paidAmt,
+              fiadoAmountBrl: fiadoAmt,
+              paymentMethod: primaryPay,
+              flowType: fiadoAmt > 0 ? 'fiado_pendente' : 'entrada_avista',
+              setorResponsavel: s.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+              recordedBy: s.employeeName || 'Operador',
+              purchaseDate: s.timestamp || new Date().toISOString(),
+            };
+            purchasesMap.set(rec.id, rec);
+            recordedSaleIds.add(s.id);
+            if (s.comandaNumber) recordedComandaNumbers.add(s.comandaNumber.trim().toLowerCase());
+            upsertRegistroCompraClienteDb(rec).catch(() => {});
+          });
+
+          // Backfill from customerEntries (debito_compra) that were not part of a sale already recorded
+          mergedEntries.forEach(e => {
+            if (e.type !== 'debito_compra' || !e.customerId) return;
+            if (e.saleId && recordedSaleIds.has(e.saleId)) return;
+            if (e.comandaNumber && recordedComandaNumbers.has(e.comandaNumber.trim().toLowerCase())) return;
+            const synthId = `purch-debt-${e.id}`;
+            if (purchasesMap.has(synthId)) return;
+
+            const matchedCust = customers.find((c: Customer) => c.id === e.customerId);
+            const rec: CustomerPurchaseRecord = {
+              id: synthId,
+              customerId: e.customerId,
+              customerName: e.customerName || matchedCust?.name || 'Cliente',
+              customerPhone: matchedCust?.phone,
+              saleId: e.saleId,
+              comandaNumber: e.comandaNumber,
+              items: [{
+                productId: 'item-fiado',
+                productName: e.description || 'Compra no Fiado / Comanda',
+                category: 'paes',
+                quantity: 1,
+                unit: 'un',
+                unitPriceBrl: e.amountBrl,
+                costPriceBrl: Math.round(e.amountBrl * 0.42),
+                subtotalBrl: e.amountBrl,
+              }],
+              itemsSummary: e.description || 'Compra lançada em Conta / Fiado',
+              totalAmountBrl: e.amountBrl,
+              estimatedCostBrl: Math.round(e.amountBrl * 0.42),
+              paidAmountBrl: 0,
+              fiadoAmountBrl: e.amountBrl,
+              paymentMethod: 'fiado',
+              flowType: 'fiado_pendente',
+              setorResponsavel: e.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+              recordedBy: e.recordedBy || 'Caixa',
+              purchaseDate: e.date || new Date().toISOString(),
+            };
+            purchasesMap.set(rec.id, rec);
+            if (e.comandaNumber) recordedComandaNumbers.add(e.comandaNumber.trim().toLowerCase());
+            upsertRegistroCompraClienteDb(rec).catch(() => {});
+          });
+
+          const mergedPurchases = Array.from(purchasesMap.values()).sort(
+            (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()
+          );
+
+          // Reconcile each customer's Total Comprado (totalSpentBrl) and purchaseCount from mergedPurchases
+          const reconciledCustomers = customers.map((c: Customer) => {
+            const custPurchases = mergedPurchases.filter(p => p.customerId === c.id);
+            const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+            const finalSpent = Math.max(c.totalSpentBrl || 0, sumPurchases, c.outstandingBalanceBrl || 0);
+            const finalCount = Math.max(c.purchaseCount || 0, custPurchases.length, finalSpent > 0 ? 1 : 0);
+            const latestDate = custPurchases[0]?.purchaseDate || c.lastPurchaseDate;
+            return {
+              ...c,
+              totalSpentBrl: finalSpent,
+              purchaseCount: finalCount,
+              lastPurchaseDate: latestDate,
+            };
+          });
+
           const newState: SystemBackupData = {
             ...prev,
             products,
-            customers,
+            customers: reconciledCustomers,
             sales,
             employees,
             currentSession,
@@ -515,6 +663,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             exchangeRates: dbExtra?.exchangeRates ?? prev.exchangeRates ?? DEFAULT_EXCHANGE_RATES,
             stockMovements: dbExtra?.stockMovements && dbExtra.stockMovements.length > 0 ? dbExtra.stockMovements : (prev.stockMovements ?? []),
             customerEntries: mergedEntries,
+            customerPurchases: mergedPurchases,
             activeCheckouts: mergedCheckouts,
           };
 
@@ -865,6 +1014,70 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ...prev,
               customers: nextCustomers,
               customerEntries: nextEntries,
+            };
+          });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_compras_clientes' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const purch = rowToCustomerPurchase(payload.new);
+            setData(prev => {
+              const exists = (prev.customerPurchases || []).some(p => p.id === purch.id);
+              const nextPurchases = exists
+                ? (prev.customerPurchases || []).map(p => p.id === purch.id ? purch : p)
+                : [purch, ...(prev.customerPurchases || [])];
+              const custPurchases = nextPurchases.filter(p => p.customerId === purch.customerId);
+              const totalSpent = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+              const nextCustomers = (prev.customers || []).map(c =>
+                c.id === purch.customerId
+                  ? {
+                      ...c,
+                      totalSpentBrl: Math.max(c.totalSpentBrl || 0, totalSpent),
+                      purchaseCount: Math.max(c.purchaseCount || 0, custPurchases.length),
+                      lastPurchaseDate: purch.purchaseDate,
+                    }
+                  : c
+              );
+              return {
+                ...prev,
+                customers: nextCustomers,
+                customerPurchases: nextPurchases,
+              };
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => {
+              const nextPurchases = (prev.customerPurchases || []).filter(p => p.id !== oldId);
+              return {
+                ...prev,
+                customerPurchases: nextPurchases,
+              };
+            });
+          }
+        })
+        .on('broadcast', { event: 'live_customer_purchase' }, ({ payload }) => {
+          if (!payload || !payload.id) return;
+          const purch = payload as CustomerPurchaseRecord;
+          setData(prev => {
+            const exists = (prev.customerPurchases || []).some(p => p.id === purch.id);
+            const nextPurchases = exists
+              ? (prev.customerPurchases || []).map(p => p.id === purch.id ? purch : p)
+              : [purch, ...(prev.customerPurchases || [])];
+            const custPurchases = nextPurchases.filter(p => p.customerId === purch.customerId);
+            const totalSpent = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+            const nextCustomers = (prev.customers || []).map(c =>
+              c.id === purch.customerId
+                ? {
+                    ...c,
+                    totalSpentBrl: Math.max(c.totalSpentBrl || 0, totalSpent),
+                    purchaseCount: Math.max(c.purchaseCount || 0, custPurchases.length),
+                    lastPurchaseDate: purch.purchaseDate,
+                  }
+                : c
+            );
+            return {
+              ...prev,
+              customers: nextCustomers,
+              customerPurchases: nextPurchases,
             };
           });
         })
@@ -1617,6 +1830,51 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch {}
     }
 
+    // Dedicated Table: public.registro_compras_clientes (Comanda Purchase Record)
+    let comandaPurchaseRecord: CustomerPurchaseRecord | undefined;
+    if (targetCustomer && totalBrl > 0) {
+      const purchaseItems: CustomerPurchaseItem[] = (items || []).map(it => ({
+        productId: it.product?.id || '',
+        productName: it.product?.name || 'Item',
+        category: it.product?.category || 'paes',
+        quantity: Number(it.quantity) || 1,
+        unit: it.product?.unit || 'un',
+        unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
+        costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
+        subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
+      }));
+      const estCost = Math.round(purchaseItems.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0));
+      comandaPurchaseRecord = {
+        id: `purch-cmd-${comandaObj.id}`,
+        customerId: targetCustomer.id,
+        customerName: targetCustomer.name,
+        customerPhone: targetCustomer.phone,
+        comandaNumber: comandaObj.number,
+        items: purchaseItems,
+        itemsSummary: itemsSummary || `Comanda #${comandaObj.number}`,
+        totalAmountBrl: totalBrl,
+        estimatedCostBrl: estCost,
+        paidAmountBrl: 0,
+        fiadoAmountBrl: totalBrl,
+        paymentMethod: 'fiado',
+        flowType: 'fiado_pendente',
+        setorResponsavel: sectorInfo.label,
+        recordedBy: currentUser.name,
+        notes: comandaObj.notes,
+        purchaseDate: nowIso,
+      };
+      upsertRegistroCompraClienteDb(comandaPurchaseRecord).catch(() => {});
+      try {
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_customer_purchase',
+            payload: comandaPurchaseRecord,
+          }).catch?.(() => {});
+        }
+      } catch {}
+    }
+
     setData(prev => {
       const existingIdx = (prev.openComandas || []).findIndex(
         c => c.id === comandaObj.id || c.number.trim().toLowerCase() === cleanNum.toLowerCase()
@@ -1629,18 +1887,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updatedComandas.unshift(comandaObj);
       }
 
+      const updatedPurchases = comandaPurchaseRecord
+        ? [comandaPurchaseRecord, ...(prev.customerPurchases || []).filter(p => p.id !== comandaPurchaseRecord!.id)]
+        : (prev.customerPurchases || []);
+
       let updatedCustomers = prev.customers || [];
       if (shouldUpdateDebtor && targetCustomer && totalBrl > 0) {
         const existsCust = updatedCustomers.some(c => c.id === targetCustomer!.id);
+        const custPurchases = updatedPurchases.filter(p => p.customerId === targetCustomer!.id);
+        const computedTotalSpent = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
         const nextCustObj: Customer = {
           ...targetCustomer,
           outstandingBalanceBrl: newCustomerDebtBal,
-          totalSpentBrl: Math.max(0, (targetCustomer.totalSpentBrl || 0) + deltaDebtBrl),
-          purchaseCount: isNewlyCreatedCustomer
-            ? 1
-            : (existing ? targetCustomer.purchaseCount : (targetCustomer.purchaseCount || 0) + 1),
+          totalSpentBrl: Math.max((targetCustomer.totalSpentBrl || 0) + deltaDebtBrl, computedTotalSpent),
+          purchaseCount: Math.max(
+            isNewlyCreatedCustomer ? 1 : (existing ? targetCustomer.purchaseCount : (targetCustomer.purchaseCount || 0) + 1),
+            custPurchases.length
+          ),
           lastPurchaseDate: nowIso,
         };
+        upsertCliente(nextCustObj).catch(() => {});
         updatedCustomers = existsCust
           ? updatedCustomers.map(c => c.id === targetCustomer!.id ? nextCustObj : c)
           : [nextCustObj, ...updatedCustomers];
@@ -1659,6 +1925,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         openComandas: updatedComandas,
         customers: updatedCustomers,
         customerEntries: updatedEntries,
+        customerPurchases: updatedPurchases,
         activeCheckouts: updatedCheckouts,
       };
       StorageService.saveState(next);
@@ -2120,11 +2387,69 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
     upsertFluxoCobrancaDb(liveFlow).catch(() => {});
 
+    // Record in dedicated SQL table public.registro_compras_clientes
+    const debtPurchaseRecord: CustomerPurchaseRecord = {
+      id: `purch-debt-${entry.id}`,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Fiado',
+      customerPhone: currentCustomer?.phone,
+      saleId,
+      comandaNumber,
+      items: [{
+        productId: 'item-fiado-manual',
+        productName: description || 'Compra lançada em Conta / Fiado',
+        category: 'paes',
+        quantity: 1,
+        unit: 'un',
+        unitPriceBrl: cleanAmount,
+        costPriceBrl: Math.round(cleanAmount * 0.42),
+        subtotalBrl: cleanAmount,
+      }],
+      itemsSummary: description || 'Compra no Fiado',
+      totalAmountBrl: cleanAmount,
+      estimatedCostBrl: Math.round(cleanAmount * 0.42),
+      paidAmountBrl: 0,
+      fiadoAmountBrl: cleanAmount,
+      paymentMethod: 'fiado',
+      flowType: 'fiado_pendente',
+      setorResponsavel: resolvedSetor,
+      recordedBy: currentUser.name,
+      purchaseDate: nowIso,
+    };
+    upsertRegistroCompraClienteDb(debtPurchaseRecord).catch(() => {});
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_customer_purchase',
+          payload: debtPurchaseRecord,
+        }).catch?.(() => {});
+      }
+    } catch {}
+
     setData(prev => {
+      const nextPurchases = [debtPurchaseRecord, ...(prev.customerPurchases || []).filter(p => p.id !== debtPurchaseRecord.id)];
+      const custPurchases = nextPurchases.filter(p => p.customerId === customerId);
+      const computedTotalSpent = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+
+      const nextCustomers = (prev.customers || []).map(c => {
+        if (c.id !== customerId) return c;
+        const updatedCust: Customer = {
+          ...c,
+          outstandingBalanceBrl: newBal,
+          totalSpentBrl: Math.max((c.totalSpentBrl || 0) + cleanAmount, computedTotalSpent),
+          purchaseCount: Math.max((c.purchaseCount || 0) + 1, custPurchases.length),
+          lastPurchaseDate: nowIso,
+        };
+        upsertCliente(updatedCust).catch(() => {});
+        return updatedCust;
+      });
+
       const next = {
         ...prev,
-        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        customers: nextCustomers,
         customerEntries: [entry, ...(prev.customerEntries || []).filter(e => e.id !== entry.id)],
+        customerPurchases: nextPurchases,
         activeCheckouts: [liveFlow, ...(prev.activeCheckouts || [])].slice(0, 40),
       };
       StorageService.saveState(next);
@@ -2259,6 +2584,171 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }),
     }));
     return discountGranted;
+  }, []);
+
+  // CRM - Manual / Direct Customer Purchase Record in public.registro_compras_clientes
+  const recordCustomerPurchase = useCallback(async (params: {
+    customerId: string;
+    items: CustomerPurchaseItem[];
+    totalAmountBrl: number;
+    estimatedCostBrl?: number;
+    paymentMethod: PaymentMethod;
+    notes?: string;
+    comandaNumber?: string;
+  }): Promise<CustomerPurchaseRecord> => {
+    const nowIso = new Date().toISOString();
+    const cust = (data.customers || []).find(c => c.id === params.customerId);
+    const cleanTotal = Math.round(params.totalAmountBrl);
+    const estCost = params.estimatedCostBrl !== undefined
+      ? Math.round(params.estimatedCostBrl)
+      : Math.round(
+          params.items.length > 0
+            ? params.items.reduce((acc, it) => acc + ((it.costPriceBrl || it.unitPriceBrl * 0.42) * it.quantity), 0)
+            : cleanTotal * 0.42
+        );
+    const isFiado = params.paymentMethod === 'fiado';
+    const summary = params.items.length > 0
+      ? params.items.map(i => `${i.quantity}x ${i.productName}`).join(', ')
+      : (params.notes || 'Compra registrada no Histórico do Cliente');
+
+    const purchaseRecord: CustomerPurchaseRecord = {
+      id: `purch-manual-${Date.now()}`,
+      customerId: params.customerId,
+      customerName: cust?.name || 'Cliente Cadastrado',
+      customerPhone: cust?.phone,
+      comandaNumber: params.comandaNumber,
+      items: params.items.length > 0
+        ? params.items
+        : [{
+            productId: 'item-avulso',
+            productName: summary,
+            category: 'paes',
+            quantity: 1,
+            unit: 'un',
+            unitPriceBrl: cleanTotal,
+            costPriceBrl: estCost,
+            subtotalBrl: cleanTotal,
+          }],
+      itemsSummary: summary,
+      totalAmountBrl: cleanTotal,
+      estimatedCostBrl: estCost,
+      paidAmountBrl: isFiado ? 0 : cleanTotal,
+      fiadoAmountBrl: isFiado ? cleanTotal : 0,
+      paymentMethod: params.paymentMethod,
+      flowType: isFiado ? 'fiado_pendente' : 'entrada_avista',
+      setorResponsavel: 'Panificação & Confeitaria Artesanal',
+      recordedBy: currentUser.name,
+      notes: params.notes,
+      purchaseDate: nowIso,
+    };
+
+    upsertRegistroCompraClienteDb(purchaseRecord).catch(() => {});
+
+    let newDebtBal = cust?.outstandingBalanceBrl || 0;
+    let fiadoEntry: CustomerAccountEntry | undefined;
+
+    if (isFiado && cust) {
+      const prevBal = cust.outstandingBalanceBrl || 0;
+      newDebtBal = prevBal + cleanTotal;
+      try {
+        newDebtBal = await rpcAjustarSaldoCliente(cust.id, cleanTotal);
+      } catch {}
+
+      fiadoEntry = {
+        id: `entry-purch-${purchaseRecord.id}`,
+        customerId: cust.id,
+        customerName: cust.name,
+        date: nowIso,
+        type: 'debito_compra',
+        amountBrl: cleanTotal,
+        previousBalanceBrl: prevBal,
+        resultingBalanceBrl: newDebtBal,
+        paymentMethod: 'fiado',
+        description: `Compra Registrada: ${summary}`,
+        comandaNumber: params.comandaNumber,
+        setorResponsavel: 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: true,
+        recordedBy: currentUser.name,
+      };
+      upsertLancamentoFiadoDb(fiadoEntry).catch(() => {});
+    }
+
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_customer_purchase',
+          payload: purchaseRecord,
+        }).catch?.(() => {});
+      }
+    } catch {}
+
+    setData(prev => {
+      const nextPurchases = [purchaseRecord, ...(prev.customerPurchases || []).filter(p => p.id !== purchaseRecord.id)];
+      const custPurchases = nextPurchases.filter(p => p.customerId === params.customerId);
+      const computedTotalSpent = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+
+      const nextCustomers = (prev.customers || []).map(c => {
+        if (c.id !== params.customerId) return c;
+        const updatedCust: Customer = {
+          ...c,
+          outstandingBalanceBrl: isFiado ? newDebtBal : c.outstandingBalanceBrl,
+          loyaltyPoints: c.loyaltyPoints + Math.max(1, Math.floor(cleanTotal / 10000)),
+          totalSpentBrl: Math.max((c.totalSpentBrl || 0) + cleanTotal, computedTotalSpent),
+          purchaseCount: Math.max((c.purchaseCount || 0) + 1, custPurchases.length),
+          lastPurchaseDate: nowIso,
+        };
+        upsertCliente(updatedCust).catch(() => {});
+        return updatedCust;
+      });
+
+      const nextEntries = fiadoEntry
+        ? [fiadoEntry, ...(prev.customerEntries || [])]
+        : (prev.customerEntries || []);
+
+      const next = {
+        ...prev,
+        customers: nextCustomers,
+        customerEntries: nextEntries,
+        customerPurchases: nextPurchases,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+
+    return purchaseRecord;
+  }, [currentUser.name, data.customers]);
+
+  const deleteCustomerPurchase = useCallback(async (purchaseId: string) => {
+    deleteRegistroCompraClienteDb(purchaseId).catch(() => {});
+    setData(prev => {
+      const target = (prev.customerPurchases || []).find(p => p.id === purchaseId);
+      const nextPurchases = (prev.customerPurchases || []).filter(p => p.id !== purchaseId);
+      const nextCustomers = target
+        ? (prev.customers || []).map(c => {
+            if (c.id !== target.customerId) return c;
+            const custPurchases = nextPurchases.filter(p => p.customerId === c.id);
+            const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+            const updatedCust: Customer = {
+              ...c,
+              totalSpentBrl: sumPurchases,
+              purchaseCount: custPurchases.length,
+            };
+            upsertCliente(updatedCust).catch(() => {});
+            return updatedCust;
+          })
+        : prev.customers;
+
+      const next = {
+        ...prev,
+        customers: nextCustomers,
+        customerPurchases: nextPurchases,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, []);
 
   // ==========================================
@@ -2558,7 +3048,58 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       removeComanda(comandaNumber, { settledInSale: true });
     }
 
-    // Single atomic state update for stock, customer balance, fiado ledger, live checkouts, and sales list
+    // Record customer purchase in dedicated SQL table public.registro_compras_clientes
+    let salePurchaseRecord: CustomerPurchaseRecord | undefined;
+    if (targetCustomerId) {
+      const purchaseItems: CustomerPurchaseItem[] = (items || []).map(it => ({
+        productId: it.product?.id || '',
+        productName: it.product?.name || (it as any).name || 'Produto',
+        category: it.product?.category || 'paes',
+        quantity: Number(it.quantity) || 1,
+        unit: it.product?.unit || 'un',
+        unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
+        costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
+        subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
+      }));
+      const estimatedCostBrl = Math.round(
+        purchaseItems.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0)
+      );
+      const paidAmountBrl = Math.max(0, finalTotalBrl - fiadoAmountBrl);
+
+      salePurchaseRecord = {
+        id: linkedComanda ? `purch-cmd-${linkedComanda.id}` : `purch-sale-${persistedSale.id}`,
+        customerId: targetCustomerId,
+        customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Cadastrado',
+        customerPhone: targetCustomer?.phone,
+        saleId: persistedSale.id,
+        saleNumber: persistedSale.saleNumber,
+        comandaNumber: resolvedComandaNumber,
+        items: purchaseItems,
+        itemsSummary: itemsSummary || `Venda #${persistedSale.saleNumber}`,
+        totalAmountBrl: finalTotalBrl,
+        estimatedCostBrl,
+        paidAmountBrl,
+        fiadoAmountBrl,
+        paymentMethod: primaryMethod,
+        flowType: fiadoAmountBrl > 0 ? 'fiado_pendente' : 'entrada_avista',
+        setorResponsavel: sectorInfo.label,
+        recordedBy: currentUser.name,
+        purchaseDate: nowIso,
+      };
+
+      upsertRegistroCompraClienteDb(salePurchaseRecord).catch(() => {});
+      try {
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_customer_purchase',
+            payload: salePurchaseRecord,
+          }).catch?.(() => {});
+        }
+      } catch {}
+    }
+
+    // Single atomic state update for stock, customer balance, fiado ledger, customer purchases, live checkouts, and sales list
     setData(prev => {
       const existingCustomers = prev.customers || [];
       const hasTargetCustomer = targetCustomerId ? existingCustomers.some(c => c.id === targetCustomerId) : true;
@@ -2566,18 +3107,32 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ? [targetCustomer, ...existingCustomers]
         : existingCustomers;
 
+      const nextPurchases = salePurchaseRecord
+        ? [salePurchaseRecord, ...(prev.customerPurchases || []).filter(p => p.id !== salePurchaseRecord!.id)]
+        : (prev.customerPurchases || []);
+
       const updatedCustomers = targetCustomerId
         ? baseCustomers.map(c => {
             if (c.id !== targetCustomerId) return c;
-            return {
+            const custPurchases = nextPurchases.filter(p => p.customerId === targetCustomerId);
+            const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+            const nextSpent = alreadyAppliedComandaDebt > 0
+              ? Math.max(sumPurchases, (c.totalSpentBrl || 0) + (finalTotalBrl - alreadyAppliedComandaDebt))
+              : Math.max(sumPurchases, (c.totalSpentBrl || 0) + finalTotalBrl);
+            const nextCount = Math.max(
+              custPurchases.length,
+              alreadyAppliedComandaDebt > 0 ? (c.purchaseCount || 1) : (c.purchaseCount || 0) + 1
+            );
+            const updatedCustObj: Customer = {
               ...c,
               outstandingBalanceBrl: newCustomerBal !== undefined ? newCustomerBal : c.outstandingBalanceBrl,
-              totalSpentBrl: alreadyAppliedComandaDebt > 0
-                ? Math.max(0, (c.totalSpentBrl || 0) + (finalTotalBrl - alreadyAppliedComandaDebt))
-                : (c.totalSpentBrl || 0) + finalTotalBrl,
-              purchaseCount: alreadyAppliedComandaDebt > 0 ? (c.purchaseCount || 1) : (c.purchaseCount || 0) + 1,
+              loyaltyPoints: (c.loyaltyPoints || 0) + Math.max(1, Math.floor(finalTotalBrl / 10000)),
+              totalSpentBrl: nextSpent,
+              purchaseCount: nextCount,
               lastPurchaseDate: nowIso,
             };
+            upsertCliente(updatedCustObj).catch(() => {});
+            return updatedCustObj;
           })
         : baseCustomers;
 
@@ -2600,6 +3155,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           : prev.products,
         customers: updatedCustomers,
         customerEntries: nextEntries,
+        customerPurchases: nextPurchases,
         activeCheckouts: [completedCheckoutFlow, ...filteredCheckouts].slice(0, 40),
         sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
       };
@@ -3070,6 +3626,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     executeProductionFromRecipe,
     customers: data.customers || [],
     customerEntries: data.customerEntries || [],
+    customerPurchases: data.customerPurchases || [],
     activeCheckouts: data.activeCheckouts || [],
     broadcastCheckoutSession,
     clearCheckoutSession,
@@ -3078,6 +3635,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deleteCustomer,
     recordCustomerDebt,
     recordCustomerPayment,
+    recordCustomerPurchase,
+    deleteCustomerPurchase,
     redeemCustomerPoints,
     openComandas: data.openComandas || [],
     saveComanda,
@@ -3121,7 +3680,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,
     executeProductionFromRecipe, broadcastCheckoutSession, clearCheckoutSession,
     addCustomer, updateCustomer, deleteCustomer,
-    recordCustomerDebt, recordCustomerPayment, redeemCustomerPoints,
+    recordCustomerDebt, recordCustomerPayment, recordCustomerPurchase, deleteCustomerPurchase, redeemCustomerPoints,
     saveComanda, updateComandaStatus, removeComanda, completeSale, deleteSale,
     openRegister, closeRegister, recordSaidaCaixa, recordEntradaCaixa,
     recordSangria, recordSuprimento, getCurrentGoal, updateGoal,

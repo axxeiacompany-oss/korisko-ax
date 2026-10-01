@@ -21,8 +21,10 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
-import { Sale } from '../../types';
+import { Sale, Customer } from '../../types';
 import { ReceiptModal } from '../modals/ReceiptModal';
+import { CustomerPurchasesModal } from '../modals/CustomerPurchasesModal';
+import { FinancialPurchasesAnalytics } from '../FinancialPurchasesAnalytics';
 import { TabType } from '../Header';
 import { LiveSalesStream } from '../LiveSalesStream';
 
@@ -49,6 +51,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
   const isAx = currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com' || currentUser.name === 'Ax';
 
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
+  const [purchasesCustomer, setPurchasesCustomer] = useState<Customer | null>(null);
 
   // Filter today's sales
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -450,6 +453,12 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
 
       </div>
 
+      {/* Gráfico Financeiro de Análise de Entradas e Saídas & Total Comprado por Cliente */}
+      <FinancialPurchasesAnalytics
+        onSelectCustomer={c => setPurchasesCustomer(c)}
+        defaultExpanded={true}
+      />
+
       {/* 2-Column Section: Hourly Sales Chart + Monthly Goal Widget */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -642,6 +651,13 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
       <ReceiptModal
         sale={inspectSale}
         onClose={() => setInspectSale(null)}
+      />
+
+      {/* Customer Purchase History & Financial Analysis Modal */}
+      <CustomerPurchasesModal
+        customer={purchasesCustomer}
+        onClose={() => setPurchasesCustomer(null)}
+        onInspectSale={sale => setInspectSale(sale)}
       />
 
     </div>

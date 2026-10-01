@@ -598,3 +598,108 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+
+-- ==============================================================================
+-- 11. TABELA DEDICADA: REGISTRO DE COMPRAS DE CADA CLIENTE & ANÁLISE FINANCEIRA (public.registro_compras_clientes)
+-- Registra cada compra feita por cada cliente, itens, valor pago (Entrada), valor em fiado e custo estimado (Saída/CMV)
+-- Atualiza automaticamente o "Total Comprado" (total_spent_brl) do cliente via Trigger SQL
+-- ==============================================================================
+ALTER TABLE public.clientes
+  ADD COLUMN IF NOT EXISTS total_spent_brl NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS purchase_count INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_purchase_date TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS public.registro_compras_clientes (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  customer_name TEXT NOT NULL DEFAULT 'Cliente Cadastrado',
+  customer_phone TEXT,
+  sale_id TEXT,
+  sale_number INTEGER,
+  comanda_number TEXT,
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  items_summary TEXT NOT NULL DEFAULT '',
+  total_amount_brl NUMERIC NOT NULL DEFAULT 0,
+  estimated_cost_brl NUMERIC NOT NULL DEFAULT 0,
+  paid_amount_brl NUMERIC NOT NULL DEFAULT 0,
+  fiado_amount_brl NUMERIC NOT NULL DEFAULT 0,
+  payment_method TEXT NOT NULL DEFAULT 'dinheiro',
+  flow_type TEXT NOT NULL DEFAULT 'entrada_avista',
+  setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
+  recorded_by TEXT DEFAULT 'Operador',
+  notes TEXT,
+  purchase_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_registro_compras_customer_id
+  ON public.registro_compras_clientes (customer_id, purchase_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_registro_compras_purchase_date
+  ON public.registro_compras_clientes (purchase_date DESC);
+
+CREATE OR REPLACE FUNCTION public.fn_atualizar_total_comprado_cliente()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_customer_id TEXT;
+  v_total NUMERIC;
+  v_count INTEGER;
+  v_last_date TIMESTAMPTZ;
+BEGIN
+  v_customer_id := COALESCE(NEW.customer_id, OLD.customer_id);
+  IF v_customer_id IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT
+    COALESCE(SUM(total_amount_brl), 0),
+    COUNT(*),
+    MAX(purchase_date)
+  INTO v_total, v_count, v_last_date
+  FROM public.registro_compras_clientes
+  WHERE customer_id = v_customer_id;
+
+  UPDATE public.clientes
+  SET
+    total_spent_brl = v_total,
+    purchase_count = v_count,
+    last_purchase_date = v_last_date
+  WHERE id = v_customer_id;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_atualizar_total_comprado_cliente ON public.registro_compras_clientes;
+CREATE TRIGGER trg_atualizar_total_comprado_cliente
+  AFTER INSERT OR UPDATE OR DELETE ON public.registro_compras_clientes
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_atualizar_total_comprado_cliente();
+
+ALTER TABLE public.registro_compras_clientes REPLICA IDENTITY FULL;
+ALTER TABLE public.registro_compras_clientes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso Total Registro Compras Clientes Korizko" ON public.registro_compras_clientes;
+CREATE POLICY "Acesso Total Registro Compras Clientes Korizko"
+  ON public.registro_compras_clientes
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+GRANT ALL ON public.registro_compras_clientes TO anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'registro_compras_clientes'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.registro_compras_clientes;
+    END IF;
+  END IF;
+END $$;

@@ -357,6 +357,41 @@ export interface BackupPoint {
   };
 }
 
+export interface CustomerPurchaseItem {
+  productId: string;
+  productName: string;
+  category?: string;
+  quantity: number;
+  unit: string;
+  unitPriceBrl: number;
+  costPriceBrl: number;
+  subtotalBrl: number;
+}
+
+export type FinancialFlowCategory = 'entrada_avista' | 'fiado_pendente' | 'entrada_amortizacao' | 'saida_custo';
+
+export interface CustomerPurchaseRecord {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  saleId?: string;
+  saleNumber?: number;
+  comandaNumber?: string;
+  items: CustomerPurchaseItem[];
+  itemsSummary: string;
+  totalAmountBrl: number;
+  estimatedCostBrl: number;
+  paidAmountBrl: number;
+  fiadoAmountBrl: number;
+  paymentMethod: PaymentMethod | string;
+  flowType: FinancialFlowCategory;
+  setorResponsavel?: string;
+  recordedBy: string;
+  notes?: string;
+  purchaseDate: string;
+}
+
 export interface SystemBackupData {
   version: string;
   timestamp: string;
@@ -373,6 +408,7 @@ export interface SystemBackupData {
   fichasTecnicas?: FichaTecnica[];
   customers?: Customer[];
   customerEntries?: CustomerAccountEntry[];
+  customerPurchases?: CustomerPurchaseRecord[];
   activeCheckouts?: ActiveCheckoutSession[];
 }
 

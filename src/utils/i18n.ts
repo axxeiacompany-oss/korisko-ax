@@ -198,7 +198,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     // Brand & Slogan
     appName: 'Korizko',
     appSlogan: 'Panificação confeitaria artesanal',
-    systemDescription: 'Panificação confeitaria artesanal • Gestão & PDV',
+    systemDescription: 'Panificação confeitaria artesanal',
 
     // Language selector
     language: 'Idioma',
@@ -391,7 +391,7 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
     // Brand & Slogan
     appName: 'Korizko',
     appSlogan: 'Panificação confeitaria artesanal',
-    systemDescription: 'Panificação confeitaria artesanal • Gestão & PDV',
+    systemDescription: 'Panificação confeitaria artesanal',
 
     // Language selector
     language: 'Idioma',
