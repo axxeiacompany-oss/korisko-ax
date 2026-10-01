@@ -16,7 +16,10 @@ export type AppFeature =
   | 'metas' 
   | 'cambio' 
   | 'backup'
-  | 'afiliados';
+  | 'afiliados'
+  | 'loja'
+  | 'minha_conta'
+  | 'portal_afiliado';
 
 export interface ExchangeRates {
   BRL_TO_PYG: number; // e.g. 1380 PYG per 1 BRL
@@ -59,6 +62,11 @@ export interface Product {
   expirationDate?: string; // YYYY-MM-DD
   barcode?: string;
   active: boolean;
+  slug?: string;
+  description?: string;
+  compareAtPrice?: number;
+  featured?: boolean;
+  imageUrl?: string;
 }
 
 export interface StockMovement {
@@ -292,4 +300,199 @@ export interface SystemBackupData {
   fichasTecnicas?: FichaTecnica[];
   customers?: Customer[];
   customerEntries?: CustomerAccountEntry[];
+}
+
+// =============================================================
+// PLATAFORMA INTEGRADA: AUTH, PERFIS, LOJA ONLINE E AFILIADOS
+// =============================================================
+
+export type ProfileRole = 'customer' | 'affiliate' | 'employee' | 'manager' | 'admin';
+
+export interface UserProfile {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  role: ProfileRole;
+  status: 'active' | 'suspended' | 'pending';
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoreCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  imageUrl?: string;
+  active: boolean;
+  displayOrder: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  sku?: string;
+  name: string;
+  price: number;
+  attributes: Record<string, string>;
+  active: boolean;
+}
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  altText?: string;
+  displayOrder: number;
+}
+
+export interface CustomerAddress {
+  id: string;
+  customerId?: string;
+  userId?: string;
+  label?: string;
+  recipientName: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+  isDefault: boolean;
+  createdAt?: string;
+}
+
+export type OrderStatus = 
+  | 'pending'
+  | 'confirmed'
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId?: string;
+  productVariantId?: string;
+  productName: string;
+  sku?: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  createdAt?: string;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerId?: string;
+  userId?: string;
+  affiliateId?: string;
+  status: OrderStatus;
+  subtotal: number;
+  discount: number;
+  shippingFee: number;
+  total: number;
+  couponId?: string;
+  shippingAddress: CustomerAddress;
+  notes?: string;
+  items?: OrderItem[];
+  payments?: OrderPayment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderPayment {
+  id: string;
+  orderId: string;
+  method: string;
+  status: 'pending' | 'approved' | 'rejected' | 'refunded';
+  amount: number;
+  transactionId?: string;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface Affiliate {
+  id: string;
+  userId: string;
+  affiliateCode: string;
+  status: 'active' | 'pending' | 'inactive';
+  commissionRate: number; // Ex: 10 (%)
+  clicksCount: number;
+  pixKey?: string;
+  bankInfo?: {
+    bankName?: string;
+    accountType?: string;
+    accountNumber?: string;
+    holderName?: string;
+  };
+  totalEarnings?: number;
+  pendingEarnings?: number;
+  approvedEarnings?: number;
+  paidEarnings?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Commission {
+  id: string;
+  affiliateId: string;
+  orderId: string;
+  amount: number;
+  rate: number;
+  status: 'pending' | 'approved' | 'paid' | 'cancelled';
+  orderNumber?: string;
+  orderTotal?: number;
+  createdAt: string;
+  paidAt?: string;
+}
+
+export interface Deal {
+  id: string;
+  customerId: string;
+  assignedTo?: string;
+  title: string;
+  value: number;
+  stage: 'lead' | 'contato' | 'proposta' | 'negociacao' | 'ganho' | 'perdido';
+  source?: string;
+  expectedCloseDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerNote {
+  id: string;
+  customerId: string;
+  authorId?: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface Activity {
+  id: string;
+  customerId?: string;
+  dealId?: string;
+  userId?: string;
+  type: 'ligacao' | 'whatsapp' | 'reuniao' | 'email' | 'nota';
+  description: string;
+  completed: boolean;
+  dueDate?: string;
+  createdAt: string;
+}
+
+export interface StoreCartItem {
+  product: Product;
+  variant?: ProductVariant;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
 }

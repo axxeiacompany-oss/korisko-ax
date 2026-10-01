@@ -27,6 +27,7 @@ import {
   Lock,
   Zap,
   ShieldCheck,
+  Store,
   X
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
@@ -96,6 +97,13 @@ export const Sidebar: React.FC<Props> = ({
           badge: language === 'es' ? '1-Clic' : '1-Clique',
           badgeColor: 'bg-emerald-500/20 text-emerald-300',
         },
+        {
+          id: 'loja' as TabType,
+          label: 'Loja Online',
+          icon: Store,
+          badge: 'Online',
+          badgeColor: 'bg-amber-500/20 text-amber-300',
+        },
       ]
     },
     {
@@ -163,6 +171,13 @@ export const Sidebar: React.FC<Props> = ({
           icon: ShieldCheck,
           badge: currentUser.role === 'admin' ? (language === 'es' ? 'Panel Ax' : 'Painel Ax') : null,
           badgeColor: 'bg-indigo-500/20 text-indigo-300',
+        },
+        {
+          id: 'portal_afiliado' as TabType,
+          label: 'Portal Afiliados',
+          icon: Sparkles,
+          badge: 'Comissões',
+          badgeColor: 'bg-emerald-500/20 text-emerald-300',
         },
       ]
     }

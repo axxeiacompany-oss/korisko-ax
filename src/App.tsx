@@ -4,11 +4,15 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { BakeryProvider, useBakery } from './context/BakeryContext';
 import { TabType } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
-import { LoginView } from './components/views/LoginView';
+import { AuthView } from './components/views/AuthView';
+import { StoreView } from './components/views/StoreView';
+import { CustomerAccountView } from './components/views/CustomerAccountView';
+import { AffiliateDashboardView } from './components/views/AffiliateDashboardView';
 import { DashboardView } from './components/views/DashboardView';
 import { PdvView } from './components/views/PdvView';
 import { InventoryView } from './components/views/InventoryView';
@@ -24,21 +28,23 @@ import { AfiliadosView } from './components/views/AfiliadosView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { SwitchEmployeeModal } from './components/modals/SwitchEmployeeModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
-import { Lock, ShieldAlert, AlertTriangle, X } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, X } from 'lucide-react';
 
 function MainAppShell() {
+  const { user, profile, role, isAuthenticated, signOut, isLoading } = useAuth();
   const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError, toast, clearToast } = useBakery();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      const isDeviceRemembered = localStorage.getItem('KORISKO_REMEMBER_DEVICE') === 'true';
-      if (isDeviceRemembered && localStorage.getItem('KORISKO_AUTH_SESSION') === 'true') {
-        return true;
-      }
-      const sessionSaved = sessionStorage.getItem('KORISKO_AUTH_SESSION');
-      return sessionSaved === 'true';
-    } catch {
-      return false;
+
+  // Active view state
+  const [currentRoute, setCurrentRoute] = useState<'loja' | 'login' | 'minha_conta' | 'portal_afiliado' | TabType>(() => {
+    // Check URL or search
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/login') return 'login';
+      if (path === '/minha-conta') return 'minha_conta';
+      if (path === '/afiliado') return 'portal_afiliado';
+      if (path === '/crm') return 'crm';
     }
+    return 'loja';
   });
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -47,8 +53,35 @@ function MainAppShell() {
   const [isSwitchUserOpen, setIsSwitchUserOpen] = useState<boolean>(false);
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
+  // Auto-route on login status change
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (role === 'customer') {
+        if (currentRoute === 'login') {
+          setCurrentRoute('minha_conta');
+        }
+      } else if (role === 'affiliate') {
+        if (currentRoute === 'login') {
+          setCurrentRoute('portal_afiliado');
+        }
+      } else if (role === 'employee' || role === 'manager') {
+        if (currentRoute === 'login' || currentRoute === 'loja') {
+          setCurrentRoute('crm');
+          setActiveTab('crm');
+        }
+      } else if (role === 'admin') {
+        if (currentRoute === 'login') {
+          setCurrentRoute('crm');
+          setActiveTab('crm');
+        }
+      }
+    }
+  }, [isAuthenticated, role, currentRoute]);
+
+  // Handle Logout
+  const handleLogout = async () => {
+    await signOut();
+    setCurrentRoute('loja');
     try {
       sessionStorage.removeItem('KORISKO_AUTH_SESSION');
       localStorage.removeItem('KORISKO_AUTH_SESSION');
@@ -57,23 +90,33 @@ function MainAppShell() {
     } catch {}
   };
 
-  const handleLoginSuccess = (rememberDevice: boolean = false) => {
-    setIsAuthenticated(true);
-    try {
-      sessionStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-      if (rememberDevice) {
-        localStorage.setItem('KORISKO_AUTH_SESSION', 'true');
-        localStorage.setItem('KORISKO_REMEMBER_DEVICE', 'true');
-      } else {
-        localStorage.removeItem('KORISKO_AUTH_SESSION');
-        localStorage.removeItem('KORISKO_REMEMBER_DEVICE');
-      }
-    } catch {}
+  // Handle Successful Login redirection
+  const handleLoginSuccess = (targetPath: string) => {
+    if (targetPath === '/minha-conta') {
+      setCurrentRoute('minha_conta');
+    } else if (targetPath === '/afiliado') {
+      setCurrentRoute('portal_afiliado');
+    } else if (targetPath === '/crm') {
+      setCurrentRoute('crm');
+      setActiveTab('crm');
+    } else {
+      setCurrentRoute('crm');
+      setActiveTab('crm');
+    }
   };
 
-  // Instant scroll & tab switch optimized for mobile
+  // Instant scroll & tab switch
   const handleSelectTab = (tab: TabType) => {
-    setActiveTab(tab);
+    if (tab === 'loja') {
+      setCurrentRoute('loja');
+    } else if (tab === 'minha_conta') {
+      setCurrentRoute('minha_conta');
+    } else if (tab === 'portal_afiliado') {
+      setCurrentRoute('portal_afiliado');
+    } else {
+      setCurrentRoute(tab);
+      setActiveTab(tab);
+    }
     setIsMobileMenuOpen(false);
     try {
       window.scrollTo({ top: 0, behavior: 'instant' as any });
@@ -85,18 +128,96 @@ function MainAppShell() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        // Dispatched to TopNav search if authenticated
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // If not authenticated, show UTMify-style Login View
-  if (!isAuthenticated) {
-    return <LoginView onLoginSuccess={handleLoginSuccess} />;
+  // -------------------------------------------------------------
+  // 1. ROTA PÚBLICA: /login (Centralizada para entrar, cadastrar, recuperar)
+  // -------------------------------------------------------------
+  if (currentRoute === 'login') {
+    return (
+      <AuthView
+        onSuccessRedirect={handleLoginSuccess}
+        onNavigateHome={() => setCurrentRoute('loja')}
+      />
+    );
   }
 
+  // -------------------------------------------------------------
+  // 2. ROTA: /minha-conta (Área do Cliente)
+  // -------------------------------------------------------------
+  if (currentRoute === 'minha_conta') {
+    if (!isAuthenticated) {
+      return (
+        <AuthView
+          onSuccessRedirect={() => setCurrentRoute('minha_conta')}
+          onNavigateHome={() => setCurrentRoute('loja')}
+        />
+      );
+    }
+    return (
+      <CustomerAccountView
+        onNavigateStore={() => setCurrentRoute('loja')}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 3. ROTA: /afiliado (Portal de Afiliados)
+  // -------------------------------------------------------------
+  if (currentRoute === 'portal_afiliado') {
+    if (!isAuthenticated) {
+      return (
+        <AuthView
+          onSuccessRedirect={() => setCurrentRoute('portal_afiliado')}
+          onNavigateHome={() => setCurrentRoute('loja')}
+        />
+      );
+    }
+    return (
+      <AffiliateDashboardView
+        onNavigateStore={() => setCurrentRoute('loja')}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 4. ROTA PÚBLICA PADRÃO: /loja ou visitante / cliente
+  // -------------------------------------------------------------
+  const isStaff = role === 'admin' || role === 'manager' || role === 'employee';
+
+  if (currentRoute === 'loja' || (!isAuthenticated && currentRoute !== 'crm' && currentRoute !== 'pdv')) {
+    return (
+      <StoreView
+        onOpenAuth={(mode) => setCurrentRoute('login')}
+        onNavigateAccount={() => {
+          if (role === 'customer') setCurrentRoute('minha_conta');
+          else if (role === 'affiliate') setCurrentRoute('portal_afiliado');
+          else setCurrentRoute('crm');
+        }}
+      />
+    );
+  }
+
+  // Se o usuário autenticado for um cliente normal tentando acessar rotas administrativas
+  if (role === 'customer') {
+    return (
+      <CustomerAccountView
+        onNavigateStore={() => setCurrentRoute('loja')}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 5. SHELL ADMINISTRATIVO: Para colaboradores, gerentes e admin
+  // Preserva 100% do CRM existente, PDV, Estoque, Caixa e Métricas!
+  // -------------------------------------------------------------
   return (
     <div className="min-h-screen max-w-full overflow-x-hidden bg-[#0A0D14] text-neutral-100 font-sans flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       
@@ -140,14 +261,14 @@ function MainAppShell() {
         onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
       />
 
-      {/* Main Content Area with optimized padding transition */}
+      {/* Main Content Area */}
       <main 
         className={`flex-1 w-full max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 lg:p-8 pb-24 lg:pb-8 transition-[padding-left] duration-200 ease-out ${
           isSidebarCollapsed ? 'lg:pl-24' : 'lg:pl-68'
         }`}
       >
         <div className="w-full max-w-7xl mx-auto">
-          {/* REQUIREMENT 4: Real Database Error Banner - Never silent */}
+          {/* Database Alert Banner if applicable */}
           {dbError && (
             <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 flex items-start justify-between shadow-xl gap-3 animate-in fade-in zoom-in-95">
               <div className="flex items-start gap-3">
@@ -195,6 +316,7 @@ function MainAppShell() {
             </div>
           ) : (
             <div className="w-full min-h-[60vh]">
+              {/* PRESERVAÇÃO TOTAL DOS MÓDULOS EXISTENTES */}
               {activeTab === 'dashboard' && <DashboardView onNavigate={handleSelectTab} />}
               {activeTab === 'pdv' && <PdvView />}
               {activeTab === 'venda_direta' && <DirectSaleView />}
@@ -212,7 +334,7 @@ function MainAppShell() {
         </div>
       </main>
 
-      {/* Mobile Sticky Quick Navigation Bar (PDV, 1-Clique, Dashboard, Afiliados, Menu) */}
+      {/* Mobile Sticky Quick Navigation Bar */}
       <MobileBottomNav
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -255,8 +377,10 @@ function MainAppShell() {
 
 export default function App() {
   return (
-    <BakeryProvider>
-      <MainAppShell />
-    </BakeryProvider>
+    <AuthProvider>
+      <BakeryProvider>
+        <MainAppShell />
+      </BakeryProvider>
+    </AuthProvider>
   );
 }

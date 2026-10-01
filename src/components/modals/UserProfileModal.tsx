@@ -22,7 +22,8 @@ import {
   Target,
   Coins,
   Cloud,
-  Users
+  Users,
+  Store
 } from 'lucide-react';
 import { AppFeature } from '../../types';
 
@@ -44,6 +45,9 @@ const FEATURE_INFO: Record<AppFeature, { label: string; icon: any; color: string
   cambio: { label: 'Cotação & Multi-Moedas', icon: Coins, color: 'text-teal-400 bg-teal-500/10' },
   backup: { label: 'Backup & Nuvem', icon: Cloud, color: 'text-blue-400 bg-blue-500/10' },
   afiliados: { label: 'Gestão de Equipe & Permissões (Admin)', icon: ShieldCheck, color: 'text-indigo-400 bg-indigo-500/10' },
+  loja: { label: 'Loja Online Pública', icon: Store, color: 'text-amber-400 bg-amber-500/10' },
+  minha_conta: { label: 'Área do Cliente', icon: User, color: 'text-indigo-400 bg-indigo-500/10' },
+  portal_afiliado: { label: 'Portal de Afiliados', icon: Sparkles, color: 'text-emerald-400 bg-emerald-500/10' },
 };
 
 export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose }) => {

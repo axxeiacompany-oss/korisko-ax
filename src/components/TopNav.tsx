@@ -84,6 +84,9 @@ export const TopNav: React.FC<Props> = ({
     cambio: { title: t.tabCurrency, subtitle: t.subCurrency },
     backup: { title: t.tabBackup, subtitle: t.subBackup },
     afiliados: { title: t.tabAffiliates, subtitle: t.subAffiliates },
+    loja: { title: 'Loja Online', subtitle: 'Vitrine pública e catálogo da loja virtual' },
+    minha_conta: { title: 'Minha Conta', subtitle: 'Área do cliente, pedidos e endereços' },
+    portal_afiliado: { title: 'Portal de Afiliados', subtitle: 'Links de divulgação, métricas e comissões' },
   };
 
   const currentTabInfo = tabTitles[activeTab] || { title: t.appName, subtitle: t.appSlogan || 'Gestão Inteligente' };

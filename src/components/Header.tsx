@@ -27,7 +27,10 @@ export type TabType =
   | 'metas' 
   | 'cambio' 
   | 'backup'
-  | 'afiliados';
+  | 'afiliados'
+  | 'loja'
+  | 'minha_conta'
+  | 'portal_afiliado';
 
 interface Props {
   activeTab: TabType;
