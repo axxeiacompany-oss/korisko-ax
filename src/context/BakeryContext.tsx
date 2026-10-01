@@ -454,14 +454,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const setupRealtime = () => {
       if (activeChannel) {
         try {
-          supabase.removeChannel(activeChannel);
+          const ch = activeChannel;
+          activeChannel = null;
+          isSubscribed = false;
+          supabase.removeChannel(ch).catch?.(() => {});
         } catch {}
-        activeChannel = null;
       }
 
-      activeChannel = supabase
-        .channel('korisko-realtime-sync')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, (payload) => {
+      try {
+        activeChannel = supabase
+          .channel('korisko-realtime-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, (payload) => {
           if (payload.eventType === 'INSERT') {
             const newSale = rowToSale(payload.new);
             setData(prev => ({
@@ -563,13 +566,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         });
 
-      activeChannel.subscribe((status: string, err?: any) => {
-        if (status === 'SUBSCRIBED') {
-          isSubscribed = true;
-        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
-          isSubscribed = false;
-        }
-      });
+        activeChannel.subscribe((status: string, err?: any) => {
+          if (status === 'SUBSCRIBED') {
+            isSubscribed = true;
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+            isSubscribed = false;
+          }
+        });
+      } catch (err) {
+        // Silently catch realtime channel setup failure
+      }
     };
 
     try {
@@ -583,10 +589,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const handlePageHide = () => {
       if (activeChannel) {
         try {
-          supabase.removeChannel(activeChannel);
+          const ch = activeChannel;
+          activeChannel = null;
+          isSubscribed = false;
+          supabase.removeChannel(ch).catch?.(() => {});
         } catch {}
-        activeChannel = null;
-        isSubscribed = false;
       }
     };
 
@@ -616,7 +623,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (activeChannel) {
         try {
-          supabase.removeChannel(activeChannel);
+          const ch = activeChannel;
+          activeChannel = null;
+          isSubscribed = false;
+          supabase.removeChannel(ch).catch?.(() => {});
         } catch {}
       }
     };

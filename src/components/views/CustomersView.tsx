@@ -882,7 +882,7 @@ export const CustomersView: React.FC = () => {
                   {hasDebt && (
                     <button
                       type="button"
-                      onClick={() => handleOpenPayment(cust, 'BRL')}
+                      onClick={() => handleOpenPayment(cust)}
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-95"
                     >
                       <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1431,8 +1431,8 @@ export const CustomersView: React.FC = () => {
                   {/* Total */}
                   <div className="py-3 border-b border-dashed border-neutral-300 space-y-1">
                     <div className="flex justify-between text-sm font-bold pt-0.5">
-                      <span>TOTAL (BRL):</span>
-                      <span>{formatCurrency(statementCustomer.outstandingBalanceBrl, 'BRL')}</span>
+                      <span>TOTAL (₲ PYG):</span>
+                      <span>{formatCurrency(statementCustomer.outstandingBalanceBrl, 'PYG')}</span>
                     </div>
                   </div>
 
@@ -1444,21 +1444,13 @@ export const CustomersView: React.FC = () => {
                     <div className="flex justify-between">
                       <span>PYG (Fiado):</span>
                       <span className="font-bold">
-                        ₲ {Math.round(statementCustomer.outstandingBalanceBrl * (exchangeRates.BRL_TO_PYG || 1400)).toLocaleString('pt-BR')} (R$ {statementCustomer.outstandingBalanceBrl.toFixed(2)})
+                        {formatCurrency(statementCustomer.outstandingBalanceBrl, 'PYG')}
                       </span>
                     </div>
-                    {statementCustomer.outstandingBalanceBrl > 0 && (
-                      <div className="flex justify-between text-neutral-600">
-                        <span>USD (Fiado):</span>
-                        <span className="font-bold">
-                          $ {(statementCustomer.outstandingBalanceBrl / (exchangeRates.USD_TO_BRL || 5.62)).toFixed(2)} (R$ {statementCustomer.outstandingBalanceBrl.toFixed(2)})
-                        </span>
-                      </div>
-                    )}
                     {statementTotals.totalAmortized > 0 && (
                       <div className="flex justify-between text-emerald-700 font-semibold pt-1 border-t border-dotted border-neutral-200">
                         <span>AMORTIZAÇÃO PAGA:</span>
-                        <span>- {formatCurrency(statementTotals.totalAmortized, 'BRL')}</span>
+                        <span>- {formatCurrency(statementTotals.totalAmortized, 'PYG')}</span>
                       </div>
                     )}
                   </div>
@@ -1499,7 +1491,7 @@ export const CustomersView: React.FC = () => {
                       onClick={() => {
                         const cust = statementCustomer;
                         setStatementCustomer(null);
-                        handleOpenPayment(cust, 'BRL');
+                        handleOpenPayment(cust);
                       }}
                       className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-neutral-950 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
                     >
@@ -2208,12 +2200,15 @@ export const CustomersView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="customer-limit-field" className="text-xs font-semibold text-neutral-300 block mb-1">Limite de Crédito / Fiado (R$)</label>
+                  <label htmlFor="customer-limit-field" className="text-xs font-semibold text-neutral-300 block mb-1">
+                    {language === 'es' ? 'Límite de Crédito / Fiado (₲)' : 'Limite de Crédito / Fiado (₲)'}
+                  </label>
                   <input
                     id="customer-limit-field"
                     name="customerCreditLimit"
                     type="number"
-                    step="10"
+                    step="1000"
+                    placeholder={language === 'es' ? 'Ej: 500.000 ₲' : 'Ex: 500.000 ₲'}
                     value={formCreditLimit}
                     onChange={(e) => setFormCreditLimit(e.target.value)}
                     className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl px-3 py-2 text-xs text-white font-mono-nums focus:outline-none focus:border-amber-500"

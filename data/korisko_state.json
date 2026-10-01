@@ -1,14 +1,469 @@
 {
+  "goals": [
+    {
+      "month": "2026-10",
+      "targetRevenueBrl": 85000,
+      "targetTransactions": 3200,
+      "targetTicketMedioBrl": 26.5,
+      "targetDailyAverageBrl": 2833
+    },
+    {
+      "month": "2026-09",
+      "targetRevenueBrl": 80000,
+      "targetTransactions": 3000,
+      "targetTicketMedioBrl": 25,
+      "targetDailyAverageBrl": 2666
+    }
+  ],
+  "sales": [
+    {
+      "id": "sale-1790807727148",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790807727147",
+            "code": "VD-001",
+            "name": "Venda Direta Balcão",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 137.11,
+            "costPriceBrl": 54.84
+          },
+          "quantity": 1,
+          "subtotalBrl": 137.11,
+          "unitPriceBrl": 137.11
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790807727147",
+          "method": "fiado",
+          "currency": "PYG",
+          "equivalentBrl": 137.11,
+          "amountReceived": 150000,
+          "exchangeRateUsed": 0.0009140767824497258
+        }
+      ],
+      "totalBrl": 137.11,
+      "timestamp": "2026-09-30T22:35:27.148+00:00",
+      "customerId": "cust-1790807588048",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 107,
+      "discountBrl": 0,
+      "subtotalBrl": 137.11,
+      "customerName": "Isaías",
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790808020249",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790808020248",
+            "code": "VD-001",
+            "name": "Venda Direta Balcão",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 22.85,
+            "costPriceBrl": 9.14
+          },
+          "quantity": 1,
+          "subtotalBrl": 22.85,
+          "unitPriceBrl": 22.85
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790808020248",
+          "method": "fiado",
+          "currency": "PYG",
+          "equivalentBrl": 22.85,
+          "amountReceived": 25000,
+          "exchangeRateUsed": 0.0009140767824497258
+        }
+      ],
+      "totalBrl": 22.85,
+      "timestamp": "2026-09-30T22:40:20.249+00:00",
+      "customerId": "cust-1790807588048",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 108,
+      "discountBrl": 0,
+      "subtotalBrl": 22.85,
+      "customerName": "Isaías",
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790810902046",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790810902044",
+            "code": "VD-001",
+            "name": "01 Brownie Gourmet. 02 Pães Recheados. 01 Cuca Simples de Doce de Leite",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 101.45,
+            "costPriceBrl": 40.58
+          },
+          "quantity": 1,
+          "subtotalBrl": 101.45,
+          "unitPriceBrl": 101.45
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790810902044",
+          "method": "fiado",
+          "currency": "PYG",
+          "equivalentBrl": 101.45,
+          "amountReceived": 140000,
+          "exchangeRateUsed": 0.0007246376811594203
+        }
+      ],
+      "totalBrl": 101.45,
+      "timestamp": "2026-09-30T23:28:22.046+00:00",
+      "customerId": "cust-1790807588048",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 109,
+      "discountBrl": 0,
+      "subtotalBrl": 101.45,
+      "customerName": "Isaías",
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790820520380",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790820520379",
+            "code": "VD-001",
+            "name": "Venda Direta Balcão",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 100,
+            "costPriceBrl": 40
+          },
+          "quantity": 1,
+          "subtotalBrl": 100,
+          "unitPriceBrl": 100
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790820520379",
+          "method": "dinheiro",
+          "currency": "BRL",
+          "equivalentBrl": 100,
+          "amountReceived": 100,
+          "exchangeRateUsed": 1
+        }
+      ],
+      "totalBrl": 100,
+      "timestamp": "2026-10-01T02:08:40.38+00:00",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 110,
+      "discountBrl": 0,
+      "subtotalBrl": 100,
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790820543052",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790820543052",
+            "code": "VD-001",
+            "name": "Venda Direta Balcão",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 10,
+            "costPriceBrl": 4
+          },
+          "quantity": 1,
+          "subtotalBrl": 10,
+          "unitPriceBrl": 10
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790820543052",
+          "method": "cartao_credito",
+          "currency": "BRL",
+          "equivalentBrl": 10,
+          "amountReceived": 10,
+          "exchangeRateUsed": 1
+        }
+      ],
+      "totalBrl": 10,
+      "timestamp": "2026-10-01T02:09:03.052+00:00",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 111,
+      "discountBrl": 0,
+      "subtotalBrl": 10,
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790820572243",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790820572243",
+            "code": "VD-001",
+            "name": "Venda Direta Balcão",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 225,
+            "costPriceBrl": 90
+          },
+          "quantity": 1,
+          "subtotalBrl": 225,
+          "unitPriceBrl": 225
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790820572243",
+          "method": "dinheiro",
+          "currency": "BRL",
+          "equivalentBrl": 225,
+          "amountReceived": 225,
+          "exchangeRateUsed": 1
+        }
+      ],
+      "totalBrl": 225,
+      "timestamp": "2026-10-01T02:09:32.243+00:00",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 112,
+      "discountBrl": 0,
+      "subtotalBrl": 225,
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790825437348",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790825437345",
+            "code": "VD-001",
+            "name": "02 Brownies Gourmet REVENDA",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 37.04,
+            "costPriceBrl": 14.82
+          },
+          "quantity": 1,
+          "subtotalBrl": 37.04,
+          "unitPriceBrl": 37.04
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790825437345",
+          "method": "fiado",
+          "currency": "PYG",
+          "equivalentBrl": 37.04,
+          "amountReceived": 50000,
+          "exchangeRateUsed": 0.0007407407407407407
+        }
+      ],
+      "totalBrl": 37.04,
+      "timestamp": "2026-10-01T03:30:37.348+00:00",
+      "customerId": "cust-1790825309183",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 113,
+      "discountBrl": 0,
+      "subtotalBrl": 37.04,
+      "customerName": "Carlos",
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    },
+    {
+      "id": "sale-1790825631211",
+      "items": [
+        {
+          "product": {
+            "id": "prod-vd-1790825631211",
+            "code": "VD-001",
+            "name": "Bolo pudim gourmet",
+            "unit": "un",
+            "stock": 9999,
+            "active": true,
+            "category": "paes",
+            "minStock": 0,
+            "priceBrl": 70,
+            "costPriceBrl": 28
+          },
+          "quantity": 1,
+          "subtotalBrl": 70,
+          "unitPriceBrl": 70
+        }
+      ],
+      "status": "completed",
+      "payments": [
+        {
+          "id": "pay-1790825631211",
+          "method": "dinheiro",
+          "currency": "BRL",
+          "equivalentBrl": 70,
+          "amountReceived": 70,
+          "exchangeRateUsed": 1
+        }
+      ],
+      "totalBrl": 70,
+      "timestamp": "2026-10-01T03:33:51.211+00:00",
+      "employeeId": "emp-1790807328423",
+      "saleNumber": 114,
+      "discountBrl": 0,
+      "subtotalBrl": 70,
+      "employeeName": "Marijuaneiro",
+      "registerSessionId": ""
+    }
+  ],
   "version": "2.0.0",
-  "timestamp": "2026-09-30T17:56:21.362Z",
+  "fornadas": [],
+  "products": [
+    {
+      "id": "prod-1790819834938",
+      "code": "PAN-122",
+      "name": "Pão Presunto e queijo",
+      "unit": "un",
+      "stock": 20,
+      "active": true,
+      "category": "paes",
+      "minStock": 5,
+      "priceBrl": 23000,
+      "costPriceBrl": 6000
+    },
+    {
+      "id": "prod-1790819807180",
+      "code": "PNC",
+      "name": "Pão Calabresa",
+      "unit": "un",
+      "stock": 20,
+      "active": true,
+      "category": "paes",
+      "minStock": 5,
+      "priceBrl": 23000,
+      "costPriceBrl": 6000
+    },
+    {
+      "id": "prod-1790808330238",
+      "code": "PAO420",
+      "name": "Pão Tradicional",
+      "unit": "un",
+      "stock": 20,
+      "active": true,
+      "category": "paes",
+      "minStock": 5,
+      "priceBrl": 20000,
+      "costPriceBrl": 5000
+    },
+    {
+      "id": "prod-1790820069582",
+      "code": "PAN-824",
+      "name": "Cuca Simples Doce de Leite",
+      "unit": "un",
+      "stock": 20,
+      "active": true,
+      "category": "paes",
+      "minStock": 5,
+      "priceBrl": 50000,
+      "costPriceBrl": 6000
+    },
+    {
+      "id": "prod-1790820029231",
+      "code": "PAN-887",
+      "name": "Brownie Gourmet",
+      "unit": "un",
+      "stock": 20,
+      "active": true,
+      "category": "confeitaria",
+      "minStock": 5,
+      "priceBrl": 33000,
+      "costPriceBrl": 6000
+    }
+  ],
+  "customers": [
+    {
+      "id": "cust-1790825309183",
+      "name": "Carlos",
+      "email": "",
+      "notes": "",
+      "phone": "11111111111",
+      "address": "",
+      "birthday": "",
+      "category": "varejo",
+      "createdAt": "2026-10-01T03:28:31.598286+00:00",
+      "documentCpf": "",
+      "loyaltyPoints": 0,
+      "purchaseCount": 0,
+      "totalSpentBrl": 0,
+      "creditLimitBrl": 200,
+      "outstandingBalanceBrl": 37.04
+    }
+  ],
   "employees": [
     {
+      "id": "emp-1790818489207",
+      "pin": "674825",
+      "name": "bruxa",
+      "role": "gerente",
+      "email": "bruxa@korisko.com",
+      "password": "674825",
+      "createdAt": "2026-10-01T01:34:49.789061+00:00",
+      "avatarColor": "bg-indigo-600",
+      "allowedFeatures": [
+        "dashboard",
+        "pdv",
+        "venda_direta",
+        "metas",
+        "caixa",
+        "estoque",
+        "crm"
+      ]
+    },
+    {
       "id": "emp-admin-ax",
-      "name": "Ax",
-      "email": "axxeiacompany@gmail.com",
-      "role": "admin",
-      "password": "9APG_47z-EgF4yz",
       "pin": "9APG_47z-EgF4yz",
+      "name": "Ax",
+      "role": "admin",
+      "email": "axxeiacompany@gmail.com",
+      "password": "9APG_47z-EgF4yz",
+      "createdAt": "2026-09-30T18:47:32.814251+00:00",
       "avatarColor": "bg-indigo-600",
       "allowedFeatures": [
         "dashboard",
@@ -20,219 +475,86 @@
         "caixa",
         "mais_vendidos",
         "metas",
+        "cambio",
         "backup",
         "afiliados"
-      ],
-      "active": true
+      ]
+    },
+    {
+      "id": "emp-1790807328423",
+      "pin": "446183",
+      "name": "Marijuaneiro",
+      "role": "gerente",
+      "email": "mari@korisko.com",
+      "password": "446183",
+      "createdAt": "2026-09-30T22:28:49.929611+00:00",
+      "avatarColor": "bg-indigo-600",
+      "allowedFeatures": [
+        "dashboard",
+        "pdv",
+        "venda_direta",
+        "crm",
+        "estoque",
+        "mais_vendidos",
+        "caixa",
+        "cambio",
+        "fichas_tecnicas",
+        "metas"
+      ]
     }
   ],
-  "products": [
+  "timestamp": "2026-10-01T13:44:40.822Z",
+  "openComandas": [],
+  "exchangeRates": {
+    "updatedAt": "2026-10-01T13:43:39.912Z",
+    "BRL_TO_PYG": 1087,
+    "USD_TO_BRL": 5.19,
+    "USD_TO_PYG": 5646
+  },
+  "currentSession": {
+    "id": "session-1790819405424",
+    "status": "aberto",
+    "openedAt": "2026-10-01T01:50:05.424+00:00",
+    "openedBy": "Operador",
+    "initialFloat": {
+      "brl": 0,
+      "pyg": 0,
+      "usd": 0
+    },
+    "transactions": [],
+    "sessionNumber": 1
+  },
+  "fichasTecnicas": [],
+  "sessionHistory": [
     {
-      "id": "prod-1",
-      "code": "PAO-001",
-      "name": "Pão Francês Tradicional",
-      "category": "paes",
-      "priceBrl": 18000,
-      "costPriceBrl": 8000,
-      "stock": 45,
-      "minStock": 15,
-      "unit": "kg",
-      "active": true
+      "id": "session-1790819405424",
+      "status": "aberto",
+      "openedAt": "2026-10-01T01:50:05.424+00:00",
+      "openedBy": "Operador",
+      "initialFloat": {
+        "brl": 0,
+        "pyg": 0,
+        "usd": 0
+      },
+      "transactions": [],
+      "sessionNumber": 1
     },
     {
-      "id": "prod-2",
-      "code": "PAO-002",
-      "name": "Pão de Queijo Mineiro",
-      "category": "salgados",
-      "priceBrl": 48000,
-      "costPriceBrl": 22000,
-      "stock": 30,
-      "minStock": 8,
-      "unit": "kg",
-      "active": true
-    },
-    {
-      "id": "prod-3",
-      "code": "PAO-003",
-      "name": "Baguete Artesanal de Fermentação Natural",
-      "category": "paes",
-      "priceBrl": 16000,
-      "costPriceBrl": 6000,
-      "stock": 20,
-      "minStock": 10,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-4",
-      "code": "CONF-001",
-      "name": "Sonho Recheado de Doce de Leite",
-      "category": "confeitaria",
-      "priceBrl": 9000,
-      "costPriceBrl": 3500,
-      "stock": 25,
-      "minStock": 12,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-5",
-      "code": "CONF-002",
-      "name": "Bolo Caseiro de Cenoura com Chocolate",
-      "category": "confeitaria",
-      "priceBrl": 45000,
-      "costPriceBrl": 18000,
-      "stock": 10,
-      "minStock": 4,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-6",
-      "code": "SALG-001",
-      "name": "Chipa Tradicional Paraguaia",
-      "category": "salgados",
-      "priceBrl": 6000,
-      "costPriceBrl": 2500,
-      "stock": 40,
-      "minStock": 15,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-7",
-      "code": "SALG-002",
-      "name": "Croissant de Manteiga Folhado",
-      "category": "paes",
-      "priceBrl": 14000,
-      "costPriceBrl": 5000,
-      "stock": 18,
-      "minStock": 10,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-8",
-      "code": "SALG-003",
-      "name": "Empada Especial de Palmito e Queijo",
-      "category": "salgados",
-      "priceBrl": 10000,
-      "costPriceBrl": 4000,
-      "stock": 22,
-      "minStock": 10,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-9",
-      "code": "BEB-001",
-      "name": "Café Expresso Especial Italiano",
-      "category": "bebidas",
-      "priceBrl": 8000,
-      "costPriceBrl": 2500,
-      "stock": 100,
-      "minStock": 30,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-10",
-      "code": "BEB-002",
-      "name": "Cappuccino Cremoso com Canela",
-      "category": "bebidas",
-      "priceBrl": 14000,
-      "costPriceBrl": 5000,
-      "stock": 80,
-      "minStock": 20,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-11",
-      "code": "BEB-003",
-      "name": "Suco Natural de Laranja 400ml",
-      "category": "bebidas",
-      "priceBrl": 12000,
-      "costPriceBrl": 4000,
-      "stock": 25,
-      "minStock": 15,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-12",
-      "code": "BEB-004",
-      "name": "Água Mineral sem Gás 500ml",
-      "category": "bebidas",
-      "priceBrl": 5000,
-      "costPriceBrl": 2000,
-      "stock": 60,
-      "minStock": 40,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-13",
-      "code": "OUT-001",
-      "name": "Manteiga de Primeira Qualidade 200g",
-      "category": "outros",
-      "priceBrl": 18000,
-      "costPriceBrl": 11000,
-      "stock": 15,
-      "minStock": 10,
-      "unit": "un",
-      "active": true
-    },
-    {
-      "id": "prod-14",
-      "code": "OUT-002",
-      "name": "Requeijão Cremoso Tradicional 200g",
-      "category": "outros",
-      "priceBrl": 16000,
-      "costPriceBrl": 9500,
-      "stock": 15,
-      "minStock": 10,
-      "unit": "un",
-      "active": true
+      "id": "sess-1790862134490",
+      "status": "fechado",
+      "closedAt": "2026-10-01T13:42:14.49+00:00",
+      "closedBy": "Operador",
+      "openedAt": "2026-10-01T13:42:14.49+00:00",
+      "openedBy": "Operador",
+      "initialFloat": {
+        "brl": 0,
+        "pyg": 0,
+        "usd": 0
+      },
+      "transactions": [],
+      "sessionNumber": 1
     }
   ],
   "stockMovements": [],
-  "sales": [],
-  "currentSession": {
-    "id": "sess-1790790981363",
-    "sessionNumber": 1,
-    "openedAt": "2026-09-30T17:56:21.363Z",
-    "closedAt": "2026-09-30T17:56:21.363Z",
-    "openedBy": "Ax",
-    "closedBy": "Ax",
-    "status": "fechado",
-    "initialFloat": {
-      "brl": 500000,
-      "pyg": 500000,
-      "usd": 0
-    },
-    "transactions": []
-  },
-  "sessionHistory": [],
-  "exchangeRates": {
-    "brlToPyg": 1,
-    "brlToUsd": 1,
-    "usdToBrl": 1,
-    "pygToBrl": 1,
-    "updatedAt": "2026-09-30T17:56:21.363Z"
-  },
-  "goals": [
-    {
-      "month": "2026-09",
-      "targetRevenueBrl": 120000000,
-      "targetTransactions": 3500,
-      "targetTicketMedioBrl": 34000,
-      "targetDailyAverageBrl": 4000000
-    }
-  ],
-  "openComandas": [],
-  "fornadas": [],
-  "fichasTecnicas": [],
-  "customers": [],
   "customerEntries": []
 }

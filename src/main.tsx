@@ -8,20 +8,46 @@ import { initSecurityShield } from './utils/security';
 initSecurityShield();
 
 // Suprime erros de WebSocket desconectado em ambientes com HMR desativado / cold-starts
-window.addEventListener('unhandledrejection', (event) => {
-  const reason = event.reason?.message || String(event.reason || '');
-  if (
-    reason.includes('WebSocket') ||
-    reason.includes('closed without opened') ||
-    reason.includes('failed to fetch') ||
-    reason.includes('NetworkError') ||
-    reason.includes('aborted')
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    return false;
-  }
-});
+window.addEventListener(
+  'unhandledrejection',
+  (event) => {
+    const reason = String(event.reason?.message || event.reason?.stack || event.reason || '').toLowerCase();
+    if (
+      reason.includes('websocket') ||
+      reason.includes('closed without opened') ||
+      reason.includes('failed to fetch') ||
+      reason.includes('networkerror') ||
+      reason.includes('aborted') ||
+      reason.includes('realtime')
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      return false;
+    }
+  },
+  { capture: true, passive: false }
+);
+
+window.addEventListener(
+  'error',
+  (event) => {
+    const msg = String(event.message || event.error?.message || event.error?.stack || '').toLowerCase();
+    if (
+      msg.includes('websocket') ||
+      msg.includes('closed without opened') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('networkerror') ||
+      msg.includes('aborted')
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      return false;
+    }
+  },
+  { capture: true, passive: false }
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

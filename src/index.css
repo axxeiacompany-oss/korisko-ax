@@ -113,3 +113,8 @@
     display: block !important;
   }
 }
+
+/* Prevent Vite dev error overlay from intercepting or freezing user interactions */
+vite-error-overlay {
+  display: none !important;
+}

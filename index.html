@@ -50,37 +50,55 @@
           return false;
         }, { capture: true, passive: false });
 
-        // Silenciamento de rejeições não tratadas de WebSocket e conexões
+        // Silenciamento rigoroso de rejeições não tratadas de WebSocket e conexões
+        function isIgnorableNetworkError(errOrMsg) {
+          if (!errOrMsg) return false;
+          var text = '';
+          try {
+            if (typeof errOrMsg === 'string') {
+              text = errOrMsg;
+            } else if (errOrMsg.message || errOrMsg.stack) {
+              text = (errOrMsg.message || '') + ' ' + (errOrMsg.stack || '');
+            } else {
+              text = String(errOrMsg);
+            }
+          } catch(e) {
+            text = String(errOrMsg);
+          }
+          text = text.toLowerCase();
+          return (
+            text.indexOf('websocket') !== -1 ||
+            text.indexOf('closed without opened') !== -1 ||
+            text.indexOf('failed to fetch') !== -1 ||
+            text.indexOf('networkerror') !== -1 ||
+            text.indexOf('aborted') !== -1 ||
+            text.indexOf('realtime') !== -1
+          );
+        }
+
         window.addEventListener('unhandledrejection', function(event) {
           try {
-            var reason = (event && event.reason) ? (event.reason.message || String(event.reason)) : '';
-            if (
-              reason.indexOf('WebSocket') !== -1 ||
-              reason.indexOf('closed without opened') !== -1 ||
-              reason.indexOf('failed to fetch') !== -1 ||
-              reason.indexOf('NetworkError') !== -1 ||
-              reason.indexOf('aborted') !== -1
-            ) {
+            var reason = event && event.reason;
+            if (isIgnorableNetworkError(reason)) {
               if (event.preventDefault) event.preventDefault();
               if (event.stopPropagation) event.stopPropagation();
+              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
               return false;
             }
           } catch(err) {}
-        });
+        }, { capture: true, passive: false });
 
         window.addEventListener('error', function(event) {
           try {
-            var msg = (event && event.message) ? String(event.message) : '';
-            if (
-              msg.indexOf('WebSocket') !== -1 ||
-              msg.indexOf('closed without opened') !== -1
-            ) {
+            var target = event && (event.message || event.error);
+            if (isIgnorableNetworkError(target)) {
               if (event.preventDefault) event.preventDefault();
               if (event.stopPropagation) event.stopPropagation();
+              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
               return false;
             }
           } catch(err) {}
-        });
+        }, { capture: true, passive: false });
 
         // Limpeza de logs
         try {
