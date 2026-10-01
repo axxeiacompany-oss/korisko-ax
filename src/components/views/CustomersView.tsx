@@ -384,26 +384,29 @@ export const CustomersView: React.FC = () => {
   const getStatementPlainText = (customer: Customer) => {
     const rawEntries = customerEntries.filter(e => e.customerId === customer.id);
     const existingSaleIds = new Set(rawEntries.filter(e => e.saleId).map(e => e.saleId));
-    const missingFiadoSales = sales.filter(s => 
+    const missingFiadoSales = (sales || []).filter(s => 
+      s &&
       s.customerId === customer.id && 
       !existingSaleIds.has(s.id) &&
-      s.payments.some(p => p.method === 'fiado')
+      Array.isArray(s.payments) &&
+      s.payments.some(p => p && p.method === 'fiado')
     );
 
     const mergedEntries = [...rawEntries];
     missingFiadoSales.forEach(s => {
-      const fiadoPay = s.payments.find(p => p.method === 'fiado');
+      const fiadoPay = Array.isArray(s.payments) ? s.payments.find(p => p && p.method === 'fiado') : undefined;
       const amount = fiadoPay ? fiadoPay.amountReceived : s.totalBrl;
-      const itemsSummary = s.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+      const itemsList = Array.isArray(s.items) ? s.items : [];
+      const itemsSummary = itemsList.map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).join(', ');
       mergedEntries.push({
         id: `auto-${s.id}`,
         customerId: customer.id,
-        date: s.timestamp,
+        date: s.timestamp || new Date().toISOString(),
         type: 'debito_compra',
         amountBrl: amount,
         description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
         saleId: s.id,
-        recordedBy: s.employeeName,
+        recordedBy: s.employeeName || 'Operador',
       });
     });
 
@@ -443,12 +446,15 @@ export const CustomersView: React.FC = () => {
         const isDebit = entry.type === 'debito_compra';
         const d = new Date(entry.date).toLocaleDateString('pt-BR');
         const sign = isDebit ? '[+] Débito' : '[-] Amortização';
-        const saleRef = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
+        const saleRef = entry.saleId ? (sales || []).find(s => s.id === entry.saleId) : null;
         text += `${sign} (${d}): ${isDebit ? '' : '-'}${formatCurrency(entry.amountBrl, 'BRL')}\n`;
         text += `   ↳ ${entry.description}\n`;
-        if (saleRef && saleRef.items && saleRef.items.length > 0) {
+        if (saleRef && Array.isArray(saleRef.items) && saleRef.items.length > 0) {
           saleRef.items.forEach(it => {
-            text += `     • ${it.quantity} ${it.product.unit} × ${it.product.name} = ${formatCurrency(it.subtotalBrl, 'BRL')}\n`;
+            const unit = it.product?.unit || (it as any).unit || 'un';
+            const name = it.product?.name || (it as any).name || 'Produto';
+            const subtotal = it.subtotalBrl ?? ((it.unitPriceBrl || 0) * (it.quantity || 1));
+            text += `     • ${it.quantity} ${unit} × ${name} = ${formatCurrency(subtotal, 'BRL')}\n`;
           });
         }
       });
@@ -514,26 +520,29 @@ export const CustomersView: React.FC = () => {
 
     const rawEntries = customerEntries.filter(e => e.customerId === statementCustomer.id);
     const existingSaleIds = new Set(rawEntries.filter(e => e.saleId).map(e => e.saleId));
-    const missingFiadoSales = sales.filter(s => 
+    const missingFiadoSales = (sales || []).filter(s => 
+      s &&
       s.customerId === statementCustomer.id && 
       !existingSaleIds.has(s.id) &&
-      s.payments.some(p => p.method === 'fiado')
+      Array.isArray(s.payments) &&
+      s.payments.some(p => p && p.method === 'fiado')
     );
 
     const mergedEntries = [...rawEntries];
     missingFiadoSales.forEach(s => {
-      const fiadoPay = s.payments.find(p => p.method === 'fiado');
+      const fiadoPay = Array.isArray(s.payments) ? s.payments.find(p => p && p.method === 'fiado') : undefined;
       const amount = fiadoPay ? fiadoPay.amountReceived : s.totalBrl;
-      const itemsSummary = s.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+      const itemsList = Array.isArray(s.items) ? s.items : [];
+      const itemsSummary = itemsList.map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).join(', ');
       mergedEntries.push({
         id: `auto-${s.id}`,
         customerId: statementCustomer.id,
-        date: s.timestamp,
+        date: s.timestamp || new Date().toISOString(),
         type: 'debito_compra',
         amountBrl: amount,
         description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
         saleId: s.id,
-        recordedBy: s.employeeName,
+        recordedBy: s.employeeName || 'Operador',
       });
     });
 
@@ -629,7 +638,7 @@ export const CustomersView: React.FC = () => {
         lastMovement,
       }
     };
-  }, [statementCustomer, customerEntries, statementPeriodFilter, statementTypeFilter, statementSearch]);
+  }, [statementCustomer, customerEntries, sales, statementPeriodFilter, statementTypeFilter, statementSearch]);
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden pb-24 lg:pb-0">
@@ -1516,14 +1525,19 @@ export const CustomersView: React.FC = () => {
                               </div>
 
                               {/* If sale items exist, list each item with quantity, unit and price */}
-                              {entrySale && entrySale.items && entrySale.items.length > 0 ? (
+                              {entrySale && Array.isArray(entrySale.items) && entrySale.items.length > 0 ? (
                                 <div className="pl-1 text-[10px] text-neutral-700 space-y-0.5 my-1">
-                                  {entrySale.items.map((it, idx) => (
-                                    <div key={idx} className="flex justify-between">
-                                      <span className="truncate pr-1">{it.quantity} {it.product.unit} × {it.product.name}</span>
-                                      <span className="font-mono shrink-0">{formatCurrency(it.subtotalBrl, 'BRL')}</span>
-                                    </div>
-                                  ))}
+                                  {entrySale.items.map((it, idx) => {
+                                    const unit = it.product?.unit || (it as any).unit || 'un';
+                                    const name = it.product?.name || (it as any).name || 'Produto';
+                                    const subtotal = it.subtotalBrl ?? ((it.unitPriceBrl || 0) * (it.quantity || 1));
+                                    return (
+                                      <div key={idx} className="flex justify-between">
+                                        <span className="truncate pr-1">{it.quantity} {unit} × {name}</span>
+                                        <span className="font-mono shrink-0">{formatCurrency(subtotal, 'BRL')}</span>
+                                      </div>
+                                    );
+                                  })}
                                   <div className="flex justify-between text-[11px] font-bold text-neutral-900 pt-0.5 border-t border-dotted border-neutral-300">
                                     <span>SUBTOTAL:</span>
                                     <span className="font-mono">{formatCurrency(entry.amountBrl, 'BRL')}</span>
@@ -1911,18 +1925,23 @@ export const CustomersView: React.FC = () => {
                             </div>
 
                             {/* Itemized breakdown if from sale */}
-                            {entrySale && entrySale.items && entrySale.items.length > 0 && (
+                            {entrySale && Array.isArray(entrySale.items) && entrySale.items.length > 0 && (
                               <div className="mt-1 pl-2 border-l-2 border-neutral-700/60 space-y-0.5 text-[11px] text-neutral-400">
-                                {entrySale.items.map((it, idx) => (
-                                  <div key={idx} className="flex items-center gap-1.5">
-                                    <span className="text-neutral-300 font-medium">
-                                      {it.quantity} {it.product.unit} × {it.product.name}
-                                    </span>
-                                    <span className="font-mono text-neutral-400">
-                                      ({formatCurrency(it.subtotalBrl, 'BRL')})
-                                    </span>
-                                  </div>
-                                ))}
+                                {entrySale.items.map((it, idx) => {
+                                  const unit = it.product?.unit || (it as any).unit || 'un';
+                                  const name = it.product?.name || (it as any).name || 'Produto';
+                                  const subtotal = it.subtotalBrl ?? ((it.unitPriceBrl || 0) * (it.quantity || 1));
+                                  return (
+                                    <div key={idx} className="flex items-center gap-1.5">
+                                      <span className="text-neutral-300 font-medium">
+                                        {it.quantity} {unit} × {name}
+                                      </span>
+                                      <span className="font-mono text-neutral-400">
+                                        ({formatCurrency(subtotal, 'BRL')})
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
 

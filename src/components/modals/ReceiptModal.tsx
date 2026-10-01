@@ -38,8 +38,12 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
     text += `Operador: ${sale.employeeName}\n`;
     if (sale.customerName) text += `Cliente: ${sale.customerName}\n`;
     text += `--------------------------------\n`;
-    sale.items.forEach(it => {
-      text += `${it.product.name}\n${it.quantity} ${it.product.unit} x R$ ${it.unitPriceBrl.toFixed(2)} = R$ ${it.subtotalBrl.toFixed(2)}\n`;
+    (sale.items || []).forEach(it => {
+      const name = it.product?.name || (it as any).name || 'Produto';
+      const unit = it.product?.unit || (it as any).unit || 'un';
+      const unitPrice = it.unitPriceBrl || 0;
+      const subtotal = it.subtotalBrl || (unitPrice * (it.quantity || 1));
+      text += `${name}\n${it.quantity} ${unit} x R$ ${unitPrice.toFixed(2)} = R$ ${subtotal.toFixed(2)}\n`;
     });
     text += `--------------------------------\n`;
     text += `*TOTAL: R$ ${sale.totalBrl.toFixed(2)}*\n`;
@@ -164,21 +168,27 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
             </div>
             
             <div className="space-y-1.5">
-              {sale.items.map((item, idx) => (
-                <div key={idx} className="space-y-0.5">
-                  <div className="font-semibold text-neutral-900 leading-tight">
-                    {item.product.name}
+              {(sale.items || []).map((item, idx) => {
+                const name = item.product?.name || (item as any).name || 'Produto';
+                const unit = item.product?.unit || (item as any).unit || 'un';
+                const unitPrice = item.unitPriceBrl || 0;
+                const subtotal = item.subtotalBrl || (unitPrice * (item.quantity || 1));
+                return (
+                  <div key={idx} className="space-y-0.5">
+                    <div className="font-semibold text-neutral-900 leading-tight">
+                      {name}
+                    </div>
+                    <div className="flex justify-between text-[11px] text-neutral-600">
+                      <span>
+                        {item.quantity} {unit} × {formatCurrency(unitPrice, 'BRL')}
+                      </span>
+                      <span className="font-bold text-neutral-900">
+                        {formatCurrency(subtotal, 'BRL')}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[11px] text-neutral-600">
-                    <span>
-                      {item.quantity} {item.product.unit} × {formatCurrency(item.unitPriceBrl, 'BRL')}
-                    </span>
-                    <span className="font-bold text-neutral-900">
-                      {formatCurrency(item.subtotalBrl, 'BRL')}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

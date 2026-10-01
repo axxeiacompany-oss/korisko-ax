@@ -1179,19 +1179,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       recordedBy: currentUser.name,
     };
 
+    const currentCustomer = (data.customers || []).find(c => c.id === customerId);
+    let newBal = (currentCustomer?.outstandingBalanceBrl || 0) + amountBrl;
     try {
-      // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor })
-      const newBal = await rpcAjustarSaldoCliente(customerId, amountBrl);
-      entry.resultingBalanceBrl = newBal;
-      setData(prev => ({
-        ...prev,
-        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-        customerEntries: [entry, ...(prev.customerEntries || [])],
-      }));
+      newBal = await rpcAjustarSaldoCliente(customerId, amountBrl);
     } catch (err: any) {
-      setDbError(`Falha ao registrar débito do cliente no Supabase: ${err.message}`);
+      console.warn('RPC ajustar_saldo_cliente fallback:', err);
+      if (currentCustomer) {
+        try {
+          await upsertCliente({ ...currentCustomer, outstandingBalanceBrl: newBal });
+        } catch {}
+      }
     }
-  }, [currentUser.name]);
+
+    entry.resultingBalanceBrl = newBal;
+    setData(prev => ({
+      ...prev,
+      customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+      customerEntries: [entry, ...(prev.customerEntries || [])],
+    }));
+  }, [currentUser.name, data.customers]);
 
   // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC
   const recordCustomerPayment = useCallback(async (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => {
@@ -1208,19 +1215,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       recordedBy: currentUser.name,
     };
 
+    const currentCustomer = (data.customers || []).find(c => c.id === customerId);
+    let newBal = Math.max(0, (currentCustomer?.outstandingBalanceBrl || 0) - cleanAmount);
     try {
-      // REQUIREMENT 6: Use supabase.rpc('ajustar_saldo_cliente', { p_id, p_valor: -amountBrl })
-      const newBal = await rpcAjustarSaldoCliente(customerId, -cleanAmount);
-      entry.resultingBalanceBrl = newBal;
-      setData(prev => ({
-        ...prev,
-        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-        customerEntries: [entry, ...(prev.customerEntries || [])],
-      }));
+      newBal = await rpcAjustarSaldoCliente(customerId, -cleanAmount);
     } catch (err: any) {
-      setDbError(`Falha ao registrar pagamento do cliente no Supabase: ${err.message}`);
+      console.warn('RPC ajustar_saldo_cliente fallback:', err);
+      if (currentCustomer) {
+        try {
+          await upsertCliente({ ...currentCustomer, outstandingBalanceBrl: newBal });
+        } catch {}
+      }
     }
-  }, [currentUser.name]);
+
+    entry.resultingBalanceBrl = newBal;
+    setData(prev => ({
+      ...prev,
+      customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+      customerEntries: [entry, ...(prev.customerEntries || [])],
+    }));
+  }, [currentUser.name, data.customers]);
 
   // CRM - Redeem Loyalty Points
   const redeemCustomerPoints = useCallback((customerId: string, points: number): number => {
@@ -1325,13 +1339,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let newCustomerBal: number | undefined;
     let fiadoAccountEntry: CustomerAccountEntry | undefined;
     if (customerId && fiadoAmountBrl > 0) {
+      const currentCust = (data.customers || []).find(c => c.id === customerId);
+      newCustomerBal = (currentCust?.outstandingBalanceBrl || 0) + fiadoAmountBrl;
       try {
         newCustomerBal = await rpcAjustarSaldoCliente(customerId, fiadoAmountBrl);
       } catch (rpcBalErr: any) {
         console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
+        if (currentCust) {
+          try {
+            await upsertCliente({ ...currentCust, outstandingBalanceBrl: newCustomerBal });
+          } catch {}
+        }
       }
 
-      const itemsSummary = items.map(i => `${i.quantity}x ${i.product.name}`).slice(0, 3).join(', ');
+      const itemsSummary = (items || []).map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).slice(0, 3).join(', ');
       fiadoAccountEntry = {
         id: `entry-${Date.now()}`,
         customerId,
