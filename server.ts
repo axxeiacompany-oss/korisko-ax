@@ -100,12 +100,20 @@ function safeReadJsonFile<T = any>(filePath: string): T | null {
 
 // Optional PostgreSQL setup if DATABASE_URL is provided (e.g. Railway / Supabase direct postgres)
 const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_PUBLIC_URL;
-let pool: pg.Pool | null = null;
+const mockPool = {
+  query: async () => ({ rows: [] }),
+  connect: async () => ({
+    query: async () => ({ rows: [] }),
+    release: () => {},
+  }),
+} as unknown as pg.Pool;
+let pool: pg.Pool = mockPool;
 let isPgConnected = false;
 
 async function initPostgres() {
   if (!dbUrl) {
     console.log('[Korisko DB] Motor de banco de dados nativo ativo (Persistência em Disco e Memória).');
+    pool = mockPool;
     return;
   }
 
@@ -159,6 +167,7 @@ async function initPostgres() {
     isPgConnected = true;
   } catch (err) {
     console.warn('[Korisko DB] PostgreSQL opcional não conectado, operando com banco nativo local:', err);
+    pool = mockPool;
     isPgConnected = false;
   }
 }

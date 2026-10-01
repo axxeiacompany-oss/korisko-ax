@@ -101,14 +101,42 @@ export interface PaymentEntry {
   method: PaymentMethod;
 }
 
+export type SetorResponsavel = 'panificacao' | 'confeitaria' | 'balcao' | 'caixa' | 'todos';
+
+export type ComandaStatus = 
+  | 'aguardando_confirmacao'
+  | 'confirmado'
+  | 'em_preparo'
+  | 'pronto'
+  | 'entregue'
+  | 'pago'
+  | 'cancelado';
+
 export interface Comanda {
   id: string;
   number: string;
+  customerId?: string;
   customerName?: string;
+  customerPhone?: string;
   items: CartItem[];
   openedAt: string;
   openedBy: string;
   notes?: string;
+  setorResponsavel?: SetorResponsavel;
+  setoresEnvolvidos?: SetorResponsavel[];
+  status?: ComandaStatus;
+  confirmedByCustomer?: boolean;
+  confirmedAt?: string;
+  origem?: 'loja_online' | 'comanda_digital' | 'pdv_balcao';
+  tipoAtendimento?: 'mesa' | 'retirada' | 'entrega';
+  enderecoEntrega?: string;
+  formaPagamento?: string;
+  subtotalBrl?: number;
+  shippingFeeBrl?: number;
+  totalBrl?: number;
+  orderId?: string;
+  saleId?: string;
+  updatedAt?: string;
 }
 
 export interface FornadaLog {
@@ -193,6 +221,9 @@ export interface CustomerAccountEntry {
   resultingBalanceBrl?: number;
   runningBalanceBrl?: number;
   saleId?: string;
+  comandaNumber?: string;
+  setorResponsavel?: string;
+  confirmedByCustomer?: boolean;
   recordedBy: string;
 }
 
@@ -224,6 +255,8 @@ export interface Sale {
   customerId?: string;
   customerName?: string;
   comandaNumber?: string;
+  setorResponsavel?: string;
+  confirmedByCustomer?: boolean;
   status: 'completed' | 'cancelled';
   registerSessionId: string;
 }
@@ -392,6 +425,9 @@ export interface OrderItem {
 export interface Order {
   id: string;
   orderNumber: string;
+  comandaNumber?: string;
+  setorResponsavel?: string;
+  confirmedByCustomer?: boolean;
   customerId?: string;
   userId?: string;
   affiliateId?: string;

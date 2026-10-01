@@ -6,8 +6,75 @@ import {
   CashRegisterSession, 
   Employee,
   UserRole,
-  AppFeature
+  AppFeature,
+  Comanda,
+  SetorResponsavel,
+  ComandaStatus,
+  CartItem
 } from '../types';
+
+// ==========================================
+// HELPERS DE SETOR RESPONSÁVEL (PANIFICAÇÃO, CONFEITARIA, BALCÃO, CAIXA)
+// ==========================================
+
+export function getItemSetor(category?: string): SetorResponsavel {
+  switch (category) {
+    case 'confeitaria':
+      return 'confeitaria';
+    case 'paes':
+    case 'salgados':
+      return 'panificacao';
+    case 'bebidas':
+    case 'frios':
+      return 'balcao';
+    default:
+      return 'panificacao';
+  }
+}
+
+export function formatSetorName(setor?: SetorResponsavel | string): string {
+  switch (setor) {
+    case 'panificacao':
+      return 'Panificação & Forno';
+    case 'confeitaria':
+      return 'Confeitaria Artesanal';
+    case 'balcao':
+      return 'Balcão & Cafeteria';
+    case 'caixa':
+      return 'Caixa & Expedição';
+    case 'todos':
+      return 'Panificação & Confeitaria Artesanal';
+    default:
+      return setor ? String(setor) : 'Panificação & Confeitaria Artesanal';
+  }
+}
+
+export function resolveSetoresFromItems(items: CartItem[]): {
+  primary: SetorResponsavel;
+  all: SetorResponsavel[];
+  label: string;
+} {
+  const set = new Set<SetorResponsavel>();
+  (items || []).forEach(it => {
+    const cat = it.product?.category || (it as any).category;
+    set.add(getItemSetor(cat));
+  });
+  const all = Array.from(set);
+  if (all.length === 0) {
+    return {
+      primary: 'panificacao',
+      all: ['panificacao'],
+      label: 'Panificação & Confeitaria Artesanal',
+    };
+  }
+  const primary: SetorResponsavel = all.length === 1 ? all[0] : (
+    all.includes('confeitaria') && all.includes('panificacao')
+      ? 'todos'
+      : all[0]
+  );
+  const label = all.map(s => formatSetorName(s)).join(' + ');
+  return { primary, all, label };
+}
 
 // ==========================================
 // ROW MAPPERS (App Model <-> Supabase DB Row)
@@ -115,13 +182,16 @@ export function rowToSale(r: any): Sale {
     saleNum = isNaN(parsed) ? 0 : parsed;
   }
 
+  const itemsList = Array.isArray(r.items) ? r.items : [];
+  const resolvedSetor = r.setor_responsavel || resolveSetoresFromItems(itemsList).label;
+
   return {
     id: String(r.id),
     saleNumber: saleNum,
     timestamp: r.created_at || new Date().toISOString(),
     employeeId: r.employee_id || '',
     employeeName: r.employee_name || '',
-    items: Array.isArray(r.items) ? r.items : [],
+    items: itemsList,
     subtotalBrl: Number(r.subtotal_brl) || Number(r.total_brl) || 0,
     discountBrl: Number(r.discount_brl) || 0,
     totalBrl: Number(r.total_brl) || 0,
@@ -129,6 +199,9 @@ export function rowToSale(r: any): Sale {
     changeGiven: r.change_given || undefined,
     customerId: r.customer_id || undefined,
     customerName: r.customer_name || undefined,
+    comandaNumber: r.comanda_number || undefined,
+    setorResponsavel: resolvedSetor,
+    confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
     status: 'completed',
     registerSessionId: '',
   };
@@ -525,3 +598,94 @@ export async function saveSystemStateDoc(extraState: any): Promise<void> {
     console.warn('[Supabase System State sync]:', err);
   }
 }
+
+// ==========================================
+// DATA ACCESS LAYER: COMANDAS EM TEMPO REAL
+// ==========================================
+
+export function comandaToRow(c: Comanda) {
+  const sectorInfo = resolveSetoresFromItems(c.items || []);
+  const totalBrl = (c.items || []).reduce(
+    (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
+    0
+  );
+  return {
+    id: c.id,
+    number: c.number,
+    customer_id: c.customerId || null,
+    customer_name: c.customerName || null,
+    customer_phone: c.customerPhone || null,
+    items: c.items || [],
+    notes: c.notes || null,
+    status: c.status || 'confirmado',
+    setor_responsavel: c.setorResponsavel || sectorInfo.primary,
+    setores_envolvidos: c.setoresEnvolvidos || sectorInfo.all,
+    confirmed_by_customer: c.confirmedByCustomer !== undefined ? c.confirmedByCustomer : true,
+    confirmed_at: c.confirmedAt || c.openedAt || new Date().toISOString(),
+    opened_by: c.openedBy || 'Balcão',
+    opened_at: c.openedAt || new Date().toISOString(),
+    updated_at: c.updatedAt || new Date().toISOString(),
+    total_brl: c.totalBrl ?? totalBrl,
+    source: c.source || 'pdv',
+  };
+}
+
+export function rowToComanda(r: any): Comanda {
+  const items: CartItem[] = Array.isArray(r.items) ? r.items : [];
+  const sectorInfo = resolveSetoresFromItems(items);
+  return {
+    id: String(r.id),
+    number: String(r.number || ''),
+    customerId: r.customer_id || undefined,
+    customerName: r.customer_name || undefined,
+    customerPhone: r.customer_phone || undefined,
+    items,
+    openedAt: r.opened_at || r.created_at || new Date().toISOString(),
+    openedBy: r.opened_by || 'Cliente / PDV',
+    notes: r.notes || undefined,
+    status: (r.status as ComandaStatus) || 'confirmado',
+    setorResponsavel: (r.setor_responsavel as SetorResponsavel) || sectorInfo.primary,
+    setoresEnvolvidos: Array.isArray(r.setores_envolvidos) ? r.setores_envolvidos : sectorInfo.all,
+    confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
+    confirmedAt: r.confirmed_at || r.opened_at || new Date().toISOString(),
+    updatedAt: r.updated_at || new Date().toISOString(),
+    source: r.source || 'pdv',
+    totalBrl: Number(r.total_brl) || items.reduce(
+      (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
+      0
+    ),
+  };
+}
+
+export async function listComandas(): Promise<Comanda[]> {
+  try {
+    const rows = await fetchAllRowsPaged<any>('comandas');
+    return rows.map(rowToComanda);
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertComandaDb(c: Comanda): Promise<Comanda | null> {
+  try {
+    const row = comandaToRow(c);
+    const { data, error } = await supabase
+      .from('comandas')
+      .upsert(row, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error || !data) return null;
+    return rowToComanda(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteComandaDb(id: string): Promise<void> {
+  try {
+    await supabase.from('comandas').delete().eq('id', id);
+  } catch {
+    // fallback handled by korisko_system_state
+  }
+}
+

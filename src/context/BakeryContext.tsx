@@ -14,6 +14,8 @@ import {
   PaymentEntry,
   Currency,
   Comanda,
+  ComandaStatus,
+  SetorResponsavel,
   FornadaLog,
   FichaTecnica,
   Customer,
@@ -52,7 +54,13 @@ import {
   rowToCustomer,
   rowToSale,
   rowToSession,
-  rowToUser
+  rowToUser,
+  listComandas,
+  upsertComandaDb,
+  deleteComandaDb,
+  rowToComanda,
+  resolveSetoresFromItems,
+  formatSetorName
 } from '../lib/db';
 
 interface BakeryContextType {
@@ -132,13 +140,27 @@ interface BakeryContextType {
   addCustomer: (cust: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>) => Promise<Customer>;
   updateCustomer: (cust: Customer) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
-  recordCustomerDebt: (customerId: string, amountBrl: number, description: string, saleId?: string) => Promise<void>;
+  recordCustomerDebt: (customerId: string, amountBrl: number, description: string, saleId?: string, comandaNumber?: string, setorResponsavel?: string) => Promise<void>;
   recordCustomerPayment: (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => Promise<void>;
   redeemCustomerPoints: (customerId: string, points: number) => number;
 
-  // Comandas & Mesas
+  // Comandas & Mesas (Tempo Real por Setor Responsável + Admin Total)
   openComandas: Comanda[];
-  saveComanda: (number: string, items: CartItem[], customerName?: string, notes?: string) => void;
+  saveComanda: (
+    number: string,
+    items: CartItem[],
+    customerName?: string,
+    notes?: string,
+    extraOptions?: {
+      customerId?: string;
+      customerPhone?: string;
+      status?: ComandaStatus;
+      setorResponsavel?: SetorResponsavel;
+      confirmedByCustomer?: boolean;
+      source?: 'pdv' | 'loja_online' | 'cliente_direto';
+    }
+  ) => Comanda;
+  updateComandaStatus: (comandaId: string, status: ComandaStatus, setorResponsavel?: SetorResponsavel) => void;
   removeComanda: (comandaId: string) => void;
 
   // Point of Sale (PDV)
@@ -338,6 +360,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           dbSales, 
           dbSessions, 
           dbUsers, 
+          dbComandas,
           dbExtra
         ] = await Promise.all([
           listProdutos().catch(err => { console.warn('Produtos load notice:', err); return []; }),
@@ -345,6 +368,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           listVendas().catch(err => { console.warn('Vendas load notice:', err); return []; }),
           listCaixaSessoes().catch(err => { console.warn('Caixa load notice:', err); return []; }),
           listUsuarios().catch(err => { console.warn('Usuarios load notice:', err); return []; }),
+          listComandas().catch(() => []),
           fetchSystemStateDoc().catch(() => null),
         ]);
 
@@ -395,6 +419,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             sessionHistory = dbSessions.filter(s => s.id !== currentSession.id);
           }
 
+          // Merge real-time comandas from comandas table + korisko_system_state
+          const extraComandas: Comanda[] = Array.isArray(dbExtra?.openComandas) ? dbExtra.openComandas : (prev.openComandas ?? []);
+          const comandasMap = new Map<string, Comanda>();
+          extraComandas.forEach(c => comandasMap.set(c.id || c.number, c));
+          dbComandas.forEach(c => comandasMap.set(c.id || c.number, c));
+          const mergedComandas = Array.from(comandasMap.values()).filter(c => c.status !== 'pago' && c.status !== 'cancelado');
+
           const newState: SystemBackupData = {
             ...prev,
             products,
@@ -404,7 +435,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentSession,
             sessionHistory,
             // Extra system state
-            openComandas: dbExtra?.openComandas && dbExtra.openComandas.length > 0 ? dbExtra.openComandas : (prev.openComandas ?? []),
+            openComandas: mergedComandas,
             fornadas: dbExtra?.fornadas && dbExtra.fornadas.length > 0 ? dbExtra.fornadas : (prev.fornadas ?? []),
             fichasTecnicas: dbExtra?.fichasTecnicas && dbExtra.fichasTecnicas.length > 0 ? dbExtra.fichasTecnicas : (prev.fichasTecnicas ?? []),
             goals: dbExtra?.goals && dbExtra.goals.length > 0 ? dbExtra.goals : (prev.goals || INITIAL_GOALS),
@@ -459,7 +490,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // ==========================================
   // REQUIREMENT 7: REALTIME MULTI-DEVICE
-  // A single channel per table (vendas, produtos, clientes, caixa_sessoes, usuarios)
+  // A single channel per table (vendas, produtos, clientes, caixa_sessoes, usuarios, comandas, korisko_system_state)
   // Created once in a useEffect with [] dependencies and cleanup
   // ==========================================
   useEffect(() => {
@@ -578,6 +609,46 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ...prev,
               employees: prev.employees.filter(e => e.id !== oldId),
             }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comandas' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const cmd = rowToComanda(payload.new);
+            setData(prev => {
+              if (cmd.status === 'pago' || cmd.status === 'cancelado') {
+                return {
+                  ...prev,
+                  openComandas: (prev.openComandas || []).filter(c => c.id !== cmd.id && c.number !== cmd.number),
+                };
+              }
+              const exists = (prev.openComandas || []).some(c => c.id === cmd.id || c.number === cmd.number);
+              const nextComandas = exists
+                ? (prev.openComandas || []).map(c => (c.id === cmd.id || c.number === cmd.number) ? cmd : c)
+                : [cmd, ...(prev.openComandas || [])];
+              return {
+                ...prev,
+                openComandas: nextComandas,
+              };
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = String((payload.old as any)?.id);
+            setData(prev => ({
+              ...prev,
+              openComandas: (prev.openComandas || []).filter(c => c.id !== oldId),
+            }));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'korisko_system_state' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const remoteData = (payload.new as any)?.data;
+            if (remoteData && typeof remoteData === 'object') {
+              setData(prev => ({
+                ...prev,
+                openComandas: Array.isArray(remoteData.openComandas) ? remoteData.openComandas : prev.openComandas,
+                customerEntries: Array.isArray(remoteData.customerEntries) ? remoteData.customerEntries : prev.customerEntries,
+                fornadas: Array.isArray(remoteData.fornadas) ? remoteData.fornadas : prev.fornadas,
+              }));
+            }
           }
         });
 
@@ -782,24 +853,27 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Update employee PIN
   const updateEmployeePin = useCallback(async (employeeId: string, newPin: string) => {
+    const emp = data.employees.find(e => e.id === employeeId);
+    if (!emp) return;
+    const updated = { ...emp, pin: newPin };
     try {
-      const emp = data.employees.find(e => e.id === employeeId);
-      if (emp) {
-        const updated = { ...emp, pin: newPin };
-        await upsertUsuario(updated);
-        setData(prev => ({
-          ...prev,
-          employees: prev.employees.map(e => e.id === employeeId ? updated : e)
-        }));
-      }
+      await upsertUsuario(updated);
     } catch (err: any) {
-      setDbError(`Erro ao atualizar PIN: ${err.message}`);
+      console.warn('[Korisko] Supabase updateEmployeePin fallback to local:', err.message);
     }
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        employees: prev.employees.map(e => e.id === employeeId ? updated : e)
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, [data.employees]);
 
   // ==========================================
   // REQUIREMENT 4: AFFILIATES / EMPLOYEES CRUD
-  // Saves single row with await to Supabase
+  // Saves single row with await to Supabase (with local fallback)
   // ==========================================
   const addEmployee = useCallback(async (empData: Omit<Employee, 'id'>): Promise<Employee> => {
     const newEmp: Employee = {
@@ -809,32 +883,42 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       avatarColor: empData.avatarColor || 'bg-indigo-600',
     };
 
+    let persisted = newEmp;
     try {
-      const persisted = await upsertUsuario(newEmp);
-      setData(prev => ({
+      persisted = await upsertUsuario(newEmp);
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase addEmployee fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         employees: [...prev.employees.filter(e => e.id !== persisted.id), persisted],
-      }));
-      return persisted;
-    } catch (err: any) {
-      setDbError(`Erro ao salvar operador no banco: ${err.message}`);
-      throw err;
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+    return persisted;
   }, []);
 
   const updateEmployee = useCallback(async (emp: Employee) => {
+    let persisted = emp;
     try {
-      const persisted = await upsertUsuario(emp);
-      setData(prev => ({
+      persisted = await upsertUsuario(emp);
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase updateEmployee fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         employees: prev.employees.map(e => e.id === emp.id ? persisted : e),
-      }));
-      if (currentUser.id === emp.id) {
-        setCurrentUser(persisted);
-      }
-    } catch (err: any) {
-      setDbError(`Erro ao atualizar operador no banco: ${err.message}`);
-      throw err;
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+    if (currentUser.id === emp.id) {
+      setCurrentUser(persisted);
     }
   }, [currentUser.id]);
 
@@ -846,32 +930,39 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       await deleteUsuario(id);
-      setData(prev => ({
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase deleteEmployee fallback to local:', err.message);
+    }
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         employees: prev.employees.filter(e => e.id !== id),
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao excluir operador do banco: ${err.message}`);
-      throw err;
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, []);
 
   const updateEmployeePermissions = useCallback(async (id: string, allowedFeatures: AppFeature[]) => {
+    const emp = data.employees.find(e => e.id === id);
+    if (!emp) return;
+    const updated = { ...emp, allowedFeatures };
     try {
-      const emp = data.employees.find(e => e.id === id);
-      if (emp) {
-        const updated = { ...emp, allowedFeatures };
-        await upsertUsuario(updated);
-        setData(prev => ({
-          ...prev,
-          employees: prev.employees.map(e => e.id === id ? updated : e),
-        }));
-        if (currentUser.id === id) {
-          setCurrentUser(prev => ({ ...prev, allowedFeatures }));
-        }
-      }
+      await upsertUsuario(updated);
     } catch (err: any) {
-      setDbError(`Erro ao atualizar permissões: ${err.message}`);
+      console.warn('[Korisko] Supabase updateEmployeePermissions fallback to local:', err.message);
+    }
+    setData(prev => {
+      const nextState = {
+        ...prev,
+        employees: prev.employees.map(e => e.id === id ? updated : e),
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
+    if (currentUser.id === id) {
+      setCurrentUser(prev => ({ ...prev, allowedFeatures }));
     }
   }, [currentUser.id, data.employees]);
 
@@ -963,30 +1054,36 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       stock: Math.round(newStock * 100) / 100,
     };
 
+    let persisted = updatedProduct;
     try {
-      const persisted = await upsertProduto(updatedProduct);
-      const movement: StockMovement = {
-        id: `mov-${Date.now()}`,
-        productId: prod.id,
-        productName: prod.name,
-        type,
-        quantity,
-        unit: prod.unit,
-        reason,
-        employeeName: currentUser.name,
-        timestamp: new Date().toISOString(),
-        previousStock: prod.stock,
-        newStock: persisted.stock,
-      };
+      persisted = await upsertProduto(updatedProduct);
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase adjustStock fallback to local:', err.message);
+    }
 
-      setData(prev => ({
+    const movement: StockMovement = {
+      id: `mov-${Date.now()}`,
+      productId: prod.id,
+      productName: prod.name,
+      type,
+      quantity,
+      unit: prod.unit,
+      reason,
+      employeeName: currentUser.name,
+      timestamp: new Date().toISOString(),
+      previousStock: prod.stock,
+      newStock: persisted.stock,
+    };
+
+    setData(prev => {
+      const nextState = {
         ...prev,
         products: prev.products.map(p => p.id === productId ? persisted : p),
         stockMovements: [movement, ...prev.stockMovements],
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao ajustar estoque no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, [currentUser.name, data.products]);
 
   // Register Fornada do Padeiro (Pão Quente)
@@ -1029,72 +1126,151 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       newStock,
     };
 
+    let persisted = { ...prod, stock: newStock };
     try {
-      const persisted = await upsertProduto({ ...prod, stock: newStock });
-      setData(prev => {
-        const next = {
-          ...prev,
-          products: prev.products.map(p => p.id === productId ? persisted : p),
-          stockMovements: [newMovement, ...prev.stockMovements],
-          fornadas: [newLog, ...(prev.fornadas || [])],
-        };
-        saveSystemStateDoc(next);
-        return next;
-      });
+      persisted = await upsertProduto(persisted);
     } catch (err: any) {
-      setDbError(`Erro ao registrar fornada: ${err.message}`);
+      console.warn('[Korisko] Supabase registerFornada fallback to local:', err.message);
     }
+
+    setData(prev => {
+      const next = {
+        ...prev,
+        products: prev.products.map(p => p.id === productId ? persisted : p),
+        stockMovements: [newMovement, ...prev.stockMovements],
+        fornadas: [newLog, ...(prev.fornadas || [])],
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, [currentUser.name, data.products]);
 
-  // Save Comanda
+  // Save / Confirm Comanda in Real Time (Routes to Setor Responsável + Admin Full Access)
   const saveComanda = useCallback((
     number: string,
     items: CartItem[],
     customerName?: string,
-    notes?: string
-  ) => {
+    notes?: string,
+    extraOptions?: {
+      customerId?: string;
+      customerPhone?: string;
+      status?: ComandaStatus;
+      setorResponsavel?: SetorResponsavel;
+      confirmedByCustomer?: boolean;
+      source?: 'pdv' | 'loja_online' | 'cliente_direto';
+    }
+  ): Comanda => {
+    const nowIso = new Date().toISOString();
+    const sectorInfo = resolveSetoresFromItems(items);
+    const totalBrl = (items || []).reduce(
+      (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
+      0
+    );
+
+    const existing = (data.openComandas || []).find(
+      c => c.number.trim().toLowerCase() === number.trim().toLowerCase()
+    );
+
+    const comandaObj: Comanda = {
+      id: existing?.id || `cmd-${Date.now()}`,
+      number: number.trim(),
+      customerId: extraOptions?.customerId || existing?.customerId,
+      customerName: customerName || existing?.customerName || 'Cliente Balcão',
+      customerPhone: extraOptions?.customerPhone || existing?.customerPhone,
+      items,
+      openedAt: existing?.openedAt || nowIso,
+      openedBy: existing?.openedBy || currentUser.name,
+      notes: notes ?? existing?.notes,
+      status: extraOptions?.status || existing?.status || 'confirmado',
+      setorResponsavel: extraOptions?.setorResponsavel || sectorInfo.primary,
+      setoresEnvolvidos: sectorInfo.all,
+      confirmedByCustomer: extraOptions?.confirmedByCustomer !== undefined
+        ? extraOptions.confirmedByCustomer
+        : true,
+      confirmedAt: existing?.confirmedAt || nowIso,
+      updatedAt: nowIso,
+      source: extraOptions?.source || existing?.source || 'pdv',
+      totalBrl,
+    };
+
+    // Sync to Supabase comandas table in real-time
+    upsertComandaDb(comandaObj).catch(() => {});
+
     setData(prev => {
       const existingIdx = (prev.openComandas || []).findIndex(
-        c => c.number.trim().toLowerCase() === number.trim().toLowerCase()
+        c => c.id === comandaObj.id || c.number.trim().toLowerCase() === number.trim().toLowerCase()
       );
-      const nowIso = new Date().toISOString();
       const updatedList = [...(prev.openComandas || [])];
 
       if (existingIdx >= 0) {
-        updatedList[existingIdx] = {
-          ...updatedList[existingIdx],
-          items,
-          customerName: customerName || updatedList[existingIdx].customerName,
-          notes: notes || updatedList[existingIdx].notes,
-        };
+        updatedList[existingIdx] = comandaObj;
       } else {
-        updatedList.unshift({
-          id: `cmd-${Date.now()}`,
-          number,
-          customerName,
-          items,
-          openedAt: nowIso,
-          openedBy: currentUser.name,
-          notes,
-        });
+        updatedList.unshift(comandaObj);
       }
 
       const next = {
         ...prev,
         openComandas: updatedList,
       };
+      StorageService.saveState(next);
       saveSystemStateDoc(next);
       return next;
     });
-  }, [currentUser.name]);
+
+    return comandaObj;
+  }, [currentUser.name, data.openComandas]);
+
+  // Update Comanda Status / Sector in Real Time (Admin has total access, sector operators can advance production)
+  const updateComandaStatus = useCallback((
+    comandaId: string,
+    status: ComandaStatus,
+    setorResponsavel?: SetorResponsavel
+  ) => {
+    const nowIso = new Date().toISOString();
+    setData(prev => {
+      const target = (prev.openComandas || []).find(c => c.id === comandaId || c.number === comandaId);
+      if (!target) return prev;
+
+      const updatedCmd: Comanda = {
+        ...target,
+        status,
+        setorResponsavel: setorResponsavel || target.setorResponsavel,
+        confirmedByCustomer: status === 'confirmado' ? true : target.confirmedByCustomer,
+        confirmedAt: status === 'confirmado' && !target.confirmedAt ? nowIso : target.confirmedAt,
+        updatedAt: nowIso,
+      };
+
+      upsertComandaDb(updatedCmd).catch(() => {});
+
+      const updatedList = (status === 'pago' || status === 'cancelado')
+        ? (prev.openComandas || []).filter(c => c.id !== target.id && c.number !== target.number)
+        : (prev.openComandas || []).map(c => (c.id === target.id || c.number === target.number) ? updatedCmd : c);
+
+      const next = {
+        ...prev,
+        openComandas: updatedList,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+  }, []);
 
   // Remove Comanda
   const removeComanda = useCallback((comandaId: string) => {
     setData(prev => {
+      const target = (prev.openComandas || []).find(
+        c => c.id === comandaId || c.number === comandaId
+      );
+      if (target) {
+        deleteComandaDb(target.id).catch(() => {});
+      }
       const updated = (prev.openComandas || []).filter(
         c => c.id !== comandaId && c.number !== comandaId
       );
       const next = { ...prev, openComandas: updated };
+      StorageService.saveState(next);
       saveSystemStateDoc(next);
       return next;
     });
@@ -1269,8 +1445,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   // CRM - Record Debt (Fiado/Faturamento) via REQUIREMENT 6 RPC
-  const recordCustomerDebt = useCallback(async (customerId: string, amountBrl: number, description: string, saleId?: string) => {
+  const recordCustomerDebt = useCallback(async (
+    customerId: string,
+    amountBrl: number,
+    description: string,
+    saleId?: string,
+    comandaNumber?: string,
+    setorResponsavel?: string
+  ) => {
     const nowIso = new Date().toISOString();
+    const resolvedSetor = setorResponsavel || 'Panificação & Confeitaria Artesanal';
     const entry: CustomerAccountEntry = {
       id: `entry-${Date.now()}`,
       customerId,
@@ -1279,6 +1463,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amountBrl: Math.round(amountBrl * 100) / 100,
       description,
       saleId,
+      comandaNumber,
+      setorResponsavel: resolvedSetor,
+      confirmedByCustomer: true,
       recordedBy: currentUser.name,
     };
 
@@ -1296,11 +1483,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     entry.resultingBalanceBrl = newBal;
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-      customerEntries: [entry, ...(prev.customerEntries || [])],
-    }));
+    setData(prev => {
+      const next = {
+        ...prev,
+        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        customerEntries: [entry, ...(prev.customerEntries || [])],
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, [currentUser.name, data.customers]);
 
   // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC
@@ -1315,6 +1507,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amountBrl: cleanAmount,
       description: `Amortização de fiado via ${method.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
       paymentMethod: method,
+      setorResponsavel: 'Caixa & Expedição',
+      confirmedByCustomer: true,
       recordedBy: currentUser.name,
     };
 
@@ -1332,11 +1526,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     entry.resultingBalanceBrl = newBal;
-    setData(prev => ({
-      ...prev,
-      customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
-      customerEntries: [entry, ...(prev.customerEntries || [])],
-    }));
+    setData(prev => {
+      const next = {
+        ...prev,
+        customers: (prev.customers || []).map(c => c.id === customerId ? { ...c, outstandingBalanceBrl: newBal } : c),
+        customerEntries: [entry, ...(prev.customerEntries || [])],
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
   }, [currentUser.name, data.customers]);
 
   // CRM - Redeem Loyalty Points
@@ -1387,6 +1586,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const nowIso = new Date().toISOString();
     const tempId = `sale-${Date.now()}`;
+    const sectorInfo = resolveSetoresFromItems(items);
+    const resolvedComandaNumber = comandaNumber || `CMD-${String(Date.now()).slice(-4)}`;
 
     // Prepare payload without sale_number (DB trigger generates it!)
     const salePayload = {
@@ -1402,7 +1603,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       changeGiven,
       customerId,
       customerName: resolvedCustomerName,
-      comandaNumber,
+      comandaNumber: resolvedComandaNumber,
+      setorResponsavel: sectorInfo.label,
+      confirmedByCustomer: true,
       status: 'completed' as const,
       registerSessionId: data.currentSession.id,
     };
@@ -1412,6 +1615,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       // REQUIREMENT 5: insert into vendas, trigger creates sale_number, returns data.sale_number
       persistedSale = await insertVenda(salePayload);
+      persistedSale = {
+        ...persistedSale,
+        comandaNumber: persistedSale.comandaNumber || resolvedComandaNumber,
+        setorResponsavel: persistedSale.setorResponsavel || sectorInfo.label,
+        confirmedByCustomer: true,
+      };
       syncedToCloud = true;
     } catch (err: any) {
       console.warn('[Korisko] Supabase insertVenda fallback to local storage:', err.message);
@@ -1473,8 +1682,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         date: new Date().toISOString(),
         type: 'debito_compra',
         amountBrl: fiadoAmountBrl,
-        description: `Venda #${persistedSale.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
+        description: `Venda #${persistedSale.saleNumber || 'PDV'} • Comanda #${resolvedComandaNumber} • Setor: ${sectorInfo.label}${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
         saleId: persistedSale.id,
+        comandaNumber: resolvedComandaNumber,
+        setorResponsavel: sectorInfo.label,
+        confirmedByCustomer: true,
         resultingBalanceBrl: newCustomerBal,
         recordedBy: currentUser.name,
       };
@@ -1501,6 +1713,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
       };
       StorageService.saveState(nextState);
+      if (fiadoAccountEntry) {
+        saveSystemStateDoc(nextState);
+      }
       return nextState;
     });
 
@@ -1511,7 +1726,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     return persistedSale;
-  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, removeComanda]);
+  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, data.sales, language, removeComanda, showToast]);
 
   // ==========================================
   // EXCLUIR VENDA - EXCLUSIVO DO ADMINISTRADOR
@@ -1691,13 +1906,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       await upsertCaixaSessao(newSession);
-      setData(prev => ({
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase openRegister fallback to local:', err.message);
+    }
+    setData(prev => {
+      const nextState = {
         ...prev,
         currentSession: newSession,
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao abrir caixa no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
   }, [currentUser.name, data.currentSession.sessionNumber]);
 
   const closeRegister = useCallback(async (
@@ -1715,14 +1934,18 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       await upsertCaixaSessao(closedSession);
-      setData(prev => ({
+    } catch (err: any) {
+      console.warn('[Korisko] Supabase closeRegister fallback to local:', err.message);
+    }
+    setData(prev => {
+      const nextState = {
         ...prev,
         currentSession: closedSession,
         sessionHistory: [closedSession, ...prev.sessionHistory],
-      }));
-    } catch (err: any) {
-      setDbError(`Erro ao fechar caixa no Supabase: ${err.message}`);
-    }
+      };
+      StorageService.saveState(nextState);
+      return nextState;
+    });
 
     return closedSession;
   }, [currentUser.name, data.currentSession]);
@@ -1956,6 +2179,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     redeemCustomerPoints,
     openComandas: data.openComandas || [],
     saveComanda,
+    updateComandaStatus,
     removeComanda,
     sales: data.sales,
     completeSale,
@@ -1995,7 +2219,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,
     executeProductionFromRecipe, addCustomer, updateCustomer, deleteCustomer,
     recordCustomerDebt, recordCustomerPayment, redeemCustomerPoints,
-    saveComanda, removeComanda, completeSale, deleteSale,
+    saveComanda, updateComandaStatus, removeComanda, completeSale, deleteSale,
     openRegister, closeRegister, recordSaidaCaixa, recordEntradaCaixa,
     recordSangria, recordSuprimento, getCurrentGoal, updateGoal,
     backupPoints, lastBackupTime, isCloudSyncing, createManualBackup,

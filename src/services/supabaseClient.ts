@@ -165,7 +165,30 @@ CREATE TABLE IF NOT EXISTS public.caixa_sessoes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. TABELAS DE ESTADO GLOBAL E BACKUP (Sincronização em tempo real do Frontend)
+-- 6. TABELA EM TEMPO REAL DE COMANDAS & PEDIDOS CONFIRMADOS POR SETOR (Table Editor -> comandas_pedidos)
+-- Quando o cliente confirma o pedido ou o caixa abre uma comanda, aparece instantaneamente para o Setor Responsável e Admin (Acesso Total).
+CREATE TABLE IF NOT EXISTS public.comandas_pedidos (
+  id TEXT PRIMARY KEY,
+  number TEXT NOT NULL,
+  order_number TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  sector TEXT NOT NULL DEFAULT 'panificacao', -- 'panificacao', 'confeitaria', 'salgados', 'cafeteria', 'expedicao', 'geral'
+  sectors JSONB DEFAULT '["panificacao"]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'confirmado', -- 'confirmado', 'em_preparo', 'pronto', 'entregue'
+  order_type TEXT DEFAULT 'mesa', -- 'mesa', 'balcao', 'entrega'
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  shipping_address JSONB DEFAULT '{}'::jsonb,
+  payment_method TEXT,
+  notes TEXT,
+  source TEXT DEFAULT 'loja_online', -- 'loja_online', 'pdv'
+  total_brl NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  opened_by TEXT DEFAULT 'Cliente Online',
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. TABELAS DE ESTADO GLOBAL E BACKUP (Sincronização em tempo real do Frontend)
 CREATE TABLE IF NOT EXISTS public.korisko_system_state (
   id TEXT PRIMARY KEY,
   data JSONB NOT NULL,
@@ -178,16 +201,17 @@ CREATE TABLE IF NOT EXISTS public.korisko_backup_points (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
+-- 8. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.caixa_sessoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comandas_pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_system_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_backup_points ENABLE ROW LEVEL SECURITY;
 
--- 8. POLÍTICAS DE ACESSO E PERMISSÕES RLS (100% OPERACIONAL PARA O PDV E GESTÃO)
+-- 9. POLÍTICAS DE ACESSO E PERMISSÕES RLS (ADMIN COM ACESSO TOTAL E SETORES EM TEMPO REAL)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'usuarios' AND policyname = 'Allow public access usuarios') THEN
@@ -210,6 +234,10 @@ BEGIN
     CREATE POLICY "Allow public access caixa_sessoes" ON public.caixa_sessoes FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'comandas_pedidos' AND policyname = 'Allow public access comandas_pedidos') THEN
+    CREATE POLICY "Allow public access comandas_pedidos" ON public.comandas_pedidos FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'korisko_system_state' AND policyname = 'Allow public access korisko_system_state') THEN
     CREATE POLICY "Allow public access korisko_system_state" ON public.korisko_system_state FOR ALL USING (true) WITH CHECK (true);
   END IF;
@@ -225,15 +253,21 @@ GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.clientes TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.vendas TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.caixa_sessoes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.comandas_pedidos TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_system_state TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_backup_points TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 9. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
--- Qualquer alteração de venda, caixa, estoque ou usuário é transmitida instantaneamente
--- via WebSockets para todos os celulares, tablets e computadores conectados.
+-- 10. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
+-- Qualquer confirmação de comanda/pedido, venda, caixa, estoque ou usuário é transmitida instantaneamente
+-- via WebSockets para todos os setores responsáveis e Admin.
 DO $$
 BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.comandas_pedidos;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.korisko_system_state;
   EXCEPTION WHEN duplicate_object THEN NULL;
@@ -270,7 +304,8 @@ BEGIN
   END;
 END $$;
 
--- 10. REPLICA IDENTITY FULL (Permite receber os dados completos no payload de tempo real)
+-- 11. REPLICA IDENTITY FULL (Permite receber os dados completos no payload de tempo real)
+ALTER TABLE public.comandas_pedidos REPLICA IDENTITY FULL;
 ALTER TABLE public.korisko_system_state REPLICA IDENTITY FULL;
 ALTER TABLE public.usuarios REPLICA IDENTITY FULL;
 ALTER TABLE public.produtos REPLICA IDENTITY FULL;

@@ -569,6 +569,36 @@ CREATE POLICY "Atividades CRM colaboradores" ON public.activities
   USING (public.is_admin_or_employee())
   WITH CHECK (public.is_admin_or_employee());
 
+-- 5.8. COMANDAS & PEDIDOS CONFIRMADOS POR SETOR EM TEMPO REAL
+CREATE TABLE IF NOT EXISTS public.comandas_pedidos (
+  id TEXT PRIMARY KEY,
+  number TEXT NOT NULL,
+  order_number TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  sector TEXT NOT NULL DEFAULT 'panificacao', -- 'panificacao', 'confeitaria', 'salgados', 'cafeteria', 'expedicao', 'geral'
+  sectors JSONB DEFAULT '["panificacao"]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'confirmado', -- 'confirmado', 'em_preparo', 'pronto', 'entregue'
+  order_type TEXT DEFAULT 'mesa', -- 'mesa', 'balcao', 'entrega'
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  shipping_address JSONB DEFAULT '{}'::jsonb,
+  payment_method TEXT,
+  notes TEXT,
+  source TEXT DEFAULT 'loja_online',
+  total_brl NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  opened_by TEXT DEFAULT 'Cliente Online',
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.comandas_pedidos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Comandas acesso tempo real setores e admin" ON public.comandas_pedidos;
+CREATE POLICY "Comandas acesso tempo real setores e admin" ON public.comandas_pedidos
+  FOR ALL TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
 -- ==============================================================================
 -- 6. PERMISSÕES DE ACESSO (GRANTS)
 -- ==============================================================================
@@ -586,6 +616,7 @@ GRANT ALL ON TABLE public.payments TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.deals TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.customer_notes TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.activities TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.comandas_pedidos TO anon, authenticated, service_role;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
@@ -595,7 +626,17 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, se
 DO $$
 BEGIN
   BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.comandas_pedidos;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.order_items;
   EXCEPTION WHEN duplicate_object THEN NULL;
   END;
 
@@ -609,3 +650,8 @@ BEGIN
   EXCEPTION WHEN duplicate_object THEN NULL;
   END;
 END $$;
+
+ALTER TABLE public.comandas_pedidos REPLICA IDENTITY FULL;
+ALTER TABLE public.orders REPLICA IDENTITY FULL;
+ALTER TABLE public.order_items REPLICA IDENTITY FULL;
+

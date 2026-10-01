@@ -28,6 +28,7 @@ import {
   Store
 } from 'lucide-react';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { resolveSetoresFromItems } from '../../lib/db';
 
 interface Props {
   onOpenAuth: (mode?: 'login' | 'register') => void;
@@ -36,7 +37,7 @@ interface Props {
 
 export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) => {
   const { user, profile, isAuthenticated, role } = useAuth();
-  const { products, language, t, completeSale } = useBakery();
+  const { products, language, t, completeSale, saveComanda } = useBakery();
 
   // Search & Categories
   const [searchQuery, setSearchQuery] = useState('');
@@ -243,18 +244,21 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
 
       let orderId = `ord-${Date.now()}`;
       let orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
+      const comandaNumber = `CMD-${orderNumber.replace('PED-', '')}`;
+
+      const saleItems = cart.map(it => ({
+        product: it.product,
+        quantity: it.quantity,
+        unitPriceBrl: it.unitPrice,
+        subtotalBrl: it.subtotal,
+        discountBrl: 0,
+        totalBrl: it.subtotal,
+      }));
+
+      const sectorInfo = resolveSetoresFromItems(saleItems);
 
       // 1. Integrar pedido diretamente ao sistema de vendas (PDV / Caixa / Live Sales)
       try {
-        const saleItems = cart.map(it => ({
-          product: it.product,
-          quantity: it.quantity,
-          unitPriceBrl: it.unitPrice,
-          subtotalBrl: it.subtotal,
-          discountBrl: 0,
-          totalBrl: it.subtotal,
-        }));
-
         const paymentMap: Record<string, 'dinheiro' | 'cartao_credito' | 'pix'> = {
           pix: 'pix',
           cartao_credito: 'cartao_credito',
@@ -280,6 +284,28 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
         );
       } catch (saleErr) {
         console.warn('[StoreView] Aviso ao registrar venda local:', saleErr);
+      }
+
+      // 1.5. Gerar Comanda Confirmada pelo Cliente em Tempo Real para o Setor Responsável e Admin
+      try {
+        saveComanda(
+          comandaNumber,
+          saleItems,
+          customerName.trim() || profile?.fullName || 'Cliente Loja Online',
+          notes.trim()
+            ? `${notes.trim()} • Endereço: ${street.trim()}, ${number.trim()} (${neighborhood.trim()})`
+            : `Pedido Online ${orderNumber} • Entrega: ${street.trim()}, ${number.trim()} (${neighborhood.trim()})`,
+          {
+            customerId: user?.id,
+            customerPhone: customerPhone.trim() || undefined,
+            status: 'confirmado',
+            setorResponsavel: sectorInfo.primary,
+            confirmedByCustomer: true,
+            source: 'loja_online',
+          }
+        );
+      } catch (cmdErr) {
+        console.warn('[StoreView] Aviso ao gerar comanda em tempo real:', cmdErr);
       }
 
       // 2. Tentar salvar nas tabelas remotas do Supabase (orders, order_items, payments)
@@ -326,6 +352,9 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
       const completedOrderObj: Order = {
         id: orderId,
         orderNumber,
+        comandaNumber,
+        setorResponsavel: sectorInfo.label,
+        confirmedByCustomer: true,
         customerId: user?.id,
         userId: user?.id,
         affiliateId: resolvedAffiliateId || undefined,
@@ -393,8 +422,8 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
               <span className="font-black text-base tracking-tight text-white block leading-tight">
                 {t.appName}
               </span>
-              <span className="text-[10px] text-amber-400 font-medium tracking-wide">
-                Padaria & Loja Online
+              <span className="text-[10px] text-amber-400 font-semibold tracking-wide block">
+                Panificação confeitaria artesanal
               </span>
             </div>
           </div>
@@ -917,18 +946,38 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-lg font-black text-white">Pedido Realizado com Sucesso!</h3>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
+                Korizko • Panificação confeitaria artesanal
+              </p>
+              <h3 className="text-lg font-black text-white">Pedido & Comanda Confirmados!</h3>
               <p className="text-xs text-neutral-400">
-                O seu pedido foi recebido pela nossa equipe de produção e está sendo preparado.
+                A sua comanda confirmada já foi enviada em tempo real para o setor responsável e para o painel do Administrador.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] text-xs font-mono space-y-1">
-              <p className="text-neutral-400">Número do Pedido:</p>
-              <p className="text-base font-bold text-amber-400">{completedOrder.orderNumber}</p>
-              <p className="text-neutral-300 font-mono-nums pt-1">
-                Total: {formatCurrency(completedOrder.total, 'PYG')}
-              </p>
+            <div className="p-3.5 rounded-xl bg-[#090D15] border border-[#1A2234] text-xs font-mono space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-400">Pedido:</span>
+                <span className="text-sm font-bold text-amber-400">{completedOrder.orderNumber}</span>
+              </div>
+              {completedOrder.comandaNumber && (
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Comanda Ativa:</span>
+                  <span className="text-sm font-bold text-emerald-400">#{completedOrder.comandaNumber}</span>
+                </div>
+              )}
+              {completedOrder.setorResponsavel && (
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Setor Responsável:</span>
+                  <span className="text-xs font-bold text-indigo-300">{completedOrder.setorResponsavel}</span>
+                </div>
+              )}
+              <div className="pt-1.5 border-t border-[#1A2234] flex items-center justify-between">
+                <span className="text-neutral-400">Total Confirmado:</span>
+                <span className="text-base font-extrabold text-white font-mono-nums">
+                  {formatCurrency(completedOrder.total, 'PYG')}
+                </span>
+              </div>
             </div>
 
             <button
@@ -939,7 +988,7 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
               }}
               className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors cursor-pointer"
             >
-              Acompanhar em Minha Conta
+              Acompanhar Comanda em Minha Conta
             </button>
           </div>
         </div>

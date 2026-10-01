@@ -19,13 +19,15 @@ import {
   Zap, 
   ShieldCheck,
   Menu,
-  Radio
+  Radio,
+  ClipboardList
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ExchangeRatesModal } from './modals/ExchangeRatesModal';
 import { SwitchEmployeeModal } from './modals/SwitchEmployeeModal';
 import { FornadaModal } from './modals/FornadaModal';
 import { DirectSaleModal } from './modals/DirectSaleModal';
+import { ComandasModal } from './modals/ComandasModal';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { LiveSalesStream } from './LiveSalesStream';
 
@@ -65,6 +67,7 @@ export const TopNav: React.FC<Props> = ({
   const [isFornadaOpen, setIsFornadaOpen] = useState(false);
   const [isDirectSaleOpen, setIsDirectSaleOpen] = useState(false);
   const [isStreamDrawerOpen, setIsStreamDrawerOpen] = useState(false);
+  const [isComandasOpen, setIsComandasOpen] = useState(false);
   
   // Quick Search Modal state (Command + K)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -126,8 +129,8 @@ export const TopNav: React.FC<Props> = ({
             <h1 className="text-sm sm:text-base font-bold text-white tracking-tight leading-none truncate">
               {currentTabInfo.title}
             </h1>
-            <p className="text-[11px] text-neutral-400 hidden sm:block mt-0.5 truncate">
-              {currentTabInfo.subtitle}
+            <p className="text-[11px] text-amber-400/90 font-medium hidden sm:block mt-0.5 truncate">
+              Korizko • Panificação confeitaria artesanal — {currentTabInfo.subtitle}
             </p>
           </div>
         </div>
@@ -177,6 +180,20 @@ export const TopNav: React.FC<Props> = ({
             </span>
             <Radio className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden xl:inline">{language === 'es' ? 'Flujo en Vivo' : 'Fluxo ao Vivo'}</span>
+          </button>
+
+          {/* Comandas & Setores em Tempo Real Button */}
+          <button
+            type="button"
+            onClick={() => setIsComandasOpen(true)}
+            className="flex px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition-all items-center gap-1.5 cursor-pointer"
+            title="Comandas Confirmadas & Setores Responsáveis em Tempo Real"
+          >
+            <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline">Comandas & Setores</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-neutral-950 text-[10px] font-extrabold">
+              {openComandas.length}
+            </span>
           </button>
 
           {/* Fornada Quente Action - hidden on mobile */}
@@ -362,6 +379,16 @@ export const TopNav: React.FC<Props> = ({
       <DirectSaleModal
         isOpen={isDirectSaleOpen}
         onClose={() => setIsDirectSaleOpen(false)}
+      />
+
+      {/* Real-Time Comandas & Setores Modal */}
+      <ComandasModal
+        isOpen={isComandasOpen}
+        onClose={() => setIsComandasOpen(false)}
+        onLoadComanda={() => {
+          setIsComandasOpen(false);
+          onSelectTab('pdv');
+        }}
       />
 
       {/* Live Sales Stream Drawer Modal (Slide-over) */}

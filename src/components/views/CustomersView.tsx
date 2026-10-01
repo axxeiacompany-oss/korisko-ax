@@ -354,6 +354,9 @@ export const CustomersView: React.FC = () => {
         amountBrl: amount,
         description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
         saleId: s.id,
+        comandaNumber: s.comandaNumber,
+        setorResponsavel: s.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: true,
         recordedBy: s.employeeName || 'Operador',
       });
     });
@@ -366,13 +369,16 @@ export const CustomersView: React.FC = () => {
         type: 'debito_compra',
         amountBrl: customer.outstandingBalanceBrl,
         description: 'Saldo devedor anterior acumulado',
+        setorResponsavel: 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: true,
         recordedBy: 'Sistema',
       });
     }
 
     const sorted = [...mergedEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
-    let text = `🥖 *PADARIA & CONFEITARIA KORISKO*\n`;
+    let text = `🥖 *KORIZKO*\n`;
+    text += `*Panificação confeitaria artesanal*\n`;
     text += `📄 *EXTRATO DE CONTA & FIADO (₲ PYG)*\n`;
     text += `--------------------------------\n`;
     text += `👤 *Cliente:* ${customer.name}\n`;
@@ -393,8 +399,11 @@ export const CustomersView: React.FC = () => {
         const d = new Date(entry.date).toLocaleDateString('pt-BR');
         const sign = isDebit ? '[+] Débito' : '[-] Amortização';
         const saleRef = entry.saleId ? (sales || []).find(s => s.id === entry.saleId) : null;
+        const cmdNum = entry.comandaNumber || saleRef?.comandaNumber;
+        const setor = entry.setorResponsavel || saleRef?.setorResponsavel || 'Panificação & Confeitaria Artesanal';
         text += `${sign} (${d}): ${isDebit ? '' : '-'}${formatCurrency(entry.amountBrl, 'PYG')}\n`;
         text += `   ↳ ${entry.description}\n`;
+        text += `   ↳ ${cmdNum ? `Comanda Confirmada: #${cmdNum} | ` : ''}Setor: ${setor}\n`;
         if (saleRef && Array.isArray(saleRef.items) && saleRef.items.length > 0) {
           saleRef.items.forEach(it => {
             const unit = it.product?.unit || (it as any).unit || 'un';
@@ -409,7 +418,7 @@ export const CustomersView: React.FC = () => {
     text += `--------------------------------\n`;
     text += `🔑 *Chave PIX da Padaria:*\n`;
     text += `E-mail / Chave: axxeiacompany@gmail.com\n\n`;
-    text += `Agradecemos a confiança e preferência! ☕`;
+    text += `*Korizko • Panificação confeitaria artesanal* ☕`;
     return text;
   };
 
@@ -488,6 +497,9 @@ export const CustomersView: React.FC = () => {
         amountBrl: amount,
         description: `Venda #${s.saleNumber || 'PDV'} no Fiado${itemsSummary ? ` (${itemsSummary})` : ''}`,
         saleId: s.id,
+        comandaNumber: s.comandaNumber,
+        setorResponsavel: s.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: true,
         recordedBy: s.employeeName || 'Operador',
       });
     });
@@ -500,6 +512,8 @@ export const CustomersView: React.FC = () => {
         type: 'debito_compra',
         amountBrl: statementCustomer.outstandingBalanceBrl,
         description: 'Saldo devedor anterior acumulado',
+        setorResponsavel: 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: true,
         recordedBy: 'Sistema',
       });
     }
@@ -1314,10 +1328,10 @@ export const CustomersView: React.FC = () => {
                 <div className="p-6 bg-white text-neutral-950 font-mono text-xs selection:bg-neutral-200" id="printable-receipt">
                   
                   {/* Header */}
-                  <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
-                    <h3 className="text-base font-bold tracking-tight uppercase">KORIZKO</h3>
-                    <p className="text-[10px] text-neutral-500">Câmbio Multi-Moeda BRL · PYG · USD</p>
-                    <p className="text-[10px] text-neutral-500">CNPJ: 12.345.678/0001-90</p>
+                  <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-0.5">
+                    <h3 className="text-base font-extrabold tracking-tight uppercase">KORIZKO</h3>
+                    <p className="text-[11px] font-bold text-neutral-800">Panificação confeitaria artesanal</p>
+                    <p className="text-[10px] text-neutral-500">Extrato de Conta & Comandas • Guaraní (₲ PYG)</p>
                   </div>
 
                   {/* Details block */}
@@ -1325,6 +1339,10 @@ export const CustomersView: React.FC = () => {
                     <div className="flex justify-between">
                       <span>EXTRATO DE CONTA & FIADO:</span>
                       <span className="font-bold">#{statementCustomer.id.slice(-4).toUpperCase() || '25'}</span>
+                    </div>
+                    <div className="flex justify-between text-neutral-600">
+                      <span>UNIDADE / SETOR:</span>
+                      <span className="font-bold text-neutral-900">Panificação confeitaria artesanal</span>
                     </div>
                     <div className="flex justify-between text-neutral-600">
                       <span>DATA/HORA:</span>
@@ -1343,7 +1361,7 @@ export const CustomersView: React.FC = () => {
                   {/* Items Table */}
                   <div className="py-3 border-b border-dashed border-neutral-300 space-y-2">
                     <div className="text-[10px] uppercase font-bold text-neutral-500 flex justify-between">
-                      <span>ITEM / QTD × PREÇO</span>
+                      <span>ITEM / COMANDA / SETOR</span>
                       <span>TOTAL</span>
                     </div>
 
@@ -1356,6 +1374,8 @@ export const CustomersView: React.FC = () => {
                         filteredStatementEntries.map((entry) => {
                           const isDebit = entry.type === 'debito_compra';
                           const entrySale = entry.saleId ? sales.find(s => s.id === entry.saleId) : null;
+                          const cmdNum = entry.comandaNumber || entrySale?.comandaNumber;
+                          const setor = entry.setorResponsavel || entrySale?.setorResponsavel || 'Panificação & Confeitaria Artesanal';
                           const entryDate = new Date(entry.date).toLocaleString('pt-BR', {
                             day: '2-digit',
                             month: '2-digit',
@@ -1378,6 +1398,12 @@ export const CustomersView: React.FC = () => {
                                     ? entry.description
                                     : `Amortização: ${entry.description}`
                                 )}
+                              </div>
+
+                              {/* Comanda Confirmada & Setor Responsável */}
+                              <div className="flex flex-wrap items-center justify-between text-[10px] text-neutral-700 font-semibold bg-neutral-100 px-1.5 py-0.5 rounded">
+                                <span>{cmdNum ? `Comanda Confirmada: #${cmdNum}` : 'Pedido Confirmado'}</span>
+                                <span>Setor: {setor}</span>
                               </div>
 
                               {/* If sale items exist, list each item with quantity, unit and price */}
@@ -1761,6 +1787,16 @@ export const CustomersView: React.FC = () => {
                                 {isDebit ? 'Débito / Fiado' : 'Amortização'}
                               </span>
 
+                              {(entry.comandaNumber || entrySale?.comandaNumber) && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                  Comanda #{entry.comandaNumber || entrySale?.comandaNumber} (Confirmada)
+                                </span>
+                              )}
+
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                Setor: {entry.setorResponsavel || entrySale?.setorResponsavel || 'Panificação & Confeitaria Artesanal'}
+                              </span>
+
                               {entry.paymentMethod && (
                                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#141C2E] text-sky-300 border border-sky-500/20 uppercase">
                                   {entry.paymentMethod}
@@ -1874,8 +1910,9 @@ export const CustomersView: React.FC = () => {
 
             <div className="p-4 rounded-xl bg-[#070A11] border border-[#1C2538] space-y-2.5 text-xs">
               <div className="text-center pb-2 border-b border-neutral-800">
-                <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">Padaria & Confeitaria Korisko</span>
-                <span className="font-bold text-white text-sm block mt-0.5">
+                <span className="text-xs text-white font-black uppercase tracking-wider block">KORIZKO</span>
+                <span className="text-[10px] text-amber-400 font-bold tracking-wide block">Panificação confeitaria artesanal</span>
+                <span className="font-bold text-neutral-200 text-xs block mt-1">
                   {entryForReceipt.type === 'debito_compra' ? 'Comprovante de Débito / Fiado' : 'Recibo de Amortização'}
                 </span>
               </div>
@@ -1895,6 +1932,18 @@ export const CustomersView: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-neutral-400">Operador:</span>
                 <span className="text-neutral-200">{entryForReceipt.recordedBy}</span>
+              </div>
+
+              {entryForReceipt.comandaNumber && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-400">Comanda Confirmada:</span>
+                  <span className="font-bold text-amber-400">#{entryForReceipt.comandaNumber}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span className="text-neutral-400">Setor Responsável:</span>
+                <span className="font-bold text-indigo-300">{entryForReceipt.setorResponsavel || 'Panificação & Confeitaria Artesanal'}</span>
               </div>
 
               {entryForReceipt.paymentMethod && (
@@ -1953,9 +2002,9 @@ export const CustomersView: React.FC = () => {
       {statementCustomer && (
         <div className="print-only hidden p-6 text-black bg-white max-w-2xl mx-auto font-sans">
           <div className="text-center pb-4 border-b border-black mb-4">
-            <h1 className="text-xl font-bold uppercase tracking-wide">Padaria & Confeitaria Korisko</h1>
-            <p className="text-xs">Sistema Integrado de Gestão & Contas a Receber</p>
-            <p className="text-xs text-neutral-600">Telefone / WhatsApp: (45) 99123-4567 · Foz do Iguaçu - PR</p>
+            <h1 className="text-xl font-extrabold uppercase tracking-wide">KORIZKO</h1>
+            <p className="text-sm font-bold">Panificação confeitaria artesanal</p>
+            <p className="text-xs text-neutral-600">Sistema Integrado de Gestão, Comandas em Tempo Real & Contas a Receber</p>
             <h2 className="text-sm font-bold uppercase mt-2 border-t border-b border-black py-1">
               Extrato de Conta Corrente & Fiado
             </h2>

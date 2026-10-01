@@ -197,8 +197,8 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
   es: {
     // Brand & Slogan
     appName: 'Korizko',
-    appSlogan: '',
-    systemDescription: 'Sistema Integrado de Gestión & PDV',
+    appSlogan: 'Panificação confeitaria artesanal',
+    systemDescription: 'Panificação confeitaria artesanal • Gestão & PDV',
 
     // Language selector
     language: 'Idioma',
@@ -390,8 +390,8 @@ export const translations: Record<AppLanguage, I18nDictionary> = {
   pt: {
     // Brand & Slogan
     appName: 'Korizko',
-    appSlogan: '',
-    systemDescription: 'Sistema Integrado de Gestão & PDV',
+    appSlogan: 'Panificação confeitaria artesanal',
+    systemDescription: 'Panificação confeitaria artesanal • Gestão & PDV',
 
     // Language selector
     language: 'Idioma',

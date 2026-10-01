@@ -3,6 +3,7 @@ import { Sale } from '../../types';
 import { formatCurrency } from '../../utils/currency';
 import { Printer, X, Check, Share2, Copy, Trash2 } from 'lucide-react';
 import { useBakery } from '../../context/BakeryContext';
+import { resolveSetoresFromItems } from '../../lib/db';
 import { DeleteSaleModal } from './DeleteSaleModal';
 
 interface Props {
@@ -17,6 +18,8 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   if (!sale) return null;
+
+  const sectorLabel = sale.setorResponsavel || resolveSetoresFromItems(sale.items || []).label;
 
   const handlePrint = () => {
     window.print();
@@ -33,10 +36,13 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
 
   const getReceiptPlainText = () => {
     let text = `⚡ *KORIZKO*\n`;
-    text += `Cupom da Venda #${sale.saleNumber}\n`;
+    text += `*Panificação confeitaria artesanal*\n`;
+    text += `Extrato / Cupom da Venda #${sale.saleNumber}\n`;
+    if (sale.comandaNumber) text += `Comanda Confirmada: #${sale.comandaNumber}\n`;
+    text += `Setor Responsável: ${sectorLabel}\n`;
     text += `Data: ${formattedDate}\n`;
     text += `Operador: ${sale.employeeName}\n`;
-    if (sale.customerName) text += `Cliente: ${sale.customerName}\n`;
+    if (sale.customerName) text += `Cliente: ${sale.customerName} (Pedido Confirmado)\n`;
     text += `--------------------------------\n`;
     (sale.items || []).forEach(it => {
       const name = it.product?.name || (it as any).name || 'Produto';
@@ -47,7 +53,7 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
     });
     text += `--------------------------------\n`;
     text += `*TOTAL: ₲ ${Math.round(sale.totalBrl).toLocaleString('es-PY')}*\n`;
-    text += `Obrigado pela preferência!`;
+    text += `Korizko • Panificação confeitaria artesanal`;
     return text;
   };
 
@@ -86,7 +92,10 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
 
         {/* Top actions bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-neutral-950/60 no-print">
-          <span className="text-xs font-semibold text-neutral-300">Cupom Não-Fiscal</span>
+          <div>
+            <span className="text-xs font-bold text-white block leading-none">Korizko • Extrato & Cupom</span>
+            <span className="text-[10px] text-amber-400 font-medium">Panificação confeitaria artesanal</span>
+          </div>
           <div className="flex items-center gap-1.5">
             {isAdmin && (
               <button
@@ -130,9 +139,10 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
         <div className="p-6 bg-white text-neutral-950 font-mono text-xs selection:bg-neutral-200" id="printable-receipt">
           
           {/* Header */}
-          <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
-            <h3 className="text-base font-bold tracking-tight uppercase">PADARIA KORISKO</h3>
-            <p className="text-[10px] text-neutral-500">Comprobante de Venta • Guaraní (₲ PYG)</p>
+          <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-0.5">
+            <h3 className="text-base font-extrabold tracking-tight uppercase">KORIZKO</h3>
+            <p className="text-[11px] font-bold text-neutral-800">Panificação confeitaria artesanal</p>
+            <p className="text-[10px] text-neutral-500">Extrato & Comprovante • Guaraní (₲ PYG)</p>
           </div>
 
           {/* Sale details */}
@@ -142,11 +152,19 @@ export const ReceiptModal: React.FC<Props> = ({ sale, onClose }) => {
               <span className="font-bold">#{sale.saleNumber}</span>
             </div>
             {sale.comandaNumber && (
-              <div className="flex justify-between text-neutral-800 font-bold">
-                <span>COMANDA / MESA:</span>
+              <div className="flex justify-between text-neutral-900 font-bold">
+                <span>COMANDA CONFIRMADA:</span>
                 <span>#{sale.comandaNumber}</span>
               </div>
             )}
+            <div className="flex justify-between text-neutral-800 font-semibold">
+              <span>SETOR RESPONSÁVEL:</span>
+              <span className="text-right">{sectorLabel}</span>
+            </div>
+            <div className="flex justify-between text-neutral-600">
+              <span>STATUS DO PEDIDO:</span>
+              <span className="font-bold text-emerald-700">CONFIRMADO PELO CLIENTE</span>
+            </div>
             <div className="flex justify-between text-neutral-600">
               <span>DATA/HORA:</span>
               <span>{formattedDate}</span>

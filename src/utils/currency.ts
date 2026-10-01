@@ -22,6 +22,10 @@ export function formatCurrency(amount: number, _currency?: Currency): string {
   }).format(roundedPyg)}`;
 }
 
+export function formatBrl(amount: number): string {
+  return formatCurrency(amount, 'PYG');
+}
+
 /**
  * Moeda base nativa: Guaraní (PYG) 1:1
  */
