@@ -116,6 +116,9 @@ async function initPostgres() {
       ssl: isLocalhost ? false : { rejectUnauthorized: false },
       connectionTimeoutMillis: 8000,
     });
+    pool.on('error', (err) => {
+      console.warn('[Korisko DB] PostgreSQL client error notice:', err.message);
+    });
 
     const client = await pool.connect();
     console.log('[Korisko DB] Conexão PostgreSQL estabelecida com sucesso!');
