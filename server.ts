@@ -584,6 +584,34 @@ app.get(['/assets/index-*.js', '*/index-*.js'], (_req, res, next) => {
 });
 
 async function start() {
+  // Ensure generated Combo 3 Brownies image is synced to public/images/products/combo-brownies.jpg and dist/
+  try {
+    const generatedComboImg = path.resolve(process.cwd(), 'src', 'assets', 'images', 'combo_tres_brownies_1790886603094.jpg');
+    if (fs.existsSync(generatedComboImg)) {
+      const publicTarget = path.resolve(process.cwd(), 'public', 'images', 'products', 'combo-brownies.jpg');
+      fs.mkdirSync(path.dirname(publicTarget), { recursive: true });
+      fs.copyFileSync(generatedComboImg, publicTarget);
+
+      const distTarget = path.resolve(process.cwd(), 'dist', 'images', 'products', 'combo-brownies.jpg');
+      if (fs.existsSync(path.resolve(process.cwd(), 'dist'))) {
+        fs.mkdirSync(path.dirname(distTarget), { recursive: true });
+        fs.copyFileSync(generatedComboImg, distTarget);
+      }
+    }
+  } catch (imgErr) {
+    console.warn('[Korisko Server] Image sync notice:', imgErr);
+  }
+
+  // Always serve /src/assets/images and /images/products directly
+  const srcAssetsImagesDir = path.resolve(process.cwd(), 'src', 'assets', 'images');
+  if (fs.existsSync(srcAssetsImagesDir)) {
+    app.use('/src/assets/images', express.static(srcAssetsImagesDir));
+  }
+  const publicProductsDir = path.resolve(process.cwd(), 'public', 'images', 'products');
+  if (fs.existsSync(publicProductsDir)) {
+    app.use('/images/products', express.static(publicProductsDir));
+  }
+
   if (isProduction) {
     const distPath = path.resolve(process.cwd(), 'dist');
     if (fs.existsSync(distPath)) {

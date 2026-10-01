@@ -338,7 +338,15 @@ export const PdvView: React.FC = () => {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                           loading="lazy"
                           onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
+                            const target = e.target as HTMLImageElement;
+                            if (!target.dataset.fallbackTried) {
+                              target.dataset.fallbackTried = 'true';
+                              if ((p.name || '').toLowerCase().includes('combo') || p.id === 'prod-combo-brownies') {
+                                target.src = '/images/products/combo-brownies.jpg?v=2';
+                                return;
+                              }
+                            }
+                            target.style.display = 'none';
                           }}
                         />
                       </div>

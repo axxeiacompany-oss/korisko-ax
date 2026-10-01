@@ -83,6 +83,11 @@ export function resolveSetoresFromItems(items: CartItem[]): {
 // ROW MAPPERS (App Model <-> Supabase DB Row)
 // ==========================================
 
+const COMBO_BROWNIES_IMG_URL = new URL('../assets/images/combo_tres_brownies_1790886603094.jpg', import.meta.url).href;
+const CUCA_ALEMA_IMG_URL = new URL('../assets/images/cuca_alema_1790871174001.jpg', import.meta.url).href;
+const BOLO_PUDIM_IMG_URL = new URL('../assets/images/bolo_pudim_1790871189081.jpg', import.meta.url).href;
+const BROWNIE_UNIT_IMG_URL = new URL('../assets/images/brownie_cacau_1790871201216.jpg', import.meta.url).href;
+
 export function resolveProductImageUrl(input: {
   id?: string;
   code?: string;
@@ -101,22 +106,49 @@ export function resolveProductImageUrl(input: {
     code === 'CONF-013' ||
     slug.includes('combo-3-brownies') ||
     (name.includes('combo') && name.includes('brownie')) ||
-    rawUrl === '/images/products/combo-brownies.jpg'
+    name.includes('3 brownies') ||
+    (rawUrl && rawUrl.includes('combo-brownies')) ||
+    (rawUrl && rawUrl.includes('combo_tres_brownies'))
   ) {
-    return '/src/assets/images/combo_tres_brownies_1790886603094.jpg';
+    return COMBO_BROWNIES_IMG_URL;
+  }
+
+  if (
+    id === 'prod-cuca-alema' ||
+    code === 'CONF-010' ||
+    (name.includes('cuca') && name.includes('alem')) ||
+    (rawUrl && rawUrl.includes('cuca-alema'))
+  ) {
+    return CUCA_ALEMA_IMG_URL;
+  }
+
+  if (
+    id === 'prod-bolo-pudim' ||
+    code === 'CONF-011' ||
+    (name.includes('bolo') && name.includes('pudim')) ||
+    (rawUrl && rawUrl.includes('bolo-pudim'))
+  ) {
+    return BOLO_PUDIM_IMG_URL;
+  }
+
+  if (
+    id === 'prod-brownie-70' ||
+    code === 'CONF-012' ||
+    (name.includes('brownie') && !name.includes('combo')) ||
+    (rawUrl && rawUrl.includes('brownie-70-cacau'))
+  ) {
+    return BROWNIE_UNIT_IMG_URL;
   }
 
   return rawUrl;
 }
 
 export function productToRow(p: Product) {
-  const resolvedImage = resolveProductImageUrl({
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    slug: p.slug,
-    imageUrl: p.imageUrl,
-  });
+  const isComboBrownie =
+    p.id === 'prod-combo-brownies' ||
+    p.code === 'CONF-013' ||
+    (p.name || '').toLowerCase().includes('combo');
+
   return {
     id: p.id,
     code: p.code || '',
@@ -128,7 +160,7 @@ export function productToRow(p: Product) {
     min_stock: Number(p.minStock) || 0,
     unit: p.unit || 'un',
     active: p.active !== false,
-    image_url: resolvedImage || null,
+    image_url: isComboBrownie ? '/images/products/combo-brownies.jpg?v=2' : (p.imageUrl || null),
     description: p.description || null,
     slug: p.slug || null,
     compare_at_price: p.compareAtPrice ? Number(p.compareAtPrice) : null,
