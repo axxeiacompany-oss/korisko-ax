@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { KorizkoEmblem } from '../KorizkoLogo';
-import { resolveSetoresFromItems } from '../../lib/db';
+import { resolveSetoresFromItems, resolveProductImageUrl } from '../../lib/db';
 
 interface Props {
   onOpenAuth: (mode?: 'login' | 'register') => void;
@@ -553,11 +553,12 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
               >
                 <div>
                   {/* Product Image Banner */}
-                  {p.imageUrl ? (
+                  {resolveProductImageUrl(p) ? (
                     <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-neutral-950 mb-3 border border-neutral-800/80">
                       <img
-                        src={p.imageUrl}
+                        src={resolveProductImageUrl(p)}
                         alt={p.name}
+                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"
                         onError={(e) => {

@@ -100,7 +100,7 @@ INSERT INTO public.produtos (
     3,
     'un',
     true,
-    '/images/products/combo-brownies.jpg',
+    '/src/assets/images/combo_tres_brownies_1790886603094.jpg',
     'Combo promocional com 3 unidades do brownie 70% cacau. Economize ₲ 10.000!',
     'combo-3-brownies-70-cacau',
     60000, -- De ₲ 60.000 por ₲ 50.000

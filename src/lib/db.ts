@@ -83,7 +83,40 @@ export function resolveSetoresFromItems(items: CartItem[]): {
 // ROW MAPPERS (App Model <-> Supabase DB Row)
 // ==========================================
 
+export function resolveProductImageUrl(input: {
+  id?: string;
+  code?: string;
+  name?: string;
+  slug?: string;
+  imageUrl?: string | null;
+}): string | undefined {
+  const id = (input.id || '').toLowerCase();
+  const code = (input.code || '').toUpperCase();
+  const name = (input.name || '').toLowerCase();
+  const slug = (input.slug || '').toLowerCase();
+  const rawUrl = input.imageUrl || undefined;
+
+  if (
+    id === 'prod-combo-brownies' ||
+    code === 'CONF-013' ||
+    slug.includes('combo-3-brownies') ||
+    (name.includes('combo') && name.includes('brownie')) ||
+    rawUrl === '/images/products/combo-brownies.jpg'
+  ) {
+    return '/src/assets/images/combo_tres_brownies_1790886603094.jpg';
+  }
+
+  return rawUrl;
+}
+
 export function productToRow(p: Product) {
+  const resolvedImage = resolveProductImageUrl({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    slug: p.slug,
+    imageUrl: p.imageUrl,
+  });
   return {
     id: p.id,
     code: p.code || '',
@@ -95,7 +128,7 @@ export function productToRow(p: Product) {
     min_stock: Number(p.minStock) || 0,
     unit: p.unit || 'un',
     active: p.active !== false,
-    image_url: p.imageUrl || null,
+    image_url: resolvedImage || null,
     description: p.description || null,
     slug: p.slug || null,
     compare_at_price: p.compareAtPrice ? Number(p.compareAtPrice) : null,
@@ -104,6 +137,13 @@ export function productToRow(p: Product) {
 }
 
 export function rowToProduct(r: any): Product {
+  const resolvedImage = resolveProductImageUrl({
+    id: String(r.id || ''),
+    code: r.code || '',
+    name: r.name || '',
+    slug: r.slug || '',
+    imageUrl: r.image_url,
+  });
   return {
     id: String(r.id),
     code: r.code || '',
@@ -115,7 +155,7 @@ export function rowToProduct(r: any): Product {
     minStock: Number(r.min_stock) || 0,
     unit: r.unit || 'un',
     active: r.active !== false,
-    imageUrl: r.image_url || undefined,
+    imageUrl: resolvedImage,
     description: r.description || undefined,
     slug: r.slug || undefined,
     compareAtPrice: r.compare_at_price != null ? Number(r.compare_at_price) : undefined,

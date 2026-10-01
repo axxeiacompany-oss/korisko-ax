@@ -61,6 +61,7 @@ import {
   deleteComandaDb,
   rowToComanda,
   resolveSetoresFromItems,
+  resolveProductImageUrl,
   formatSetorName,
   listLancamentosFiado,
   upsertLancamentoFiadoDb,
@@ -400,12 +401,22 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isMounted) return;
 
         setData(prev => {
-          // Merge products
-          const products = dbProducts.length > 0 
+          // Merge products & ensure Combo 3 Brownies 70% Cacau photo is resolved
+          const rawProducts = dbProducts.length > 0 
             ? dbProducts 
             : (dbExtra?.products && dbExtra.products.length > 0 
               ? dbExtra.products 
               : (serverFallback?.products && serverFallback.products.length > 0 ? serverFallback.products : prev.products));
+
+          const products = (rawProducts || []).map(p => {
+            const resolvedImg = resolveProductImageUrl(p);
+            if (resolvedImg && resolvedImg !== p.imageUrl) {
+              const updatedProd = { ...p, imageUrl: resolvedImg };
+              upsertProduto(updatedProd).catch(() => {});
+              return updatedProd;
+            }
+            return p;
+          });
 
           // Merge customers
           const customers = dbCustomers.length > 0 

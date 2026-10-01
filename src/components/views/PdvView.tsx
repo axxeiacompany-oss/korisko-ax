@@ -23,6 +23,7 @@ import { ReceiptModal } from '../modals/ReceiptModal';
 import { FornadaModal } from '../modals/FornadaModal';
 import { ComandasModal } from '../modals/ComandasModal';
 import { DirectSaleModal } from '../modals/DirectSaleModal';
+import { resolveProductImageUrl } from '../../lib/db';
 
 export const PdvView: React.FC = () => {
   const { products, exchangeRates, openComandas, t, language } = useBakery();
@@ -328,11 +329,12 @@ export const PdvView: React.FC = () => {
                   }`}
                 >
                   <div>
-                    {p.imageUrl && (
+                    {resolveProductImageUrl(p) && (
                       <div className="w-full h-24 rounded-xl overflow-hidden mb-2 bg-neutral-950 border border-neutral-800/80">
                         <img
-                          src={p.imageUrl}
+                          src={resolveProductImageUrl(p)}
                           alt={p.name}
+                          referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                           loading="lazy"
                           onError={(e) => {

@@ -62,7 +62,7 @@
       "minStock": 3,
       "unit": "un",
       "active": true,
-      "imageUrl": "/images/products/combo-brownies.jpg",
+      "imageUrl": "/src/assets/images/combo_tres_brownies_1790886603094.jpg",
       "description": "Combo promocional com 3 unidades do brownie 70% cacau. Economize ₲ 10.000!",
       "slug": "combo-3-brownies-70-cacau",
       "featured": true
