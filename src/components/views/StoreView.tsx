@@ -505,33 +505,6 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6">
-        
-        {/* Hero Section */}
-        <div className="p-6 sm:p-10 rounded-3xl bg-gradient-to-r from-[#111624] via-[#0E1422] to-[#161B2E] border border-[#1E293E] shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl text-center md:text-left z-10">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/30 text-amber-300">
-              <Sparkles className="w-3.5 h-3.5 fill-current" /> Pães Quentes & Produtos Artesanais
-            </span>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              Sabor Tradicional & Entrega Rápida
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-              Faça seu pedido online e receba pães fresquinhos, bolos caseiros, salgados gourmet e lanches direto na sua mesa.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 z-10">
-            <div className="p-4 rounded-2xl bg-[#080B12]/80 border border-[#1E283E] text-center space-y-1">
-              <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono-nums">🇵🇾 ₲</span>
-              <span className="text-[10px] text-neutral-400 block uppercase font-bold">Guaraní Oficial</span>
-            </div>
-            <div className="p-4 rounded-2xl bg-[#080B12]/80 border border-[#1E283E] text-center space-y-1">
-              <Clock className="w-5 h-5 text-emerald-400 mx-auto" />
-              <span className="text-[10px] text-neutral-400 block uppercase font-bold">Pronta Entrega</span>
-            </div>
-          </div>
-        </div>
-
         {/* Mobile Search */}
         <div className="md:hidden">
           <div className="relative w-full">

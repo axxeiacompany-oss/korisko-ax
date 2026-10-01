@@ -255,7 +255,7 @@ export const AuthView: React.FC<Props> = ({
             <span className="font-bold text-base tracking-tight text-white">
               {t.appName}
             </span>
-            <span className="text-[11px] text-neutral-400">Plataforma Unificada</span>
+            <span className="text-[11px] text-amber-400 font-medium">Panificação confeitaria artesanal</span>
           </div>
         </div>
 
@@ -502,23 +502,12 @@ export const AuthView: React.FC<Props> = ({
 
           </div>
 
-          {/* Dica de segurança */}
-          <div className="text-center text-xs text-neutral-500 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Autenticação protegida por Supabase Auth & RLS</span>
-          </div>
-
         </div>
       </main>
 
       {/* Footer minimalista */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-[#141A28] text-neutral-500 text-xs">
-        <p>© 2026 {t.appName}. Todos os direitos reservados.</p>
-        <div className="flex items-center gap-4 text-[11px]">
-          <span className="text-neutral-400">Ambiente Seguro</span>
-          <span aria-hidden="true">·</span>
-          <span>Acesso Unificado</span>
-        </div>
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-center gap-2 border-t border-[#141A28] text-neutral-500 text-xs">
+        <p>© 2026 {t.appName} • Panificação confeitaria artesanal. Todos os direitos reservados.</p>
       </footer>
 
     </div>
