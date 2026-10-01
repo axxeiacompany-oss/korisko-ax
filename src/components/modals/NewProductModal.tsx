@@ -19,9 +19,9 @@ export const NewProductModal: React.FC<Props> = ({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [category, setCategory] = useState<ProductCategory>('paes');
-  const [priceBrl, setPriceBrl] = useState('15.00');
-  const [costPriceBrl, setCostPriceBrl] = useState('5.00');
-  const [stock, setStock] = useState('10');
+  const [priceBrl, setPriceBrl] = useState('18000');
+  const [costPriceBrl, setCostPriceBrl] = useState('6000');
+  const [stock, setStock] = useState('20');
   const [minStock, setMinStock] = useState('5');
   const [unit, setUnit] = useState<'un' | 'kg' | 'g' | 'pct' | 'l'>('un');
   const [isIngredient, setIsIngredient] = useState(false);
@@ -43,8 +43,8 @@ export const NewProductModal: React.FC<Props> = ({
       setName('');
       setCode(`PAN-${Math.floor(100 + Math.random() * 900)}`);
       setCategory('paes');
-      setPriceBrl('18.00');
-      setCostPriceBrl('6.00');
+      setPriceBrl('18000');
+      setCostPriceBrl('6000');
       setStock('20');
       setMinStock('5');
       setUnit('un');

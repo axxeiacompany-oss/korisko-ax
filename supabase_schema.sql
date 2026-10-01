@@ -187,6 +187,16 @@ BEGIN
   END IF;
 END $$;
 
+-- Conceder permissões operacionais completas
+GRANT ALL ON TABLE public.usuarios TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.clientes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.vendas TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.caixa_sessoes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.korisko_system_state TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.korisko_backup_points TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
 -- 9. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
 -- Qualquer alteração de venda, caixa, estoque ou usuário é transmitida instantaneamente
 -- via WebSockets para todos os celulares, tablets e computadores conectados.

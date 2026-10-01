@@ -351,12 +351,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isMounted) return;
 
         setData(prev => {
-          // Merge products (if dbProducts table has rows use them, else if dbExtra exists use dbExtra.products, else prev)
-          const products = dbProducts.length > 0 ? dbProducts : (dbExtra ? (dbExtra.products ?? []) : prev.products);
+          // Merge products (if dbProducts table has rows use them, else if dbExtra has products use them, else preserve local prev.products)
+          const products = dbProducts.length > 0 
+            ? dbProducts 
+            : (dbExtra?.products && dbExtra.products.length > 0 ? dbExtra.products : prev.products);
+
           // Merge customers
-          const customers = dbCustomers.length > 0 ? dbCustomers : (dbExtra ? (dbExtra.customers ?? []) : prev.customers);
+          const customers = dbCustomers.length > 0 
+            ? dbCustomers 
+            : (dbExtra?.customers && dbExtra.customers.length > 0 ? dbExtra.customers : prev.customers);
+
           // Merge sales
-          const sales = dbSales.length > 0 ? dbSales : (dbExtra ? (dbExtra.sales ?? []) : prev.sales);
+          const sales = dbSales.length > 0 
+            ? dbSales 
+            : (dbExtra?.sales && dbExtra.sales.length > 0 ? dbExtra.sales : prev.sales);
           // Merge employees: ensure Admin Ax always preserved
           let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
@@ -381,13 +389,13 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentSession,
             sessionHistory,
             // Extra system state
-            openComandas: dbExtra?.openComandas ?? prev.openComandas ?? [],
-            fornadas: dbExtra?.fornadas ?? prev.fornadas ?? [],
-            fichasTecnicas: dbExtra ? (dbExtra.fichasTecnicas ?? []) : (prev.fichasTecnicas ?? []),
+            openComandas: dbExtra?.openComandas && dbExtra.openComandas.length > 0 ? dbExtra.openComandas : (prev.openComandas ?? []),
+            fornadas: dbExtra?.fornadas && dbExtra.fornadas.length > 0 ? dbExtra.fornadas : (prev.fornadas ?? []),
+            fichasTecnicas: dbExtra?.fichasTecnicas && dbExtra.fichasTecnicas.length > 0 ? dbExtra.fichasTecnicas : (prev.fichasTecnicas ?? []),
             goals: dbExtra?.goals && dbExtra.goals.length > 0 ? dbExtra.goals : (prev.goals || INITIAL_GOALS),
             exchangeRates: dbExtra?.exchangeRates ?? prev.exchangeRates ?? DEFAULT_EXCHANGE_RATES,
-            stockMovements: dbExtra?.stockMovements ?? prev.stockMovements ?? [],
-            customerEntries: dbExtra?.customerEntries ?? prev.customerEntries ?? [],
+            stockMovements: dbExtra?.stockMovements && dbExtra.stockMovements.length > 0 ? dbExtra.stockMovements : (prev.stockMovements ?? []),
+            customerEntries: dbExtra?.customerEntries && dbExtra.customerEntries.length > 0 ? dbExtra.customerEntries : (prev.customerEntries ?? []),
           };
 
           // Cache updated state locally for offline fallback

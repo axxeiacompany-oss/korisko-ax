@@ -310,21 +310,20 @@ export const PdvView: React.FC = () => {
         <div className="flex-1 overflow-y-auto pr-1">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {filteredProducts.map((p) => {
-              const isLow = p.stock <= p.minStock;
-              const isOutOfStock = p.stock <= 0;
+              const isLow = p.stock <= p.minStock && p.stock > 0;
+              const isZero = p.stock <= 0;
               const inCartQty = cartQuantityByProduct.get(p.id);
 
               return (
                 <button
                   key={p.id}
                   type="button"
-                  disabled={isOutOfStock}
                   onClick={() => handleAddToCart(p)}
                   className={`flex flex-col justify-between p-3 sm:p-3.5 rounded-2xl border text-left transition-all group relative active:scale-[0.97] cursor-pointer ${
-                    isOutOfStock
-                      ? 'border-neutral-800/40 bg-neutral-950/40 opacity-40 cursor-not-allowed'
-                      : inCartQty && inCartQty > 0
-                        ? 'border-amber-500/60 bg-amber-500/5 hover:border-amber-400 shadow-md shadow-amber-500/5'
+                    inCartQty && inCartQty > 0
+                      ? 'border-amber-500/60 bg-amber-500/5 hover:border-amber-400 shadow-md shadow-amber-500/5'
+                      : isZero
+                        ? 'border-neutral-800 bg-neutral-900/90 hover:border-amber-500/50 hover:bg-neutral-850'
                         : 'border-neutral-800 bg-neutral-900 hover:border-amber-500/50 hover:bg-neutral-850 hover:shadow-lg hover:shadow-black/20'
                   }`}
                 >
@@ -337,7 +336,7 @@ export const PdvView: React.FC = () => {
                             ✓ {inCartQty} {p.unit}
                           </span>
                         )}
-                        <span className={isLow ? 'text-rose-400 font-semibold' : 'text-neutral-400'}>
+                        <span className={isZero ? 'text-rose-400/90 font-medium' : isLow ? 'text-amber-400 font-semibold' : 'text-neutral-400'}>
                           {p.stock} {p.unit}
                         </span>
                       </div>

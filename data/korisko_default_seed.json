@@ -34,7 +34,7 @@
       "category": "paes",
       "priceBrl": 18000,
       "costPriceBrl": 8000,
-      "stock": 0,
+      "stock": 45,
       "minStock": 15,
       "unit": "kg",
       "active": true
@@ -46,7 +46,7 @@
       "category": "salgados",
       "priceBrl": 48000,
       "costPriceBrl": 22000,
-      "stock": 0,
+      "stock": 30,
       "minStock": 8,
       "unit": "kg",
       "active": true
@@ -58,7 +58,7 @@
       "category": "paes",
       "priceBrl": 16000,
       "costPriceBrl": 6000,
-      "stock": 0,
+      "stock": 20,
       "minStock": 10,
       "unit": "un",
       "active": true
@@ -70,7 +70,7 @@
       "category": "confeitaria",
       "priceBrl": 9000,
       "costPriceBrl": 3500,
-      "stock": 0,
+      "stock": 25,
       "minStock": 12,
       "unit": "un",
       "active": true
@@ -82,7 +82,7 @@
       "category": "confeitaria",
       "priceBrl": 45000,
       "costPriceBrl": 18000,
-      "stock": 0,
+      "stock": 10,
       "minStock": 4,
       "unit": "un",
       "active": true
@@ -94,7 +94,7 @@
       "category": "salgados",
       "priceBrl": 6000,
       "costPriceBrl": 2500,
-      "stock": 0,
+      "stock": 40,
       "minStock": 15,
       "unit": "un",
       "active": true
@@ -106,7 +106,7 @@
       "category": "paes",
       "priceBrl": 14000,
       "costPriceBrl": 5000,
-      "stock": 0,
+      "stock": 18,
       "minStock": 10,
       "unit": "un",
       "active": true
@@ -118,7 +118,7 @@
       "category": "salgados",
       "priceBrl": 10000,
       "costPriceBrl": 4000,
-      "stock": 0,
+      "stock": 22,
       "minStock": 10,
       "unit": "un",
       "active": true
@@ -130,7 +130,7 @@
       "category": "bebidas",
       "priceBrl": 8000,
       "costPriceBrl": 2500,
-      "stock": 0,
+      "stock": 100,
       "minStock": 30,
       "unit": "un",
       "active": true
@@ -142,7 +142,7 @@
       "category": "bebidas",
       "priceBrl": 14000,
       "costPriceBrl": 5000,
-      "stock": 0,
+      "stock": 80,
       "minStock": 20,
       "unit": "un",
       "active": true
@@ -154,7 +154,7 @@
       "category": "bebidas",
       "priceBrl": 12000,
       "costPriceBrl": 4000,
-      "stock": 0,
+      "stock": 25,
       "minStock": 15,
       "unit": "un",
       "active": true
@@ -166,7 +166,7 @@
       "category": "bebidas",
       "priceBrl": 5000,
       "costPriceBrl": 2000,
-      "stock": 0,
+      "stock": 60,
       "minStock": 40,
       "unit": "un",
       "active": true
@@ -178,7 +178,7 @@
       "category": "outros",
       "priceBrl": 18000,
       "costPriceBrl": 11000,
-      "stock": 0,
+      "stock": 15,
       "minStock": 10,
       "unit": "un",
       "active": true
@@ -188,9 +188,9 @@
       "code": "OUT-002",
       "name": "Requeijão Cremoso Tradicional 200g",
       "category": "outros",
-      "priceBrl": 15000,
-      "costPriceBrl": 9000,
-      "stock": 0,
+      "priceBrl": 16000,
+      "costPriceBrl": 9500,
+      "stock": 15,
       "minStock": 10,
       "unit": "un",
       "active": true

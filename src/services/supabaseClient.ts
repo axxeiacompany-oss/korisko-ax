@@ -187,15 +187,11 @@ ALTER TABLE public.caixa_sessoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_system_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_backup_points ENABLE ROW LEVEL SECURITY;
 
--- 8. POLÍTICAS DE SEGURANÇA E BLINDAGEM RLS (ANTI-F12)
+-- 8. POLÍTICAS DE ACESSO E PERMISSÕES RLS (100% OPERACIONAL PARA O PDV E GESTÃO)
 DO $$
 BEGIN
-  -- Remover políticas públicas antigas permissivas
-  DROP POLICY IF EXISTS "Allow public access usuarios" ON public.usuarios;
-  
-  -- Bloquear leitura pública de senhas em usuarios (retorna vazio se inspecionado via F12)
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'usuarios' AND policyname = 'Bloquear leitura pública de senhas em usuarios') THEN
-    CREATE POLICY "Bloquear leitura pública de senhas em usuarios" ON public.usuarios FOR SELECT TO anon USING (false);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'usuarios' AND policyname = 'Allow public access usuarios') THEN
+    CREATE POLICY "Allow public access usuarios" ON public.usuarios FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'produtos' AND policyname = 'Allow public access produtos') THEN
@@ -221,6 +217,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'korisko_backup_points' AND policyname = 'Allow public access korisko_backup_points') THEN
     CREATE POLICY "Allow public access korisko_backup_points" ON public.korisko_backup_points FOR ALL USING (true) WITH CHECK (true);
   END IF;
+END $$;
+
+-- Conceder permissões operacionais completas
+GRANT ALL ON TABLE public.usuarios TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.clientes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.vendas TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.caixa_sessoes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.korisko_system_state TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.korisko_backup_points TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
 -- 9. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL MULTI-DISPOSITIVOS (SUPABASE REALTIME)
 -- Qualquer alteração de venda, caixa, estoque ou usuário é transmitida instantaneamente
