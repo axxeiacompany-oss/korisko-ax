@@ -1,275 +1,310 @@
 -- =================================================================================
 -- KORIZKO • PANIFICAÇÃO CONFEITARIA ARTESANAL
--- SQL MESTRE DO FLUXO COMPLETO EM TEMPO REAL:
--- 1. COMANDAS POR SETOR + ADMIN TOTAL (public.comandas)
--- 2. LANÇAMENTOS DE FIADO & CONTA CORRENTE ANTI-PERDA (public.lancamentos_fiado)
--- 3. FLUXO DE COBRANÇAS & PAGAMENTOS NA HORA (public.fluxo_cobrancas_tempo_real)
--- Copie e execute este script no SQL Editor do seu painel Supabase
+-- SCRIPT SQL ÚNICO E COMPLETO (PRODUTOS COM FOTOS + COMANDAS + FIADO + TEMPO REAL)
+-- Copie todo este script, cole no SQL Editor do Supabase e clique em RUN.
 -- =================================================================================
 
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- 1. GARANTIR COLUNAS DE FOTOS E DETALHES NA TABELA DE PRODUTOS
+ALTER TABLE IF EXISTS public.produtos
+  ADD COLUMN IF NOT EXISTS image_url TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS slug TEXT,
+  ADD COLUMN IF NOT EXISTS compare_at_price NUMERIC(14, 2),
+  ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT true;
 
--- =================================================================================
--- 1. TABELA DE COMANDAS EM TEMPO REAL (POR SETOR RESPONSÁVEL E ACESSO TOTAL ADMIN)
--- =================================================================================
+-- 2. INSERIR / ATUALIZAR OS PRODUTOS COM FOTOS (INCLUINDO COMBO 3 BROWNIES 70% CACAU)
+INSERT INTO public.produtos (
+  id,
+  code,
+  name,
+  category,
+  price_brl,
+  cost_price_brl,
+  stock,
+  min_stock,
+  unit,
+  active,
+  image_url,
+  description,
+  slug,
+  compare_at_price,
+  featured
+) VALUES
+  (
+    'prod-cuca-alema',
+    'CONF-010',
+    'Cuca Alemã Doce de Leite com Canela',
+    'confeitaria',
+    50000,
+    20000,
+    15,
+    5,
+    'un',
+    true,
+    '/images/products/cuca-alema.jpg',
+    'Massa fofinha artesanal, farta cobertura de doce de leite com canela e farofa crocante alemã.',
+    'cuca-alema-doce-de-leite-canela',
+    NULL,
+    true
+  ),
+  (
+    'prod-bolo-pudim',
+    'CONF-011',
+    'Bolo Pudim',
+    'confeitaria',
+    40000,
+    16000,
+    12,
+    4,
+    'un',
+    true,
+    '/images/products/bolo-pudim.jpg',
+    'Pudim de leite condensado caramelizado e super cremoso sobre bolo de chocolate úmido.',
+    'bolo-pudim',
+    NULL,
+    true
+  ),
+  (
+    'prod-brownie-70',
+    'CONF-012',
+    'Brownie de Chocolate 70% Cacau (Unidade)',
+    'confeitaria',
+    20000,
+    8000,
+    30,
+    10,
+    'un',
+    true,
+    '/images/products/brownie-70-cacau.jpg',
+    'Intenso no sabor, irresistível em cada mordida. Chocolate nobre 70% cacau com casquinha craquelada.',
+    'brownie-chocolate-70-cacau',
+    NULL,
+    true
+  ),
+  (
+    'prod-combo-brownies',
+    'CONF-013',
+    'Combo 3 Brownies 70% Cacau',
+    'confeitaria',
+    50000,
+    24000,
+    10,
+    3,
+    'un',
+    true,
+    '/src/assets/images/combo_tres_brownies_1790886603094.jpg',
+    'Combo promocional com 3 unidades do brownie 70% cacau. Economize ₲ 10.000!',
+    'combo-3-brownies-70-cacau',
+    60000,
+    true
+  )
+ON CONFLICT (id) DO UPDATE SET
+  code = EXCLUDED.code,
+  name = EXCLUDED.name,
+  category = EXCLUDED.category,
+  price_brl = EXCLUDED.price_brl,
+  cost_price_brl = EXCLUDED.cost_price_brl,
+  stock = EXCLUDED.stock,
+  min_stock = EXCLUDED.min_stock,
+  unit = EXCLUDED.unit,
+  active = EXCLUDED.active,
+  image_url = EXCLUDED.image_url,
+  description = EXCLUDED.description,
+  slug = EXCLUDED.slug,
+  compare_at_price = EXCLUDED.compare_at_price,
+  featured = EXCLUDED.featured,
+  updated_at = NOW();
+
+-- 3. TABELA DE COMANDAS EM TEMPO REAL POR SETOR RESPONSÁVEL + ACESSO TOTAL ADMIN
 CREATE TABLE IF NOT EXISTS public.comandas (
-  id TEXT PRIMARY KEY DEFAULT ('cmd-' || extract(epoch from now())::bigint::text),
+  id TEXT PRIMARY KEY,
   number TEXT NOT NULL,
   customer_id TEXT,
   customer_name TEXT DEFAULT 'Cliente Balcão',
   customer_phone TEXT,
   items JSONB NOT NULL DEFAULT '[]'::jsonb,
-  notes TEXT,
-  status TEXT NOT NULL DEFAULT 'confirmado' CHECK (
-    status IN ('aguardando_confirmacao', 'confirmado', 'em_preparo', 'pronto', 'entregue', 'pago', 'cancelado')
-  ),
-  setor_responsavel TEXT NOT NULL DEFAULT 'panificacao' CHECK (
-    setor_responsavel IN ('panificacao', 'confeitaria', 'balcao', 'caixa', 'todos')
-  ),
-  setores_envolvidos JSONB NOT NULL DEFAULT '["panificacao"]'::jsonb,
+  total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'confirmado', -- 'aberto', 'confirmado', 'em_preparo', 'pronto', 'entregue', 'pago', 'cancelado'
+  setor_responsavel TEXT NOT NULL DEFAULT 'panificacao', -- 'panificacao', 'confeitaria', 'salgados', 'bebidas_frios', 'todos'
   confirmed_by_customer BOOLEAN NOT NULL DEFAULT true,
-  confirmed_at TIMESTAMPTZ DEFAULT now(),
-  opened_by TEXT DEFAULT 'Cliente / PDV',
-  opened_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  total_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  forma_pagamento TEXT DEFAULT 'aguardando',
-  source TEXT DEFAULT 'pdv'
+  confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+  source TEXT DEFAULT 'pdv', -- 'pdv', 'loja_online', 'cliente_direto'
+  notes TEXT,
+  created_by TEXT DEFAULT 'Sistema',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS forma_pagamento TEXT DEFAULT 'aguardando';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS customer_id TEXT;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS customer_phone TEXT;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'confirmado';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS setor_responsavel TEXT NOT NULL DEFAULT 'panificacao';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'pdv';
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.comandas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
-CREATE INDEX IF NOT EXISTS idx_comandas_status ON public.comandas(status);
-CREATE INDEX IF NOT EXISTS idx_comandas_setor ON public.comandas(setor_responsavel);
-CREATE INDEX IF NOT EXISTS idx_comandas_opened_at ON public.comandas(opened_at DESC);
-
--- =================================================================================
--- 2. TABELA DE LANÇAMENTOS DE FIADO & CONTA CORRENTE (PROTEÇÃO ANTI-PERDA EM TEMPO REAL)
--- Registra cada venda no Fiado e cada Amortização/Pagamento na hora em que ocorre
--- =================================================================================
+-- 4. TABELA DE LANÇAMENTOS DE FIADO E CONTA CORRENTE (ANTI-PERDA EM TEMPO REAL)
 CREATE TABLE IF NOT EXISTS public.lancamentos_fiado (
-  id TEXT PRIMARY KEY DEFAULT ('entry-' || extract(epoch from now())::bigint::text),
+  id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
-  customer_name TEXT NOT NULL DEFAULT 'Cliente Cadastrado',
-  type TEXT NOT NULL DEFAULT 'debito_compra' CHECK (
-    type IN ('debito_compra', 'pagamento_amortizacao')
-  ),
-  amount_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  previous_balance_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  resulting_balance_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  payment_method TEXT NOT NULL DEFAULT 'fiado',
-  description TEXT NOT NULL DEFAULT 'Lançamento em Conta Corrente / Fiado',
+  customer_name TEXT NOT NULL,
   sale_id TEXT,
   comanda_number TEXT,
   setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
-  confirmed_by_customer BOOLEAN NOT NULL DEFAULT true,
+  type TEXT NOT NULL DEFAULT 'debito_compra', -- 'debito_compra' (Fiado) ou 'credito_pagamento' (Quitação)
+  payment_method TEXT DEFAULT 'fiado',
+  amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  previous_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  resulting_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  description TEXT NOT NULL,
   recorded_by TEXT NOT NULL DEFAULT 'Caixa',
-  date TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  company_name TEXT NOT NULL DEFAULT 'Korizko',
+  company_subtitle TEXT NOT NULL DEFAULT 'Panificação confeitaria artesanal',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_lancamentos_fiado_customer ON public.lancamentos_fiado(customer_id);
-CREATE INDEX IF NOT EXISTS idx_lancamentos_fiado_date ON public.lancamentos_fiado(date DESC);
-CREATE INDEX IF NOT EXISTS idx_lancamentos_fiado_type ON public.lancamentos_fiado(type);
-
--- TRIGGER AUTOMÁTICA ANTI-PERDA:
--- Sempre que um lançamento de Fiado ou Amortização entra em public.lancamentos_fiado,
--- garante que o saldo do cliente em public.clientes seja atualizado instantaneamente.
-CREATE OR REPLACE FUNCTION public.fn_proteger_saldo_fiado_cliente()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_saldo_atual NUMERIC(14,2);
-  v_novo_saldo NUMERIC(14,2);
-BEGIN
-  SELECT COALESCE(outstanding_balance_brl, 0)
-  INTO v_saldo_atual
-  FROM public.clientes
-  WHERE id = NEW.customer_id;
-
-  IF FOUND THEN
-    IF NEW.previous_balance_brl IS NULL OR NEW.previous_balance_brl = 0 THEN
-      NEW.previous_balance_brl := v_saldo_atual;
-    END IF;
-
-    IF NEW.resulting_balance_brl IS NOT NULL AND NEW.resulting_balance_brl >= 0 THEN
-      v_novo_saldo := NEW.resulting_balance_brl;
-    ELSIF NEW.type = 'debito_compra' THEN
-      v_novo_saldo := v_saldo_atual + COALESCE(NEW.amount_brl, 0);
-      NEW.resulting_balance_brl := v_novo_saldo;
-    ELSE
-      v_novo_saldo := GREATEST(0, v_saldo_atual - COALESCE(NEW.amount_brl, 0));
-      NEW.resulting_balance_brl := v_novo_saldo;
-    END IF;
-
-    UPDATE public.clientes
-    SET outstanding_balance_brl = v_novo_saldo,
-        last_purchase_date = CASE WHEN NEW.type = 'debito_compra' THEN now() ELSE last_purchase_date END,
-        updated_at = now()
-    WHERE id = NEW.customer_id;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_proteger_saldo_fiado_cliente ON public.lancamentos_fiado;
-CREATE TRIGGER trg_proteger_saldo_fiado_cliente
-BEFORE INSERT ON public.lancamentos_fiado
-FOR EACH ROW EXECUTE FUNCTION public.fn_proteger_saldo_fiado_cliente();
-
--- =================================================================================
--- 3. TABELA DE FLUXO DE COBRANÇAS E PAGAMENTOS EM TEMPO REAL ("NA HORA DE COBRAR")
--- Mostra instantaneamente quando o caixa ou balcão está cobrando em Fiado, PIX,
--- Dinheiro ou Cartão antes mesmo de fechar a tela e registra a confirmação imediata
--- =================================================================================
+-- 5. TABELA DO FLUXO DE COBRANÇAS E SELEÇÃO DE PAGAMENTO NA HORA (TEMPO REAL)
 CREATE TABLE IF NOT EXISTS public.fluxo_cobrancas_tempo_real (
-  id TEXT PRIMARY KEY DEFAULT ('chk-' || extract(epoch from now())::bigint::text),
-  operator_id TEXT NOT NULL DEFAULT 'emp-admin-ax',
-  operator_name TEXT NOT NULL DEFAULT 'Operador',
-  customer_id TEXT,
-  customer_name TEXT NOT NULL DEFAULT 'Cliente Balcão',
+  id TEXT PRIMARY KEY,
+  operator_id TEXT,
+  operator_name TEXT NOT NULL DEFAULT 'Caixa',
+  source TEXT NOT NULL DEFAULT 'pdv', -- 'pdv', 'comanda', 'venda_direta', 'loja_online', 'fiado_quitacao'
   comanda_number TEXT,
   setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
-  payment_method TEXT NOT NULL DEFAULT 'dinheiro' CHECK (
-    payment_method IN ('dinheiro', 'pix', 'cartao_debito', 'cartao_credito', 'transferencia', 'fiado')
-  ),
-  amount_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  previous_debt_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  projected_debt_brl NUMERIC(14,2) NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'em_cobranca' CHECK (
-    status IN ('em_cobranca', 'confirmado_fiado', 'pago', 'cancelado')
-  ),
+  customer_id TEXT,
+  customer_name TEXT DEFAULT 'Cliente Balcão',
+  selected_method TEXT NOT NULL DEFAULT 'dinheiro', -- 'fiado', 'dinheiro', 'pix', 'cartao_debito', 'cartao_credito'
+  status TEXT NOT NULL DEFAULT 'em_cobranca', -- 'em_cobranca', 'confirmando_fiado', 'concluido', 'cancelado'
+  subtotal_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  discount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  paid_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  remaining_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  previous_debt_brl NUMERIC(14, 2) DEFAULT 0,
+  projected_debt_brl NUMERIC(14, 2) DEFAULT 0,
+  items_count INTEGER NOT NULL DEFAULT 0,
   items_summary TEXT,
   sale_id TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_fluxo_cobrancas_status ON public.fluxo_cobrancas_tempo_real(status);
-CREATE INDEX IF NOT EXISTS idx_fluxo_cobrancas_updated ON public.fluxo_cobrancas_tempo_real(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_fluxo_cobrancas_method ON public.fluxo_cobrancas_tempo_real(payment_method);
-
--- =================================================================================
--- 4. COLUNAS DE COMANDA E SETOR RESPONSÁVEL EM VENDAS E ORDERS (EXTRATO & CUPOM)
--- =================================================================================
-ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS comanda_number TEXT;
-ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal';
-ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN DEFAULT true;
-
--- =================================================================================
--- 5. TRIGGER AUTOMÁTICA: QUANDO UMA VENDA COM PAGAMENTO EM FIADO ENTRA EM public.vendas,
--- GERA AUTOMATICAMENTE O REGISTRO NA TABELA public.lancamentos_fiado SE AINDA NÃO EXISTIR
--- =================================================================================
-CREATE OR REPLACE FUNCTION public.fn_auto_registrar_fiado_da_venda()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_payment JSONB;
-  v_fiado_amount NUMERIC(14,2) := 0;
-  v_cust_name TEXT;
-  v_saldo_anterior NUMERIC(14,2) := 0;
+-- 6. COLUNAS EXTRAS NA TABELA DE VENDAS PARA RASTREIO DE COMANDA E EXTRATO KORIZKO
+DO $$
 BEGIN
-  IF NEW.customer_id IS NOT NULL AND NEW.payments IS NOT NULL AND jsonb_typeof(NEW.payments) = 'array' THEN
-    FOR v_payment IN SELECT * FROM jsonb_array_elements(NEW.payments)
-    LOOP
-      IF (v_payment->>'method') = 'fiado' THEN
-        v_fiado_amount := v_fiado_amount + COALESCE((v_payment->>'equivalentBrl')::numeric, (v_payment->>'amountReceived')::numeric, 0);
-      END IF;
-    END LOOP;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'vendas') THEN
+    ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS comanda_number TEXT;
+    ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal';
+    ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS confirmed_by_customer BOOLEAN DEFAULT true;
+    ALTER TABLE public.vendas ADD COLUMN IF NOT EXISTS company_subtitle TEXT DEFAULT 'Panificação confeitaria artesanal';
+  END IF;
+END $$;
 
-    IF v_fiado_amount > 0 THEN
-      SELECT COALESCE(name, NEW.customer_name, 'Cliente Fiado'), COALESCE(outstanding_balance_brl, 0)
-      INTO v_cust_name, v_saldo_anterior
-      FROM public.clientes
+-- 7. TRIGGER AUTOMÁTICA: ATUALIZAR SALDO DO CLIENTE NA HORA AO LANÇAR FIADO OU PAGAMENTO
+CREATE OR REPLACE FUNCTION public.fn_sync_fiado_saldo_cliente()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'clientes') THEN
+    IF NEW.type = 'debito_compra' THEN
+      UPDATE public.clientes
+      SET
+        outstanding_balance_brl = GREATEST(0, COALESCE(outstanding_balance_brl, 0) + NEW.amount_brl),
+        total_spent_brl = COALESCE(total_spent_brl, 0) + NEW.amount_brl,
+        purchase_count = COALESCE(purchase_count, 0) + 1,
+        last_purchase_date = NOW(),
+        updated_at = NOW()
       WHERE id = NEW.customer_id;
-
-      IF NOT EXISTS (SELECT 1 FROM public.lancamentos_fiado WHERE sale_id = NEW.id) THEN
-        INSERT INTO public.lancamentos_fiado (
-          id,
-          customer_id,
-          customer_name,
-          type,
-          amount_brl,
-          previous_balance_brl,
-          resulting_balance_brl,
-          payment_method,
-          description,
-          sale_id,
-          comanda_number,
-          setor_responsavel,
-          confirmed_by_customer,
-          recorded_by,
-          date
-        ) VALUES (
-          'entry-auto-' || NEW.id,
-          NEW.customer_id,
-          COALESCE(v_cust_name, NEW.customer_name, 'Cliente Fiado'),
-          'debito_compra',
-          v_fiado_amount,
-          v_saldo_anterior,
-          v_saldo_anterior + v_fiado_amount,
-          'fiado',
-          'Venda #' || COALESCE(NEW.sale_number::text, 'PDV') || ' • Comanda #' || COALESCE(NEW.comanda_number, 'BALCÃO'),
-          NEW.id,
-          NEW.comanda_number,
-          COALESCE(NEW.setor_responsavel, 'Panificação & Confeitaria Artesanal'),
-          true,
-          COALESCE(NEW.employee_name, 'Caixa'),
-          COALESCE(NEW.timestamp, now())
-        )
-        ON CONFLICT (id) DO NOTHING;
-      END IF;
+    ELSIF NEW.type = 'credito_pagamento' THEN
+      UPDATE public.clientes
+      SET
+        outstanding_balance_brl = GREATEST(0, COALESCE(outstanding_balance_brl, 0) - NEW.amount_brl),
+        updated_at = NOW()
+      WHERE id = NEW.customer_id;
     END IF;
   END IF;
   RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS trg_auto_registrar_fiado_da_venda ON public.vendas;
-CREATE TRIGGER trg_auto_registrar_fiado_da_venda
-AFTER INSERT ON public.vendas
-FOR EACH ROW EXECUTE FUNCTION public.fn_auto_registrar_fiado_da_venda();
+DROP TRIGGER IF EXISTS trg_sync_fiado_saldo_cliente ON public.lancamentos_fiado;
+CREATE TRIGGER trg_sync_fiado_saldo_cliente
+AFTER INSERT ON public.lancamentos_fiado
+FOR EACH ROW
+EXECUTE FUNCTION public.fn_sync_fiado_saldo_cliente();
 
--- =================================================================================
--- 6. PERMISSÕES E POLÍTICAS RLS + SUPABASE REALTIME
--- =================================================================================
+-- 8. ÍNDICES DE ALTA PERFORMANCE E RLS
+CREATE INDEX IF NOT EXISTS idx_comandas_setor_status ON public.comandas (setor_responsavel, status);
+CREATE INDEX IF NOT EXISTS idx_lancamentos_fiado_customer ON public.lancamentos_fiado (customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fluxo_cobrancas_status ON public.fluxo_cobrancas_tempo_real (status, updated_at DESC);
+
 ALTER TABLE public.comandas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lancamentos_fiado ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fluxo_cobrancas_tempo_real ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "comandas_admin_and_sectors_full_access" ON public.comandas;
-CREATE POLICY "comandas_admin_and_sectors_full_access"
-ON public.comandas FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Acesso tempo real comandas" ON public.comandas;
+CREATE POLICY "Acesso tempo real comandas" ON public.comandas FOR ALL USING (true) WITH CHECK (true);
 
-DROP POLICY IF EXISTS "lancamentos_fiado_full_access" ON public.lancamentos_fiado;
-CREATE POLICY "lancamentos_fiado_full_access"
-ON public.lancamentos_fiado FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Acesso tempo real lancamentos_fiado" ON public.lancamentos_fiado;
+CREATE POLICY "Acesso tempo real lancamentos_fiado" ON public.lancamentos_fiado FOR ALL USING (true) WITH CHECK (true);
 
-DROP POLICY IF EXISTS "fluxo_cobrancas_tempo_real_full_access" ON public.fluxo_cobrancas_tempo_real;
-CREATE POLICY "fluxo_cobrancas_tempo_real_full_access"
-ON public.fluxo_cobrancas_tempo_real FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Acesso tempo real fluxo_cobrancas" ON public.fluxo_cobrancas_tempo_real;
+CREATE POLICY "Acesso tempo real fluxo_cobrancas" ON public.fluxo_cobrancas_tempo_real FOR ALL USING (true) WITH CHECK (true);
 
-GRANT ALL ON public.comandas TO anon, authenticated, service_role;
-GRANT ALL ON public.lancamentos_fiado TO anon, authenticated, service_role;
-GRANT ALL ON public.fluxo_cobrancas_tempo_real TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.comandas TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.lancamentos_fiado TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.fluxo_cobrancas_tempo_real TO anon, authenticated, service_role;
 
+-- 9. SINCRONIZAR ESTADO CONSOLIDADO (korisko_system_state) COM OS PRODUTOS ATUALIZADOS
+UPDATE public.korisko_system_state
+SET 
+  data = jsonb_set(
+    data,
+    '{products}',
+    (
+      SELECT COALESCE(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', id,
+            'code', code,
+            'name', name,
+            'category', category,
+            'priceBrl', price_brl,
+            'costPriceBrl', cost_price_brl,
+            'stock', stock,
+            'minStock', min_stock,
+            'unit', unit,
+            'active', active,
+            'imageUrl', image_url,
+            'description', description,
+            'slug', slug,
+            'compareAtPrice', compare_at_price,
+            'featured', featured
+          )
+        ),
+        '[]'::jsonb
+      )
+      FROM public.produtos
+      WHERE active = true
+    )
+  ),
+  updated_at = NOW()
+WHERE id = 'active_state';
+
+-- 10. ATIVAR SUPABASE REALTIME EM TODAS AS TABELAS DO FLUXO
+ALTER TABLE public.produtos REPLICA IDENTITY FULL;
 ALTER TABLE public.comandas REPLICA IDENTITY FULL;
 ALTER TABLE public.lancamentos_fiado REPLICA IDENTITY FULL;
 ALTER TABLE public.fluxo_cobrancas_tempo_real REPLICA IDENTITY FULL;
-ALTER TABLE public.clientes REPLICA IDENTITY FULL;
-ALTER TABLE public.vendas REPLICA IDENTITY FULL;
-ALTER TABLE public.korisko_system_state REPLICA IDENTITY FULL;
 
 DO $$
 DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
+    'produtos',
     'comandas',
     'lancamentos_fiado',
     'fluxo_cobrancas_tempo_real',
