@@ -150,7 +150,76 @@ ALTER TABLE public.caixa_sessoes ADD COLUMN IF NOT EXISTS transactions JSONB DEF
 ALTER TABLE public.caixa_sessoes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 -- ==============================================================================
--- 6. TABELAS DE ESTADO GLOBAL E BACKUP (SINCRONIZAÇÃO EM TEMPO REAL)
+-- 6. TABELAS DE PEDIDOS DA LOJA ONLINE (E-COMMERCE, ITENS, PAGAMENTOS E ENDEREÇOS)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.orders (
+  id TEXT PRIMARY KEY,
+  status TEXT DEFAULT 'confirmed'
+);
+
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_number TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS affiliate_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'confirmed';
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS total NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_address JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS public.order_items (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  order_id TEXT NOT NULL,
+  product_name TEXT NOT NULL
+);
+
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS order_id TEXT;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS product_id TEXT;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS product_name TEXT;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS sku TEXT;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS quantity NUMERIC(12, 3) DEFAULT 1;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS total NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS public.payments (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  order_id TEXT NOT NULL,
+  method TEXT NOT NULL
+);
+
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS order_id TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS method TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS amount NUMERIC(12, 2) DEFAULT 0.00;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS public.addresses (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  user_id TEXT NOT NULL
+);
+
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS label TEXT DEFAULT 'Casa';
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS recipient_name TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS street TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS number TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS complement TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS neighborhood TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS zip_code TEXT;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+-- ==============================================================================
+-- 7. TABELAS DE ESTADO GLOBAL E BACKUP (SINCRONIZAÇÃO EM TEMPO REAL)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.korisko_system_state (
   id VARCHAR(64) PRIMARY KEY,
@@ -217,6 +286,10 @@ ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.caixa_sessoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addresses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_system_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_backup_points ENABLE ROW LEVEL SECURITY;
 
@@ -228,6 +301,10 @@ BEGIN
   DROP POLICY IF EXISTS "Allow public access clientes" ON public.clientes;
   DROP POLICY IF EXISTS "Allow public access vendas" ON public.vendas;
   DROP POLICY IF EXISTS "Allow public access caixa_sessoes" ON public.caixa_sessoes;
+  DROP POLICY IF EXISTS "Allow public access orders" ON public.orders;
+  DROP POLICY IF EXISTS "Allow public access order_items" ON public.order_items;
+  DROP POLICY IF EXISTS "Allow public access payments" ON public.payments;
+  DROP POLICY IF EXISTS "Allow public access addresses" ON public.addresses;
   DROP POLICY IF EXISTS "Allow public access korisko_system_state" ON public.korisko_system_state;
   DROP POLICY IF EXISTS "Allow public access korisko_backup_points" ON public.korisko_backup_points;
 
@@ -237,6 +314,10 @@ BEGIN
   CREATE POLICY "Allow public access clientes" ON public.clientes FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
   CREATE POLICY "Allow public access vendas" ON public.vendas FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
   CREATE POLICY "Allow public access caixa_sessoes" ON public.caixa_sessoes FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "Allow public access orders" ON public.orders FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "Allow public access order_items" ON public.order_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "Allow public access payments" ON public.payments FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "Allow public access addresses" ON public.addresses FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
   CREATE POLICY "Allow public access korisko_system_state" ON public.korisko_system_state FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
   CREATE POLICY "Allow public access korisko_backup_points" ON public.korisko_backup_points FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 END $$;
@@ -247,6 +328,10 @@ GRANT ALL ON TABLE public.produtos TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.clientes TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.vendas TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.caixa_sessoes TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.orders TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.order_items TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.payments TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.addresses TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_system_state TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.korisko_backup_points TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
@@ -264,6 +349,8 @@ BEGIN
   BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.clientes; EXCEPTION WHEN OTHERS THEN NULL; END;
   BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.vendas; EXCEPTION WHEN OTHERS THEN NULL; END;
   BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.caixa_sessoes; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.orders; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.order_items; EXCEPTION WHEN OTHERS THEN NULL; END;
 END $$;
 
 -- ==============================================================================

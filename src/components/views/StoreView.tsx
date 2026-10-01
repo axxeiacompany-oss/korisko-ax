@@ -36,7 +36,7 @@ interface Props {
 
 export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) => {
   const { user, profile, isAuthenticated, role } = useAuth();
-  const { products, language, t } = useBakery();
+  const { products, language, t, completeSale } = useBakery();
 
   // Search & Categories
   const [searchQuery, setSearchQuery] = useState('');
@@ -241,60 +241,133 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
         notes: notes.trim() || null,
       };
 
-      // 1. Insert order
-      const { data: orderData, error: orderErr } = await supabase
-        .from('orders')
-        .insert(orderPayload)
-        .select()
-        .single();
+      let orderId = `ord-${Date.now()}`;
+      let orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      if (orderErr) {
-        throw new Error(orderErr.message);
+      // 1. Integrar pedido diretamente ao sistema de vendas (PDV / Caixa / Live Sales)
+      try {
+        const saleItems = cart.map(it => ({
+          product: it.product,
+          quantity: it.quantity,
+          unitPriceBrl: it.unitPrice,
+          subtotalBrl: it.subtotal,
+          discountBrl: 0,
+          totalBrl: it.subtotal,
+        }));
+
+        const paymentMap: Record<string, 'dinheiro' | 'cartao_credito' | 'pix'> = {
+          pix: 'pix',
+          cartao_credito: 'cartao_credito',
+          dinheiro_entrega: 'dinheiro',
+        };
+
+        await completeSale(
+          saleItems,
+          [{
+            id: `pay-${Date.now()}`,
+            currency: 'PYG',
+            amountReceived: cartTotal,
+            exchangeRateUsed: 1,
+            equivalentBrl: cartTotal,
+            method: paymentMap[paymentMethod] || 'dinheiro',
+          }],
+          undefined,
+          customerName.trim() || profile?.fullName || 'Cliente Loja Online',
+          undefined,
+          0,
+          cartSubtotal,
+          user?.id
+        );
+      } catch (saleErr) {
+        console.warn('[StoreView] Aviso ao registrar venda local:', saleErr);
       }
 
-      // 2. Insert order items
-      const itemsPayload = cart.map(it => ({
-        order_id: orderData.id,
-        product_id: it.product.id,
-        product_name: it.product.name,
-        sku: it.product.code || 'PRD',
-        quantity: it.quantity,
-        unit_price: it.unitPrice,
-        total: it.subtotal,
-      }));
+      // 2. Tentar salvar nas tabelas remotas do Supabase (orders, order_items, payments)
+      try {
+        const { data: orderData, error: orderErr } = await supabase
+          .from('orders')
+          .insert(orderPayload)
+          .select()
+          .single();
 
-      await supabase.from('order_items').insert(itemsPayload);
+        if (!orderErr && orderData) {
+          orderId = orderData.id;
+          orderNumber = orderData.order_number || `PED-${orderData.id.slice(0, 6)}`;
 
-      // 3. Register payment record
-      await supabase.from('payments').insert({
-        order_id: orderData.id,
-        method: paymentMethod,
-        status: paymentMethod === 'dinheiro_entrega' ? 'pending' : 'approved',
-        amount: cartTotal,
-        paid_at: paymentMethod !== 'dinheiro_entrega' ? new Date().toISOString() : null,
-      });
+          const itemsPayload = cart.map(it => ({
+            order_id: orderData.id,
+            product_id: it.product.id,
+            product_name: it.product.name,
+            sku: it.product.code || 'PRD',
+            quantity: it.quantity,
+            unit_price: it.unitPrice,
+            total: it.subtotal,
+          }));
 
-      // Clear cart
-      setCart([]);
-      localStorage.removeItem('KORISKO_STORE_CART');
-      setIsCheckoutOpen(false);
-      setIsCartOpen(false);
+          try {
+            await supabase.from('order_items').insert(itemsPayload);
+          } catch {}
 
-      setCompletedOrder({
-        ...orderData,
-        orderNumber: orderData.order_number || `PED-${orderData.id.slice(0, 6)}`,
+          try {
+            await supabase.from('payments').insert({
+              order_id: orderData.id,
+              method: paymentMethod,
+              status: paymentMethod === 'dinheiro_entrega' ? 'pending' : 'approved',
+              amount: cartTotal,
+              paid_at: paymentMethod !== 'dinheiro_entrega' ? new Date().toISOString() : null,
+            });
+          } catch {}
+        }
+      } catch (dbErr) {
+        console.warn('[StoreView] Supabase orders sync notice:', dbErr);
+      }
+
+      // 3. Salvar pedido no histórico do cliente no localStorage para acesso offline imediato
+      const completedOrderObj: Order = {
+        id: orderId,
+        orderNumber,
+        customerId: user?.id,
+        userId: user?.id,
+        affiliateId: resolvedAffiliateId || undefined,
+        status: 'confirmed',
+        subtotal: cartSubtotal,
+        discount: 0,
+        shippingFee,
+        total: cartTotal,
+        shippingAddress,
+        notes: notes.trim() || undefined,
         items: cart.map(c => ({
-          id: `item-${c.product.id}`,
-          orderId: orderData.id,
+          id: `item-${c.product.id}-${Date.now()}`,
+          orderId,
+          productId: c.product.id,
           productName: c.product.name,
+          sku: c.product.code || 'PRD',
           quantity: c.quantity,
           unitPrice: c.unitPrice,
           total: c.subtotal,
+          createdAt: new Date().toISOString(),
         })),
-        shippingAddress,
-      });
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        const storageKey = `KORISKO_CUSTOMER_ORDERS_${user?.id || 'guest'}`;
+        const existingList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        localStorage.setItem(storageKey, JSON.stringify([completedOrderObj, ...existingList]));
+      } catch {}
+
+      // Limpar carrinho e fechar checkout
+      setCart([]);
+      try {
+        localStorage.removeItem('KORISKO_STORE_CART');
+      } catch {}
+      setIsCheckoutOpen(false);
+      setIsCartOpen(false);
+
+      setCompletedOrder(completedOrderObj);
     } catch (err: any) {
-      alert(`Erro ao registrar pedido: ${err.message || err}`);
+      console.warn('[StoreView] Exceção no checkout:', err);
     } finally {
       setIsSubmittingOrder(false);
     }

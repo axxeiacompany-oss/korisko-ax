@@ -94,38 +94,52 @@ export const CustomerAccountView: React.FC<Props> = ({ onNavigateStore, onLogout
           console.warn('[MinhaConta] Aviso ao buscar pedidos:', error.message);
         }
 
+        let remoteOrders: Order[] = [];
+        if (!error && data && Array.isArray(data)) {
+          remoteOrders = data.map((o: any) => ({
+            id: o.id,
+            orderNumber: o.order_number || `PED-${o.id.slice(0, 6)}`,
+            customerId: o.customer_id,
+            userId: o.user_id,
+            affiliateId: o.affiliate_id,
+            status: o.status || 'pending',
+            subtotal: Number(o.subtotal) || 0,
+            discount: Number(o.discount) || 0,
+            shippingFee: Number(o.shipping_fee) || 0,
+            total: Number(o.total) || 0,
+            shippingAddress: o.shipping_address || {},
+            notes: o.notes,
+            items: (o.items || []).map((it: any) => ({
+              id: it.id,
+              orderId: it.order_id,
+              productId: it.product_id,
+              productVariantId: it.product_variant_id,
+              productName: it.product_name,
+              sku: it.sku,
+              quantity: Number(it.quantity) || 1,
+              unitPrice: Number(it.unit_price) || 0,
+              total: Number(it.total) || 0,
+              createdAt: it.created_at,
+            })),
+            createdAt: o.created_at,
+            updatedAt: o.updated_at,
+          }));
+        }
+
+        // Recuperar também pedidos locais salvos
+        let localOrders: Order[] = [];
+        try {
+          const storageKey = `KORISKO_CUSTOMER_ORDERS_${user.id}`;
+          const raw = localStorage.getItem(storageKey);
+          if (raw) localOrders = JSON.parse(raw);
+        } catch {}
+
         if (isMounted) {
-          if (data && Array.isArray(data)) {
-            const mappedOrders: Order[] = data.map((o: any) => ({
-              id: o.id,
-              orderNumber: o.order_number || `PED-${o.id.slice(0, 6)}`,
-              customerId: o.customer_id,
-              userId: o.user_id,
-              affiliateId: o.affiliate_id,
-              status: o.status || 'pending',
-              subtotal: Number(o.subtotal) || 0,
-              discount: Number(o.discount) || 0,
-              shippingFee: Number(o.shipping_fee) || 0,
-              total: Number(o.total) || 0,
-              shippingAddress: o.shipping_address || {},
-              notes: o.notes,
-              items: (o.items || []).map((it: any) => ({
-                id: it.id,
-                orderId: it.order_id,
-                productId: it.product_id,
-                productVariantId: it.product_variant_id,
-                productName: it.product_name,
-                sku: it.sku,
-                quantity: Number(it.quantity) || 1,
-                unitPrice: Number(it.unit_price) || 0,
-                total: Number(it.total) || 0,
-                createdAt: it.created_at,
-              })),
-              createdAt: o.created_at,
-              updatedAt: o.updated_at,
-            }));
-            setOrders(mappedOrders);
-          }
+          const merged = [
+            ...remoteOrders,
+            ...localOrders.filter(lo => !remoteOrders.some(ro => ro.id === lo.id)),
+          ];
+          setOrders(merged);
         }
       } catch (err) {
         console.warn('[MinhaConta] Erro ao carregar pedidos:', err);
