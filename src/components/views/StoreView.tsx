@@ -166,8 +166,8 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
     return cart.reduce((acc, it) => acc + it.subtotal, 0);
   }, [cart]);
 
-  const shippingFee = cartSubtotal > 150000 ? 0 : (cart.length > 0 ? 15000 : 0);
-  const cartTotal = cartSubtotal + shippingFee;
+  const shippingFee = 0;
+  const cartTotal = cartSubtotal;
 
   // Track affiliate click if present in URL
   useEffect(() => {
@@ -726,10 +726,6 @@ export const StoreView: React.FC<Props> = ({ onOpenAuth, onNavigateAccount }) =>
                   <div className="flex justify-between text-neutral-400">
                     <span>Subtotal:</span>
                     <span>{formatCurrency(cartSubtotal, 'PYG')}</span>
-                  </div>
-                  <div className="flex justify-between text-neutral-400">
-                    <span>Taxa de Entrega:</span>
-                    <span>{shippingFee === 0 ? 'Grátis' : formatCurrency(shippingFee, 'PYG')}</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold text-amber-400 pt-1 border-t border-[#1F273A]">
                     <span>Total a Pagar:</span>

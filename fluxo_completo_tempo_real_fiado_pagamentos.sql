@@ -323,3 +323,105 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+
+-- ==============================================================================
+-- 7. APRIMORAMENTO: TABELAS SEPARADAS POR FUNÇÃO + SALDO DEVEDOR AO LANÇAR COMANDA
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.saldos_devedores_tempo_real (
+  customer_id TEXT PRIMARY KEY,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  previous_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  current_debt_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  open_comandas_total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  credit_limit_brl NUMERIC(14, 2) NOT NULL DEFAULT 200000,
+  available_credit_brl NUMERIC(14, 2) NOT NULL DEFAULT 200000,
+  last_comanda_id TEXT,
+  last_comanda_number TEXT,
+  last_operation_type TEXT NOT NULL DEFAULT 'comanda_lancada',
+  last_operation_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
+  updated_by TEXT DEFAULT 'Sistema',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.comandas_abertas ADD COLUMN IF NOT EXISTS customer_id TEXT;
+ALTER TABLE public.comandas_abertas ADD COLUMN IF NOT EXISTS debt_applied_brl NUMERIC(14, 2) DEFAULT 0;
+ALTER TABLE public.comandas_abertas ADD COLUMN IF NOT EXISTS previous_debt_brl NUMERIC(14, 2) DEFAULT 0;
+ALTER TABLE public.comandas_abertas ADD COLUMN IF NOT EXISTS resulting_debt_brl NUMERIC(14, 2) DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS public.comandas_historico_setores (
+  id TEXT PRIMARY KEY,
+  comanda_id TEXT NOT NULL,
+  comanda_number TEXT NOT NULL,
+  customer_id TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  items JSONB DEFAULT '[]'::jsonb,
+  total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  debt_applied_brl NUMERIC(14, 2) DEFAULT 0,
+  previous_debt_brl NUMERIC(14, 2) DEFAULT 0,
+  resulting_debt_brl NUMERIC(14, 2) DEFAULT 0,
+  setor_responsavel TEXT DEFAULT 'todos',
+  setores_envolvidos JSONB DEFAULT '["todos"]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'confirmado',
+  action_type TEXT NOT NULL DEFAULT 'lancamento_comanda',
+  operator_name TEXT DEFAULT 'Sistema',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.amortizacoes_pagamentos_fiado (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  amount_paid_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  previous_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  remaining_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  payment_method TEXT NOT NULL DEFAULT 'dinheiro',
+  notes TEXT,
+  received_by TEXT DEFAULT 'Operador',
+  comanda_number TEXT,
+  sale_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.caixa_movimentacoes (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  type TEXT NOT NULL,
+  amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  currency_origin TEXT DEFAULT 'PYG',
+  amount_origin NUMERIC(14, 2) DEFAULT 0,
+  reason TEXT NOT NULL,
+  category TEXT,
+  document_ref TEXT,
+  operator_name TEXT DEFAULT 'Operador',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.estoque_movimentacoes (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  quantity NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  previous_stock NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  new_stock NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  reason TEXT,
+  employee_id TEXT,
+  employee_name TEXT,
+  timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.fornadas_producao (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  quantity NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  baked_by TEXT DEFAULT 'Padeiro',
+  notes TEXT,
+  timestamp TIMESTAMPTZ DEFAULT NOW()
+);

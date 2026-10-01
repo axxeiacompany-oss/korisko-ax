@@ -653,7 +653,7 @@ export const CustomersView: React.FC = () => {
               </h2>
             </div>
             <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-              Sincronizado com public.lancamentos_fiado & public.fluxo_cobrancas_tempo_real
+              Sincronizado: saldos_devedores_tempo_real • lancamentos_fiado • comandas_abertas
             </span>
           </div>
 
@@ -661,12 +661,13 @@ export const CustomersView: React.FC = () => {
             {(activeCheckouts || []).slice(0, 3).map(chk => {
               const isFiado = chk.paymentMethod === 'fiado';
               const isChargingNow = chk.status === 'em_cobranca';
+              const isComandaLancada = chk.status === 'comanda_lancada';
               const linkedCust = customers.find(c => c.id === chk.customerId || c.name.toLowerCase() === chk.customerName.toLowerCase());
               return (
                 <div
                   key={chk.id}
                   className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
-                    isChargingNow
+                    isChargingNow || isComandaLancada
                       ? isFiado
                         ? 'bg-rose-950/40 border-rose-500/60 shadow-md shadow-rose-950/30'
                         : 'bg-amber-950/30 border-amber-500/50'
@@ -680,15 +681,19 @@ export const CustomersView: React.FC = () => {
                       <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                         isChargingNow
                           ? 'bg-amber-500 text-neutral-950 animate-pulse'
-                          : isFiado
-                            ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
-                            : 'bg-emerald-500/20 text-emerald-300'
+                          : isComandaLancada
+                            ? 'bg-rose-500 text-white animate-pulse'
+                            : isFiado
+                              ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
+                              : 'bg-emerald-500/20 text-emerald-300'
                       }`}>
                         {isChargingNow
                           ? `COBRANDO AGORA: ${chk.paymentMethod.toUpperCase()}`
-                          : isFiado
-                            ? 'FIADO CONFIRMADO'
-                            : `PAGO (${chk.paymentMethod.toUpperCase()})`}
+                          : isComandaLancada
+                            ? `COMANDA LANÇADA ${chk.comandaNumber ? `#${chk.comandaNumber}` : ''} • SALDO ATUALIZADO`
+                            : isFiado
+                              ? 'FIADO CONFIRMADO'
+                              : `PAGO (${chk.paymentMethod.toUpperCase()})`}
                       </span>
                       <span className="font-mono-nums font-black text-sm text-amber-400">
                         {formatCurrency(chk.amountBrl, 'PYG')}

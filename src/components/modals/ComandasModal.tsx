@@ -81,11 +81,21 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
   const cartTotalBrl = currentCart.reduce((acc, i) => acc + i.subtotalBrl, 0);
   const cartTotalPyg = fromBrl(cartTotalBrl, 'PYG', exchangeRates);
 
+  const chosenCustomer = useMemo(() => {
+    if (selectedCustomerId) {
+      return customers.find(c => c.id === selectedCustomerId);
+    }
+    if (customerName.trim()) {
+      const normalized = customerName.trim().toLowerCase();
+      return customers.find(c => c.name.trim().toLowerCase() === normalized);
+    }
+    return undefined;
+  }, [customers, selectedCustomerId, customerName]);
+
   const handleSaveCurrentCart = (e: React.FormEvent) => {
     e.preventDefault();
     if (!comandaNumber.trim() || currentCart.length === 0) return;
 
-    const chosenCustomer = customers.find(c => c.id === selectedCustomerId);
     const finalCustomerName = chosenCustomer ? chosenCustomer.name : (customerName.trim() || 'Cliente Balcão');
     const targetSetor: SetorResponsavel = selectedSetor === 'auto'
       ? autoDetectedSector.primary
@@ -106,10 +116,17 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
       }
     );
 
-    showToast(
-      `Comanda #${saved.number} confirmada e enviada em tempo real para ${formatSetorName(saved.setorResponsavel)}!`,
-      'success'
-    );
+    if (saved.debtAppliedBrl && saved.debtAppliedBrl > 0) {
+      showToast(
+        `Comanda #${saved.number} lançada! Saldo devedor de ${finalCustomerName} atualizado em tempo real para ${formatCurrency(saved.resultingDebtBrl || saved.debtAppliedBrl, 'PYG')}.`,
+        'success'
+      );
+    } else {
+      showToast(
+        `Comanda #${saved.number} confirmada e enviada em tempo real para ${formatSetorName(saved.setorResponsavel)}!`,
+        'success'
+      );
+    }
 
     setComandaNumber('');
     setCustomerName('');
@@ -371,6 +388,40 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                     />
                   </div>
 
+                  {chosenCustomer && (
+                    <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                          <Radio className="w-3 h-3 text-rose-400 animate-pulse" />
+                          Atualização de Saldo Devedor em Tempo Real
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-300">
+                          Automático ao Lançar
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+                        <div className="bg-neutral-950/80 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block">Saldo Atual</span>
+                          <span className="font-mono font-bold text-neutral-200">
+                            {formatCurrency(chosenCustomer.outstandingBalanceBrl || 0, 'PYG')}
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950/80 p-2 rounded-lg border border-rose-500/30">
+                          <span className="text-[10px] text-rose-300 block">+ Comanda</span>
+                          <span className="font-mono font-bold text-rose-400">
+                            +{formatCurrency(cartTotalPyg, 'PYG')}
+                          </span>
+                        </div>
+                        <div className="bg-rose-500/15 p-2 rounded-lg border border-rose-500/40">
+                          <span className="text-[10px] text-amber-300 block font-semibold">Novo Saldo</span>
+                          <span className="font-mono font-extrabold text-amber-300">
+                            {formatCurrency((chosenCustomer.outstandingBalanceBrl || 0) + cartTotalBrl, 'PYG')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-medium text-neutral-400 mb-1">
                       Setor Responsável pelo Preparo
@@ -495,6 +546,11 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                           <span className="text-[11px] text-neutral-400 font-mono">
                             {formatBrl(cmdTotalBrl)}
                           </span>
+                          {cmd.debtAppliedBrl && cmd.debtAppliedBrl > 0 && (
+                            <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-[10px] font-bold text-rose-300">
+                              Saldo Devedor: {formatCurrency(cmd.previousDebtBrl || 0, 'PYG')} → {formatCurrency(cmd.resultingDebtBrl || cmd.debtAppliedBrl, 'PYG')}
+                            </span>
+                          )}
                         </div>
                       </div>
 

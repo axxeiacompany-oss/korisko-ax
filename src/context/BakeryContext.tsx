@@ -65,11 +65,20 @@ import {
   formatSetorName,
   listLancamentosFiado,
   upsertLancamentoFiadoDb,
+  deleteLancamentoFiadoDb,
   rowToFiadoEntry,
   listFluxoCobrancas,
   upsertFluxoCobrancaDb,
   deleteFluxoCobrancaDb,
-  rowToCheckoutSession
+  rowToCheckoutSession,
+  listSaldosDevedoresTempoReal,
+  upsertSaldoDevedorTempoRealDb,
+  rowToLiveDebtorBalance,
+  insertComandaHistoricoSetorDb,
+  insertAmortizacaoFiadoDb,
+  insertCaixaMovimentacaoDb,
+  insertEstoqueMovimentacaoDb,
+  insertFornadaProducaoDb
 } from '../lib/db';
 
 interface BakeryContextType {
@@ -156,7 +165,7 @@ interface BakeryContextType {
   recordCustomerPayment: (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => Promise<void>;
   redeemCustomerPoints: (customerId: string, points: number) => number;
 
-  // Comandas & Mesas (Tempo Real por Setor Responsável + Admin Total)
+  // Comandas & Mesas (Tempo Real por Setor Responsável + Admin Total + Saldo Devedor Imediato)
   openComandas: Comanda[];
   saveComanda: (
     number: string,
@@ -170,10 +179,11 @@ interface BakeryContextType {
       setorResponsavel?: SetorResponsavel;
       confirmedByCustomer?: boolean;
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
+      updateDebtorBalance?: boolean;
     }
   ) => Comanda;
   updateComandaStatus: (comandaId: string, status: ComandaStatus, setorResponsavel?: SetorResponsavel) => void;
-  removeComanda: (comandaId: string) => void;
+  removeComanda: (comandaId: string, options?: { settledInSale?: boolean }) => void;
 
   // Point of Sale (PDV)
   sales: Sale[];
@@ -376,6 +386,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           dbComandas,
           dbFiadoEntries,
           dbCheckouts,
+          dbLiveDebtorBalances,
           dbExtra
         ] = await Promise.all([
           listProdutos().catch(err => { console.warn('Produtos load notice:', err); return []; }),
@@ -386,6 +397,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           listComandas().catch(() => []),
           listLancamentosFiado().catch(() => []),
           listFluxoCobrancas().catch(() => []),
+          listSaldosDevedoresTempoReal().catch(() => []),
           fetchSystemStateDoc().catch(() => null),
         ]);
 
@@ -418,12 +430,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return p;
           });
 
-          // Merge customers
-          const customers = dbCustomers.length > 0 
+          // Merge customers + reconcile with saldos_devedores_tempo_real
+          const baseCustomers = dbCustomers.length > 0 
             ? dbCustomers 
             : (dbExtra?.customers && dbExtra.customers.length > 0 
               ? dbExtra.customers 
               : (serverFallback?.customers && serverFallback.customers.length > 0 ? serverFallback.customers : prev.customers));
+
+          const debtorMap = new Map<string, number>();
+          (dbLiveDebtorBalances || []).forEach(d => {
+            if (d.customerId && typeof d.currentDebtBalanceBrl === 'number') {
+              debtorMap.set(d.customerId, d.currentDebtBalanceBrl);
+            }
+          });
+
+          const customers = (baseCustomers || []).map(c => {
+            if (debtorMap.has(c.id)) {
+              return { ...c, outstandingBalanceBrl: debtorMap.get(c.id)! };
+            }
+            return c;
+          });
 
           // Merge sales
           const sales = dbSales.length > 0 
@@ -738,6 +764,71 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               activeCheckouts: (prev.activeCheckouts || []).filter(s => s.id !== oldId),
             }));
           }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'saldos_devedores_tempo_real' }, (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const liveDebtor = rowToLiveDebtorBalance(payload.new);
+            if (!liveDebtor.customerId) return;
+            setData(prev => {
+              const exists = (prev.customers || []).some(c => c.id === liveDebtor.customerId);
+              const nextCustomers = exists
+                ? (prev.customers || []).map(c =>
+                    c.id === liveDebtor.customerId
+                      ? { ...c, outstandingBalanceBrl: liveDebtor.currentDebtBalanceBrl }
+                      : c
+                  )
+                : [
+                    {
+                      id: liveDebtor.customerId,
+                      name: liveDebtor.customerName || 'Cliente Comanda',
+                      phone: liveDebtor.customerPhone || '',
+                      category: 'varejo' as const,
+                      creditLimitBrl: liveDebtor.creditLimitBrl || 500000,
+                      outstandingBalanceBrl: liveDebtor.currentDebtBalanceBrl,
+                      loyaltyPoints: 0,
+                      totalSpentBrl: liveDebtor.currentDebtBalanceBrl,
+                      purchaseCount: 1,
+                      createdAt: liveDebtor.updatedAt,
+                    },
+                    ...(prev.customers || []),
+                  ];
+              return {
+                ...prev,
+                customers: nextCustomers,
+              };
+            });
+          }
+        })
+        .on('broadcast', { event: 'live_debtor_balance' }, ({ payload }) => {
+          if (!payload || !payload.customerId) return;
+          setData(prev => {
+            const exists = (prev.customers || []).some(c => c.id === payload.customerId);
+            const nextCustomers = exists
+              ? (prev.customers || []).map(c =>
+                  c.id === payload.customerId
+                    ? { ...c, outstandingBalanceBrl: Number(payload.currentDebtBalanceBrl) || 0 }
+                    : c
+                )
+              : [
+                  {
+                    id: payload.customerId,
+                    name: payload.customerName || 'Cliente Comanda',
+                    phone: payload.customerPhone || '',
+                    category: 'varejo' as const,
+                    creditLimitBrl: Number(payload.creditLimitBrl) || 500000,
+                    outstandingBalanceBrl: Number(payload.currentDebtBalanceBrl) || 0,
+                    loyaltyPoints: 0,
+                    totalSpentBrl: Number(payload.currentDebtBalanceBrl) || 0,
+                    purchaseCount: 1,
+                    createdAt: payload.updatedAt || new Date().toISOString(),
+                  },
+                  ...(prev.customers || []),
+                ];
+            return {
+              ...prev,
+              customers: nextCustomers,
+            };
+          });
         })
         .on('broadcast', { event: 'live_checkout_update' }, ({ payload }) => {
           if (!payload || !payload.id) return;
@@ -1217,6 +1308,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       newStock: persisted.stock,
     };
 
+    insertEstoqueMovimentacaoDb(movement).catch(() => {});
+
     setData(prev => {
       const nextState = {
         ...prev,
@@ -1275,6 +1368,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.warn('[Korisko] Supabase registerFornada fallback to local:', err.message);
     }
 
+    insertFornadaProducaoDb(newLog).catch(() => {});
+    insertEstoqueMovimentacaoDb(newMovement).catch(() => {});
+
     setData(prev => {
       const next = {
         ...prev,
@@ -1288,7 +1384,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [currentUser.name, data.products]);
 
-  // Save / Confirm Comanda in Real Time (Routes to Setor Responsável + Admin Full Access)
+  // Save / Confirm Comanda in Real Time:
+  // IMMEDIATELY updates the debtor's balance (Saldo Devedor) in real-time flow across all separate Supabase tables!
   const saveComanda = useCallback((
     number: string,
     items: CartItem[],
@@ -1301,25 +1398,84 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setorResponsavel?: SetorResponsavel;
       confirmedByCustomer?: boolean;
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
+      updateDebtorBalance?: boolean;
     }
   ): Comanda => {
     const nowIso = new Date().toISOString();
+    const cleanNum = number.trim();
     const sectorInfo = resolveSetoresFromItems(items);
-    const totalBrl = (items || []).reduce(
-      (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
-      0
-    );
+    const totalBrl = Math.round(
+      (items || []).reduce(
+        (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
+        0
+      ) * 100
+    ) / 100;
 
     const existing = (data.openComandas || []).find(
-      c => c.number.trim().toLowerCase() === number.trim().toLowerCase()
+      c => c.number.trim().toLowerCase() === cleanNum.toLowerCase()
     );
+
+    const shouldUpdateDebtor = extraOptions?.updateDebtorBalance !== false;
+
+    // Resolve or auto-create Debtor Customer so Comanda launch immediately updates Debtor Balance in real time
+    const rawTypedName = (customerName || existing?.customerName || '').trim();
+    const effectiveDebtorName =
+      rawTypedName && rawTypedName !== 'Cliente Balcão'
+        ? rawTypedName
+        : `Cliente Comanda #${cleanNum}`;
+
+    let targetCustomer: Customer | undefined = undefined;
+    const requestedCustomerId = extraOptions?.customerId || existing?.customerId;
+    if (requestedCustomerId) {
+      targetCustomer = (data.customers || []).find(c => c.id === requestedCustomerId);
+    }
+    if (!targetCustomer && effectiveDebtorName) {
+      targetCustomer = (data.customers || []).find(
+        c => c.name.trim().toLowerCase() === effectiveDebtorName.toLowerCase()
+      );
+    }
+
+    let isNewlyCreatedCustomer = false;
+    if (!targetCustomer && shouldUpdateDebtor && totalBrl > 0) {
+      isNewlyCreatedCustomer = true;
+      targetCustomer = {
+        id: requestedCustomerId || `cust-cmd-${cleanNum.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-4)}`,
+        name: effectiveDebtorName,
+        phone: extraOptions?.customerPhone || existing?.customerPhone || '',
+        category: 'mensalista',
+        creditLimitBrl: Math.max(500000, totalBrl * 3),
+        outstandingBalanceBrl: 0,
+        loyaltyPoints: 0,
+        totalSpentBrl: 0,
+        purchaseCount: 0,
+        createdAt: nowIso,
+      };
+    }
+
+    const previouslyAppliedDebt =
+      existing && targetCustomer && existing.customerId === targetCustomer.id
+        ? (existing.debtAppliedBrl || 0)
+        : 0;
+
+    const deltaDebtBrl = shouldUpdateDebtor && targetCustomer
+      ? Math.round((totalBrl - previouslyAppliedDebt) * 100) / 100
+      : 0;
+
+    const currentCustomerBal = targetCustomer?.outstandingBalanceBrl || 0;
+    const initialBeforeComandaBal =
+      existing?.previousDebtBrl !== undefined
+        ? existing.previousDebtBrl
+        : currentCustomerBal;
+    const newCustomerDebtBal = targetCustomer
+      ? Math.max(0, Math.round((currentCustomerBal + deltaDebtBrl) * 100) / 100)
+      : 0;
 
     const comandaObj: Comanda = {
       id: existing?.id || `cmd-${Date.now()}`,
-      number: number.trim(),
-      customerId: extraOptions?.customerId || existing?.customerId,
-      customerName: customerName || existing?.customerName || 'Cliente Balcão',
-      customerPhone: extraOptions?.customerPhone || existing?.customerPhone,
+      number: cleanNum,
+      customerId: targetCustomer?.id || requestedCustomerId,
+      customerName: targetCustomer?.name || rawTypedName || 'Cliente Balcão',
+      customerPhone: extraOptions?.customerPhone || targetCustomer?.phone || existing?.customerPhone,
       items,
       openedAt: existing?.openedAt || nowIso,
       openedBy: existing?.openedBy || currentUser.name,
@@ -1334,26 +1490,176 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: nowIso,
       source: extraOptions?.source || existing?.source || 'pdv',
       totalBrl,
+      debtAppliedBrl: shouldUpdateDebtor && targetCustomer ? totalBrl : (existing?.debtAppliedBrl || 0),
+      previousDebtBrl: initialBeforeComandaBal,
+      resultingDebtBrl: newCustomerDebtBal,
     };
 
-    // Sync to Supabase comandas table in real-time
+    // 1. Sync Comanda to public.comandas
     upsertComandaDb(comandaObj).catch(() => {});
+
+    // 2. Log sector production workflow to public.comandas_historico_setores
+    insertComandaHistoricoSetorDb({
+      comandaId: comandaObj.id,
+      comandaNumber: comandaObj.number,
+      customerId: comandaObj.customerId,
+      customerName: comandaObj.customerName,
+      setorResponsavel: formatSetorName(comandaObj.setorResponsavel),
+      statusAnterior: existing?.status,
+      statusNovo: comandaObj.status || 'confirmado',
+      totalBrl,
+      debtBalanceAfterBrl: newCustomerDebtBal,
+      operador: currentUser.name,
+    }).catch(() => {});
+
+    // 3. Real-Time Debtor Balance Update across Clientes + Saldos Devedores + Lançamentos Fiado + Fluxo Cobranças
+    let comandaFiadoEntry: CustomerAccountEntry | undefined;
+    let comandaLiveCheckout: ActiveCheckoutSession | undefined;
+    const itemsSummary = (items || [])
+      .map(i => `${i.quantity}x ${i.product?.name || 'Item'}`)
+      .slice(0, 3)
+      .join(', ');
+
+    if (shouldUpdateDebtor && targetCustomer && totalBrl > 0) {
+      const updatedCustomerObj: Customer = {
+        ...targetCustomer,
+        outstandingBalanceBrl: newCustomerDebtBal,
+        totalSpentBrl: Math.max(0, (targetCustomer.totalSpentBrl || 0) + deltaDebtBrl),
+        purchaseCount: isNewlyCreatedCustomer
+          ? 1
+          : (existing ? targetCustomer.purchaseCount : (targetCustomer.purchaseCount || 0) + 1),
+        lastPurchaseDate: nowIso,
+      };
+
+      if (isNewlyCreatedCustomer) {
+        upsertCliente(updatedCustomerObj).catch(() => {});
+      } else if (deltaDebtBrl !== 0) {
+        rpcAjustarSaldoCliente(targetCustomer.id, deltaDebtBrl).catch(() => {
+          upsertCliente(updatedCustomerObj).catch(() => {});
+        });
+      }
+
+      // Dedicated Table: public.saldos_devedores_tempo_real
+      const debtorRecord = {
+        customerId: targetCustomer.id,
+        customerName: targetCustomer.name,
+        customerPhone: targetCustomer.phone,
+        previousBalanceBrl: initialBeforeComandaBal,
+        lastComandaAmountBrl: totalBrl,
+        currentDebtBalanceBrl: newCustomerDebtBal,
+        creditLimitBrl: targetCustomer.creditLimitBrl || 500000,
+        openComandasCount: 1,
+        lastComandaNumber: comandaObj.number,
+        lastSetorResponsavel: sectorInfo.label,
+        lastOperationType: 'comanda_lancada' as const,
+        updatedBy: currentUser.name,
+        updatedAt: nowIso,
+      };
+      upsertSaldoDevedorTempoRealDb(debtorRecord).catch(() => {});
+
+      // Dedicated Table: public.lancamentos_fiado
+      comandaFiadoEntry = {
+        id: `entry-cmd-${comandaObj.id}`,
+        customerId: targetCustomer.id,
+        customerName: targetCustomer.name,
+        date: nowIso,
+        type: 'debito_compra',
+        amountBrl: totalBrl,
+        previousBalanceBrl: initialBeforeComandaBal,
+        resultingBalanceBrl: newCustomerDebtBal,
+        paymentMethod: 'fiado',
+        description: `Comanda #${comandaObj.number} lançada em tempo real • Setor: ${sectorInfo.label}${itemsSummary ? ` (${itemsSummary})` : ''}`,
+        comandaNumber: comandaObj.number,
+        setorResponsavel: sectorInfo.label,
+        confirmedByCustomer: true,
+        recordedBy: currentUser.name,
+      };
+      upsertLancamentoFiadoDb(comandaFiadoEntry).catch(() => {});
+
+      // Dedicated Table: public.fluxo_cobrancas_tempo_real
+      comandaLiveCheckout = {
+        id: `chk-cmd-${comandaObj.id}`,
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+        customerId: targetCustomer.id,
+        customerName: targetCustomer.name,
+        comandaNumber: comandaObj.number,
+        setorResponsavel: sectorInfo.label,
+        paymentMethod: 'fiado',
+        amountBrl: totalBrl,
+        previousDebtBrl: initialBeforeComandaBal,
+        projectedDebtBrl: newCustomerDebtBal,
+        status: 'comanda_lancada',
+        itemsSummary: itemsSummary || `Comanda #${comandaObj.number}`,
+        updatedAt: nowIso,
+      };
+      upsertFluxoCobrancaDb(comandaLiveCheckout).catch(() => {});
+
+      // Instantaneous Supabase Realtime Broadcasts
+      try {
+        if (realtimeChannelRef.current) {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_debtor_balance',
+            payload: debtorRecord,
+          }).catch?.(() => {});
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_fiado_entry',
+            payload: comandaFiadoEntry,
+          }).catch?.(() => {});
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'live_checkout_update',
+            payload: comandaLiveCheckout,
+          }).catch?.(() => {});
+        }
+      } catch {}
+    }
 
     setData(prev => {
       const existingIdx = (prev.openComandas || []).findIndex(
-        c => c.id === comandaObj.id || c.number.trim().toLowerCase() === number.trim().toLowerCase()
+        c => c.id === comandaObj.id || c.number.trim().toLowerCase() === cleanNum.toLowerCase()
       );
-      const updatedList = [...(prev.openComandas || [])];
+      const updatedComandas = [...(prev.openComandas || [])];
 
       if (existingIdx >= 0) {
-        updatedList[existingIdx] = comandaObj;
+        updatedComandas[existingIdx] = comandaObj;
       } else {
-        updatedList.unshift(comandaObj);
+        updatedComandas.unshift(comandaObj);
       }
+
+      let updatedCustomers = prev.customers || [];
+      if (shouldUpdateDebtor && targetCustomer && totalBrl > 0) {
+        const existsCust = updatedCustomers.some(c => c.id === targetCustomer!.id);
+        const nextCustObj: Customer = {
+          ...targetCustomer,
+          outstandingBalanceBrl: newCustomerDebtBal,
+          totalSpentBrl: Math.max(0, (targetCustomer.totalSpentBrl || 0) + deltaDebtBrl),
+          purchaseCount: isNewlyCreatedCustomer
+            ? 1
+            : (existing ? targetCustomer.purchaseCount : (targetCustomer.purchaseCount || 0) + 1),
+          lastPurchaseDate: nowIso,
+        };
+        updatedCustomers = existsCust
+          ? updatedCustomers.map(c => c.id === targetCustomer!.id ? nextCustObj : c)
+          : [nextCustObj, ...updatedCustomers];
+      }
+
+      const updatedEntries = comandaFiadoEntry
+        ? [comandaFiadoEntry, ...(prev.customerEntries || []).filter(e => e.id !== comandaFiadoEntry!.id)]
+        : prev.customerEntries;
+
+      const updatedCheckouts = comandaLiveCheckout
+        ? [comandaLiveCheckout, ...(prev.activeCheckouts || []).filter(s => s.id !== comandaLiveCheckout!.id)].slice(0, 40)
+        : prev.activeCheckouts;
 
       const next = {
         ...prev,
-        openComandas: updatedList,
+        openComandas: updatedComandas,
+        customers: updatedCustomers,
+        customerEntries: updatedEntries,
+        activeCheckouts: updatedCheckouts,
       };
       StorageService.saveState(next);
       saveSystemStateDoc(next);
@@ -1361,7 +1667,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     return comandaObj;
-  }, [currentUser.name, data.openComandas]);
+  }, [currentUser.id, currentUser.name, data.customers, data.openComandas]);
 
   // Update Comanda Status / Sector in Real Time (Admin has total access, sector operators can advance production)
   const updateComandaStatus = useCallback((
@@ -1384,6 +1690,18 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
 
       upsertComandaDb(updatedCmd).catch(() => {});
+      insertComandaHistoricoSetorDb({
+        comandaId: updatedCmd.id,
+        comandaNumber: updatedCmd.number,
+        customerId: updatedCmd.customerId,
+        customerName: updatedCmd.customerName,
+        setorResponsavel: formatSetorName(updatedCmd.setorResponsavel),
+        statusAnterior: target.status,
+        statusNovo: status,
+        totalBrl: updatedCmd.totalBrl || 0,
+        debtBalanceAfterBrl: updatedCmd.resultingDebtBrl,
+        operador: currentUser.name,
+      }).catch(() => {});
 
       const updatedList = (status === 'pago' || status === 'cancelado')
         ? (prev.openComandas || []).filter(c => c.id !== target.id && c.number !== target.number)
@@ -1397,26 +1715,79 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       saveSystemStateDoc(next);
       return next;
     });
-  }, []);
+  }, [currentUser.name]);
 
-  // Remove Comanda
-  const removeComanda = useCallback((comandaId: string) => {
+  // Remove Comanda (reverses open comanda debtor balance if cancelled before sale completion)
+  const removeComanda = useCallback((comandaId: string, options?: { settledInSale?: boolean }) => {
+    const nowIso = new Date().toISOString();
     setData(prev => {
       const target = (prev.openComandas || []).find(
-        c => c.id === comandaId || c.number === comandaId
+        c => c.id === comandaId || c.number.trim().toLowerCase() === comandaId.trim().toLowerCase()
       );
+      let nextCustomers = prev.customers || [];
+      let nextEntries = prev.customerEntries || [];
+      let nextCheckouts = prev.activeCheckouts || [];
+
       if (target) {
         deleteComandaDb(target.id).catch(() => {});
+
+        // If comanda is being cancelled (not settled in a sale) and had updated debtor balance, reverse it in real time
+        if (!options?.settledInSale && target.customerId && (target.debtAppliedBrl || 0) > 0) {
+          const reversedAmount = target.debtAppliedBrl || 0;
+          const cust = nextCustomers.find(c => c.id === target.customerId);
+          const prevBal = cust?.outstandingBalanceBrl || 0;
+          const restoredBal = Math.max(0, Math.round((prevBal - reversedAmount) * 100) / 100);
+
+          rpcAjustarSaldoCliente(target.customerId, -reversedAmount).catch(() => {
+            if (cust) {
+              upsertCliente({ ...cust, outstandingBalanceBrl: restoredBal }).catch(() => {});
+            }
+          });
+
+          if (cust) {
+            upsertSaldoDevedorTempoRealDb({
+              customerId: cust.id,
+              customerName: cust.name,
+              customerPhone: cust.phone,
+              previousBalanceBrl: prevBal,
+              lastComandaAmountBrl: 0,
+              currentDebtBalanceBrl: restoredBal,
+              creditLimitBrl: cust.creditLimitBrl || 500000,
+              openComandasCount: 0,
+              lastComandaNumber: target.number,
+              lastSetorResponsavel: formatSetorName(target.setorResponsavel),
+              lastOperationType: 'estorno_comanda',
+              updatedBy: currentUser.name,
+              updatedAt: nowIso,
+            }).catch(() => {});
+          }
+
+          deleteLancamentoFiadoDb(`entry-cmd-${target.id}`).catch(() => {});
+          deleteFluxoCobrancaDb(`chk-cmd-${target.id}`).catch(() => {});
+
+          nextCustomers = nextCustomers.map(c =>
+            c.id === target.customerId ? { ...c, outstandingBalanceBrl: restoredBal } : c
+          );
+          nextEntries = nextEntries.filter(e => e.id !== `entry-cmd-${target.id}`);
+          nextCheckouts = nextCheckouts.filter(s => s.id !== `chk-cmd-${target.id}`);
+        }
       }
+
       const updated = (prev.openComandas || []).filter(
-        c => c.id !== comandaId && c.number !== comandaId
+        c => c.id !== comandaId && c.number.trim().toLowerCase() !== comandaId.trim().toLowerCase()
       );
-      const next = { ...prev, openComandas: updated };
+      const next = {
+        ...prev,
+        openComandas: updated,
+        customers: nextCustomers,
+        customerEntries: nextEntries,
+        activeCheckouts: nextCheckouts,
+      };
       StorageService.saveState(next);
       saveSystemStateDoc(next);
       return next;
     });
-  }, []);
+  }, [currentUser.name]);
 
   // Ficha Técnica - Add
   const addFichaTecnica = useCallback((ftData: Omit<FichaTecnica, 'id' | 'lastUpdated'>) => {
@@ -1696,14 +2067,35 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       recordedBy: currentUser.name,
     };
 
-    // Save to dedicated SQL table lancamentos_fiado + broadcast in real time
+    // Save to dedicated SQL table lancamentos_fiado + saldos_devedores_tempo_real + broadcast in real time
     upsertLancamentoFiadoDb(entry).catch(() => {});
+    const debtorRecord = {
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Fiado',
+      customerPhone: currentCustomer?.phone,
+      previousBalanceBrl: previousBal,
+      lastComandaAmountBrl: cleanAmount,
+      currentDebtBalanceBrl: newBal,
+      creditLimitBrl: currentCustomer?.creditLimitBrl || 500000,
+      openComandasCount: 0,
+      lastComandaNumber: comandaNumber,
+      lastSetorResponsavel: resolvedSetor,
+      lastOperationType: 'venda_fiado' as const,
+      updatedBy: currentUser.name,
+      updatedAt: nowIso,
+    };
+    upsertSaldoDevedorTempoRealDb(debtorRecord).catch(() => {});
     try {
       if (realtimeChannelRef.current) {
         realtimeChannelRef.current.send({
           type: 'broadcast',
           event: 'live_fiado_entry',
           payload: entry,
+        }).catch?.(() => {});
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_debtor_balance',
+          payload: debtorRecord,
         }).catch?.(() => {});
       }
     } catch {}
@@ -1741,7 +2133,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [currentUser.id, currentUser.name, data.customers]);
 
-  // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC + Real-Time lancamentos_fiado
+  // CRM - Record Payment / Amortização via REQUIREMENT 6 RPC + Real-Time lancamentos_fiado + amortizacoes_pagamentos_fiado + saldos_devedores_tempo_real
   const recordCustomerPayment = useCallback(async (customerId: string, amountBrl: number, method: PaymentMethod, notes?: string) => {
     const nowIso = new Date().toISOString();
     const cleanAmount = Math.round(amountBrl * 100) / 100;
@@ -1776,14 +2168,47 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       recordedBy: currentUser.name,
     };
 
-    // Save to dedicated SQL table lancamentos_fiado + broadcast in real time
+    // Save to dedicated SQL tables: lancamentos_fiado + amortizacoes_pagamentos_fiado + saldos_devedores_tempo_real
     upsertLancamentoFiadoDb(entry).catch(() => {});
+    insertAmortizacaoFiadoDb({
+      id: `amort-${entry.id}`,
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Cadastrado',
+      valorPagoBrl: cleanAmount,
+      saldoAntesBrl: previousBal,
+      saldoDepoisBrl: newBal,
+      metodoPagamento: method,
+      observacoes: notes,
+      recebidoPor: currentUser.name,
+    }).catch(() => {});
+
+    const debtorRecord = {
+      customerId,
+      customerName: currentCustomer?.name || 'Cliente Cadastrado',
+      customerPhone: currentCustomer?.phone,
+      previousBalanceBrl: previousBal,
+      lastComandaAmountBrl: cleanAmount,
+      currentDebtBalanceBrl: newBal,
+      creditLimitBrl: currentCustomer?.creditLimitBrl || 500000,
+      openComandasCount: 0,
+      lastSetorResponsavel: 'Caixa & Expedição',
+      lastOperationType: 'pagamento_amortizacao' as const,
+      updatedBy: currentUser.name,
+      updatedAt: nowIso,
+    };
+    upsertSaldoDevedorTempoRealDb(debtorRecord).catch(() => {});
+
     try {
       if (realtimeChannelRef.current) {
         realtimeChannelRef.current.send({
           type: 'broadcast',
           event: 'live_fiado_entry',
           payload: entry,
+        }).catch?.(() => {});
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_debtor_balance',
+          payload: debtorRecord,
         }).catch?.(() => {});
       }
     } catch {}
@@ -1977,57 +2402,123 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
     );
 
-    // REQUIREMENT 6: If fiado, adjust customer balance via RPC ajustar_saldo_cliente + insert into lancamentos_fiado
+    // Check if this sale is closing an open Comanda that already applied debtor balance upon launch
+    const linkedComanda = comandaNumber
+      ? (data.openComandas || []).find(c => c.number.trim().toLowerCase() === comandaNumber.trim().toLowerCase())
+      : undefined;
+
+    if (!targetCustomerId && linkedComanda?.customerId) {
+      targetCustomerId = linkedComanda.customerId;
+      targetCustomer = (data.customers || []).find(c => c.id === targetCustomerId);
+    }
+
+    const alreadyAppliedComandaDebt =
+      linkedComanda && targetCustomerId && linkedComanda.customerId === targetCustomerId
+        ? (linkedComanda.debtAppliedBrl || 0)
+        : 0;
+
+    // REQUIREMENT 6: Reconcile customer balance (avoiding duplicate charge if Comanda already updated debtor balance on launch!)
     let previousCustomerBal = targetCustomer?.outstandingBalanceBrl || 0;
     let newCustomerBal: number | undefined;
     let fiadoAccountEntry: CustomerAccountEntry | undefined;
+    let removedEntryId: string | undefined;
     const itemsSummary = (items || []).map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).slice(0, 3).join(', ');
 
-    if (targetCustomerId && fiadoAmountBrl > 0) {
-      newCustomerBal = previousCustomerBal + fiadoAmountBrl;
-      try {
-        newCustomerBal = await rpcAjustarSaldoCliente(targetCustomerId, fiadoAmountBrl);
-      } catch (rpcBalErr: any) {
-        console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
-        if (targetCustomer) {
-          try {
-            await upsertCliente({
-              ...targetCustomer,
-              outstandingBalanceBrl: newCustomerBal,
-              totalSpentBrl: (targetCustomer.totalSpentBrl || 0) + finalTotalBrl,
-              purchaseCount: (targetCustomer.purchaseCount || 0) + 1,
-              lastPurchaseDate: nowIso,
-            });
-          } catch {}
+    if (targetCustomerId && (fiadoAmountBrl > 0 || alreadyAppliedComandaDebt > 0)) {
+      const netDebtDelta = Math.round((fiadoAmountBrl - alreadyAppliedComandaDebt) * 100) / 100;
+      newCustomerBal = Math.max(0, Math.round((previousCustomerBal + netDebtDelta) * 100) / 100);
+
+      if (netDebtDelta !== 0) {
+        try {
+          newCustomerBal = await rpcAjustarSaldoCliente(targetCustomerId, netDebtDelta);
+        } catch (rpcBalErr: any) {
+          console.warn('RPC ajustar_saldo_cliente warning:', rpcBalErr);
+          if (targetCustomer) {
+            try {
+              await upsertCliente({
+                ...targetCustomer,
+                outstandingBalanceBrl: newCustomerBal,
+                totalSpentBrl: (targetCustomer.totalSpentBrl || 0) + finalTotalBrl,
+                purchaseCount: (targetCustomer.purchaseCount || 0) + 1,
+                lastPurchaseDate: nowIso,
+              });
+            } catch {}
+          }
         }
       }
 
-      fiadoAccountEntry = {
-        id: `entry-${Date.now()}`,
-        customerId: targetCustomerId,
-        customerName: resolvedCustomerName || 'Cliente Fiado',
-        date: nowIso,
-        type: 'debito_compra',
-        amountBrl: fiadoAmountBrl,
-        previousBalanceBrl: previousCustomerBal,
-        resultingBalanceBrl: newCustomerBal,
-        paymentMethod: 'fiado',
-        description: `Venda #${persistedSale.saleNumber || 'PDV'} • Comanda #${resolvedComandaNumber} • Setor: ${sectorInfo.label}${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
-        saleId: persistedSale.id,
-        comandaNumber: resolvedComandaNumber,
-        setorResponsavel: sectorInfo.label,
-        confirmedByCustomer: true,
-        recordedBy: currentUser.name,
-      };
+      const initialBalBeforeComanda =
+        linkedComanda?.previousDebtBrl !== undefined
+          ? linkedComanda.previousDebtBrl
+          : previousCustomerBal;
 
-      // Save to SQL table lancamentos_fiado and broadcast immediately
-      upsertLancamentoFiadoDb(fiadoAccountEntry).catch(() => {});
+      if (fiadoAmountBrl > 0) {
+        fiadoAccountEntry = {
+          id: linkedComanda ? `entry-cmd-${linkedComanda.id}` : `entry-${Date.now()}`,
+          customerId: targetCustomerId,
+          customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Fiado',
+          date: nowIso,
+          type: 'debito_compra',
+          amountBrl: fiadoAmountBrl,
+          previousBalanceBrl: initialBalBeforeComanda,
+          resultingBalanceBrl: newCustomerBal,
+          paymentMethod: 'fiado',
+          description: `Venda #${persistedSale.saleNumber || 'PDV'} • Comanda #${resolvedComandaNumber} • Setor: ${sectorInfo.label}${itemsSummary ? ` (${itemsSummary}${items.length > 3 ? '...' : ''})` : ''}`,
+          saleId: persistedSale.id,
+          comandaNumber: resolvedComandaNumber,
+          setorResponsavel: sectorInfo.label,
+          confirmedByCustomer: true,
+          recordedBy: currentUser.name,
+        };
+
+        upsertLancamentoFiadoDb(fiadoAccountEntry).catch(() => {});
+      } else if (linkedComanda && alreadyAppliedComandaDebt > 0) {
+        // Comanda was launched on debtor balance, and now customer paid in Cash/PIX/Card at checkout
+        removedEntryId = `entry-cmd-${linkedComanda.id}`;
+        deleteLancamentoFiadoDb(removedEntryId).catch(() => {});
+        insertAmortizacaoFiadoDb({
+          customerId: targetCustomerId,
+          customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Comanda',
+          valorPagoBrl: alreadyAppliedComandaDebt,
+          saldoAntesBrl: previousCustomerBal,
+          saldoDepoisBrl: newCustomerBal,
+          metodoPagamento: primaryMethod,
+          comandaNumber: resolvedComandaNumber,
+          observacoes: `Quitação da Comanda #${resolvedComandaNumber} na Venda #${persistedSale.saleNumber}`,
+          recebidoPor: currentUser.name,
+        }).catch(() => {});
+      }
+
+      const debtorRecord = {
+        customerId: targetCustomerId,
+        customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Fiado',
+        customerPhone: targetCustomer?.phone,
+        previousBalanceBrl: initialBalBeforeComanda,
+        lastComandaAmountBrl: fiadoAmountBrl > 0 ? fiadoAmountBrl : finalTotalBrl,
+        currentDebtBalanceBrl: newCustomerBal,
+        creditLimitBrl: targetCustomer?.creditLimitBrl || 500000,
+        openComandasCount: 0,
+        lastComandaNumber: resolvedComandaNumber,
+        lastSetorResponsavel: sectorInfo.label,
+        lastOperationType: (fiadoAmountBrl > 0 ? 'venda_fiado' : 'pagamento_amortizacao') as 'venda_fiado' | 'pagamento_amortizacao',
+        updatedBy: currentUser.name,
+        updatedAt: nowIso,
+      };
+      upsertSaldoDevedorTempoRealDb(debtorRecord).catch(() => {});
+
       try {
         if (realtimeChannelRef.current) {
+          if (fiadoAccountEntry) {
+            realtimeChannelRef.current.send({
+              type: 'broadcast',
+              event: 'live_fiado_entry',
+              payload: fiadoAccountEntry,
+            }).catch?.(() => {});
+          }
           realtimeChannelRef.current.send({
             type: 'broadcast',
-            event: 'live_fiado_entry',
-            payload: fiadoAccountEntry,
+            event: 'live_debtor_balance',
+            payload: debtorRecord,
           }).catch?.(() => {});
         }
       } catch {}
@@ -2035,16 +2526,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Record finalized payment in real-time checkout flow (fluxo_cobrancas_tempo_real)
     const completedCheckoutFlow: ActiveCheckoutSession = {
-      id: `chk-sale-${persistedSale.id}`,
+      id: linkedComanda ? `chk-cmd-${linkedComanda.id}` : `chk-sale-${persistedSale.id}`,
       operatorId: currentUser.id,
       operatorName: currentUser.name,
       customerId: targetCustomerId,
-      customerName: resolvedCustomerName || 'Cliente Balcão',
+      customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Balcão',
       comandaNumber: resolvedComandaNumber,
       setorResponsavel: sectorInfo.label,
       paymentMethod: primaryMethod,
       amountBrl: finalTotalBrl,
-      previousDebtBrl: previousCustomerBal,
+      previousDebtBrl: linkedComanda?.previousDebtBrl ?? previousCustomerBal,
       projectedDebtBrl: newCustomerBal ?? previousCustomerBal,
       status: fiadoAmountBrl > 0 ? 'confirmado_fiado' : 'pago',
       itemsSummary: itemsSummary || `Venda #${persistedSale.saleNumber}`,
@@ -2062,9 +2553,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch {}
 
-    // Close comanda if attached
+    // Close comanda if attached (passing settledInSale: true so removeComanda knows completeSale already reconciled debtor balance)
     if (comandaNumber) {
-      removeComanda(comandaNumber);
+      removeComanda(comandaNumber, { settledInSale: true });
     }
 
     // Single atomic state update for stock, customer balance, fiado ledger, live checkouts, and sales list
@@ -2081,16 +2572,26 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return {
               ...c,
               outstandingBalanceBrl: newCustomerBal !== undefined ? newCustomerBal : c.outstandingBalanceBrl,
-              totalSpentBrl: (c.totalSpentBrl || 0) + finalTotalBrl,
-              purchaseCount: (c.purchaseCount || 0) + 1,
+              totalSpentBrl: alreadyAppliedComandaDebt > 0
+                ? Math.max(0, (c.totalSpentBrl || 0) + (finalTotalBrl - alreadyAppliedComandaDebt))
+                : (c.totalSpentBrl || 0) + finalTotalBrl,
+              purchaseCount: alreadyAppliedComandaDebt > 0 ? (c.purchaseCount || 1) : (c.purchaseCount || 0) + 1,
               lastPurchaseDate: nowIso,
             };
           })
         : baseCustomers;
 
       const filteredCheckouts = (prev.activeCheckouts || []).filter(
-        s => s.status !== 'em_cobranca' || (s.comandaNumber !== comandaNumber && s.operatorId !== currentUser.id)
+        s => s.id !== completedCheckoutFlow.id && (s.status !== 'em_cobranca' || (s.comandaNumber !== comandaNumber && s.operatorId !== currentUser.id))
       );
+
+      let nextEntries = prev.customerEntries || [];
+      if (removedEntryId) {
+        nextEntries = nextEntries.filter(e => e.id !== removedEntryId);
+      }
+      if (fiadoAccountEntry) {
+        nextEntries = [fiadoAccountEntry, ...nextEntries.filter(e => e.id !== fiadoAccountEntry!.id)];
+      }
 
       const nextState: SystemBackupData = {
         ...prev,
@@ -2098,9 +2599,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
           : prev.products,
         customers: updatedCustomers,
-        customerEntries: fiadoAccountEntry
-          ? [fiadoAccountEntry, ...(prev.customerEntries || []).filter(e => e.id !== fiadoAccountEntry!.id)]
-          : prev.customerEntries,
+        customerEntries: nextEntries,
         activeCheckouts: [completedCheckoutFlow, ...filteredCheckouts].slice(0, 40),
         sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
       };
@@ -2121,7 +2620,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     return persistedSale;
-  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.products, data.sales, language, removeComanda, showToast]);
+  }, [currentUser.id, currentUser.name, data.currentSession.id, data.customers, data.openComandas, data.products, data.sales, language, removeComanda, showToast]);
 
   // ==========================================
   // EXCLUIR VENDA - EXCLUSIVO DO ADMINISTRADOR
@@ -2358,6 +2857,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       employeeName: currentUser.name,
     };
 
+    insertCaixaMovimentacaoDb(data.currentSession.id, tx).catch(() => {});
+
     setData(prev => ({
       ...prev,
       currentSession: {
@@ -2365,7 +2866,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         transactions: [tx, ...prev.currentSession.transactions],
       }
     }));
-  }, [currentUser.name]);
+  }, [currentUser.name, data.currentSession.id]);
 
   const recordEntradaCaixa = useCallback((amount: number, currency: Currency, reason: string, category?: string, documentNumber?: string) => {
     const tx: CashTransaction = {
@@ -2380,6 +2881,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       employeeName: currentUser.name,
     };
 
+    insertCaixaMovimentacaoDb(data.currentSession.id, tx).catch(() => {});
+
     setData(prev => ({
       ...prev,
       currentSession: {
@@ -2387,7 +2890,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         transactions: [tx, ...prev.currentSession.transactions],
       }
     }));
-  }, [currentUser.name]);
+  }, [currentUser.name, data.currentSession.id]);
 
   const recordSangria = recordSaidaCaixa;
   const recordSuprimento = recordEntradaCaixa;

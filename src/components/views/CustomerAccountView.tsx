@@ -777,12 +777,6 @@ export const CustomerAccountView: React.FC<Props> = ({ onNavigateStore, onLogout
                 <span>Subtotal:</span>
                 <span>{formatCurrency(selectedOrder.subtotal, 'PYG')}</span>
               </div>
-              {selectedOrder.shippingFee > 0 && (
-                <div className="flex justify-between text-neutral-400">
-                  <span>Taxa de Entrega:</span>
-                  <span>{formatCurrency(selectedOrder.shippingFee, 'PYG')}</span>
-                </div>
-              )}
               {selectedOrder.discount > 0 && (
                 <div className="flex justify-between text-emerald-400">
                   <span>Desconto:</span>

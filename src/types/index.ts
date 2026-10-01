@@ -135,9 +135,28 @@ export interface Comanda {
   subtotalBrl?: number;
   shippingFeeBrl?: number;
   totalBrl?: number;
+  debtAppliedBrl?: number;
+  previousDebtBrl?: number;
+  resultingDebtBrl?: number;
   orderId?: string;
   saleId?: string;
   updatedAt?: string;
+}
+
+export interface LiveDebtorBalanceRecord {
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  previousBalanceBrl: number;
+  lastComandaAmountBrl: number;
+  currentDebtBalanceBrl: number;
+  creditLimitBrl: number;
+  openComandasCount: number;
+  lastComandaNumber?: string;
+  lastSetorResponsavel?: string;
+  lastOperationType: 'comanda_lancada' | 'venda_fiado' | 'pagamento_amortizacao' | 'estorno_comanda';
+  updatedBy: string;
+  updatedAt: string;
 }
 
 export interface FornadaLog {
@@ -242,7 +261,7 @@ export interface ActiveCheckoutSession {
   amountBrl: number;
   previousDebtBrl?: number;
   projectedDebtBrl?: number;
-  status: 'em_cobranca' | 'confirmado_fiado' | 'pago' | 'cancelado';
+  status: 'em_cobranca' | 'comanda_lancada' | 'confirmado_fiado' | 'pago' | 'cancelado';
   itemsSummary?: string;
   saleId?: string;
   updatedAt: string;

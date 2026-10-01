@@ -13,7 +13,11 @@ import {
   CartItem,
   CustomerAccountEntry,
   ActiveCheckoutSession,
-  PaymentMethod
+  PaymentMethod,
+  LiveDebtorBalanceRecord,
+  StockMovement,
+  FornadaLog,
+  CashTransaction
 } from '../types';
 
 // ==========================================
@@ -701,6 +705,9 @@ export function comandaToRow(c: Comanda) {
     opened_at: c.openedAt || new Date().toISOString(),
     updated_at: c.updatedAt || new Date().toISOString(),
     total_brl: c.totalBrl ?? totalBrl,
+    debt_applied_brl: c.debtAppliedBrl ?? 0,
+    previous_debt_brl: c.previousDebtBrl ?? 0,
+    resulting_debt_brl: c.resultingDebtBrl ?? 0,
     source: c.source || 'pdv',
   };
 }
@@ -708,6 +715,10 @@ export function comandaToRow(c: Comanda) {
 export function rowToComanda(r: any): Comanda {
   const items: CartItem[] = Array.isArray(r.items) ? r.items : [];
   const sectorInfo = resolveSetoresFromItems(items);
+  const computedTotal = Number(r.total_brl) || items.reduce(
+    (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
+    0
+  );
   return {
     id: String(r.id),
     number: String(r.number || ''),
@@ -725,10 +736,10 @@ export function rowToComanda(r: any): Comanda {
     confirmedAt: r.confirmed_at || r.opened_at || new Date().toISOString(),
     updatedAt: r.updated_at || new Date().toISOString(),
     source: r.source || 'pdv',
-    totalBrl: Number(r.total_brl) || items.reduce(
-      (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
-      0
-    ),
+    totalBrl: computedTotal,
+    debtAppliedBrl: r.debt_applied_brl !== undefined ? Number(r.debt_applied_brl) : (r.customer_id ? computedTotal : 0),
+    previousDebtBrl: r.previous_debt_brl !== undefined ? Number(r.previous_debt_brl) : undefined,
+    resultingDebtBrl: r.resulting_debt_brl !== undefined ? Number(r.resulting_debt_brl) : undefined,
   };
 }
 
@@ -749,7 +760,17 @@ export async function upsertComandaDb(c: Comanda): Promise<Comanda | null> {
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error || !data) return null;
+    if (error) {
+      // Fallback if extended columns not yet created in user's DB
+      const { debt_applied_brl, previous_debt_brl, resulting_debt_brl, ...legacyRow } = row;
+      const { data: legacyData } = await supabase
+        .from('comandas')
+        .upsert(legacyRow, { onConflict: 'id' })
+        .select()
+        .single();
+      return legacyData ? rowToComanda({ ...legacyData, debt_applied_brl, previous_debt_brl, resulting_debt_brl }) : null;
+    }
+    if (!data) return null;
     return rowToComanda(data);
   } catch {
     return null;
@@ -918,5 +939,189 @@ export async function deleteFluxoCobrancaDb(id: string): Promise<void> {
     await supabase.from('fluxo_cobrancas_tempo_real').delete().eq('id', id);
   } catch {}
 }
+
+// ==========================================
+// DATA ACCESS LAYER: SALDOS DEVEDORES EM FLUXO TEMPO REAL
+// Tabela Separada: public.saldos_devedores_tempo_real
+// ==========================================
+
+export function liveDebtorBalanceToRow(d: LiveDebtorBalanceRecord) {
+  return {
+    customer_id: d.customerId,
+    customer_name: d.customerName,
+    customer_phone: d.customerPhone || null,
+    previous_balance_brl: Number(d.previousBalanceBrl) || 0,
+    last_comanda_amount_brl: Number(d.lastComandaAmountBrl) || 0,
+    current_debt_balance_brl: Number(d.currentDebtBalanceBrl) || 0,
+    credit_limit_brl: Number(d.creditLimitBrl) || 0,
+    open_comandas_count: Number(d.openComandasCount) || 0,
+    last_comanda_number: d.lastComandaNumber || null,
+    last_setor_responsavel: d.lastSetorResponsavel || 'Panificação & Confeitaria Artesanal',
+    last_operation_type: d.lastOperationType || 'comanda_lancada',
+    updated_by: d.updatedBy || 'Sistema',
+    updated_at: d.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function rowToLiveDebtorBalance(r: any): LiveDebtorBalanceRecord {
+  return {
+    customerId: String(r.customer_id || ''),
+    customerName: String(r.customer_name || 'Cliente'),
+    customerPhone: r.customer_phone || undefined,
+    previousBalanceBrl: Number(r.previous_balance_brl) || 0,
+    lastComandaAmountBrl: Number(r.last_comanda_amount_brl) || 0,
+    currentDebtBalanceBrl: Number(r.current_debt_balance_brl) || 0,
+    creditLimitBrl: Number(r.credit_limit_brl) || 0,
+    openComandasCount: Number(r.open_comandas_count) || 0,
+    lastComandaNumber: r.last_comanda_number || undefined,
+    lastSetorResponsavel: r.last_setor_responsavel || undefined,
+    lastOperationType: r.last_operation_type || 'comanda_lancada',
+    updatedBy: String(r.updated_by || 'Sistema'),
+    updatedAt: r.updated_at || new Date().toISOString(),
+  };
+}
+
+export async function listSaldosDevedoresTempoReal(): Promise<LiveDebtorBalanceRecord[]> {
+  try {
+    const rows = await fetchAllRowsPaged<any>('saldos_devedores_tempo_real');
+    return rows.map(rowToLiveDebtorBalance);
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertSaldoDevedorTempoRealDb(d: LiveDebtorBalanceRecord): Promise<LiveDebtorBalanceRecord | null> {
+  try {
+    const row = liveDebtorBalanceToRow(d);
+    const { data, error } = await supabase
+      .from('saldos_devedores_tempo_real')
+      .upsert(row, { onConflict: 'customer_id' })
+      .select()
+      .single();
+    if (error || !data) return null;
+    return rowToLiveDebtorBalance(data);
+  } catch {
+    return null;
+  }
+}
+
+// ==========================================
+// DATA ACCESS LAYER: TABELAS SEPARADAS POR FUNÇÃO
+// 1. public.comandas_historico_setores (Fluxo de Produção dos Setores)
+// 2. public.amortizacoes_pagamentos_fiado (Quitação & Recebimento de Devedores)
+// 3. public.caixa_movimentacoes (Sangria, Suprimento, Entrada e Saída de Caixa)
+// 4. public.estoque_movimentacoes (Entradas, Baixas, Perdas e Ajustes de Estoque)
+// 5. public.fornadas_producao (Fornadas do Padeiro em Tempo Real)
+// ==========================================
+
+export async function insertComandaHistoricoSetorDb(params: {
+  comandaId: string;
+  comandaNumber: string;
+  customerId?: string;
+  customerName?: string;
+  setorResponsavel: string;
+  statusAnterior?: string;
+  statusNovo: string;
+  totalBrl: number;
+  debtBalanceAfterBrl?: number;
+  operador: string;
+}): Promise<void> {
+  try {
+    await supabase.from('comandas_historico_setores').insert({
+      id: `cmd-hist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      comanda_id: params.comandaId,
+      comanda_number: params.comandaNumber,
+      customer_id: params.customerId || null,
+      customer_name: params.customerName || 'Cliente Balcão',
+      setor_responsavel: params.setorResponsavel,
+      status_anterior: params.statusAnterior || null,
+      status_novo: params.statusNovo,
+      total_brl: Number(params.totalBrl) || 0,
+      debt_balance_after_brl: params.debtBalanceAfterBrl !== undefined ? Number(params.debtBalanceAfterBrl) : null,
+      operador: params.operador || 'Sistema',
+      created_at: new Date().toISOString(),
+    });
+  } catch {}
+}
+
+export async function insertAmortizacaoFiadoDb(params: {
+  id?: string;
+  customerId: string;
+  customerName: string;
+  valorPagoBrl: number;
+  saldoAntesBrl: number;
+  saldoDepoisBrl: number;
+  metodoPagamento: string;
+  comandaNumber?: string;
+  observacoes?: string;
+  recebidoPor: string;
+}): Promise<void> {
+  try {
+    await supabase.from('amortizacoes_pagamentos_fiado').insert({
+      id: params.id || `amort-${Date.now()}`,
+      customer_id: params.customerId,
+      customer_name: params.customerName,
+      valor_pago_brl: Number(params.valorPagoBrl) || 0,
+      saldo_antes_brl: Number(params.saldoAntesBrl) || 0,
+      saldo_depois_brl: Number(params.saldoDepoisBrl) || 0,
+      metodo_pagamento: params.metodoPagamento,
+      comanda_number: params.comandaNumber || null,
+      observacoes: params.observacoes || null,
+      recebido_por: params.recebidoPor || 'Caixa',
+      created_at: new Date().toISOString(),
+    });
+  } catch {}
+}
+
+export async function insertCaixaMovimentacaoDb(sessionId: string, tx: CashTransaction): Promise<void> {
+  try {
+    await supabase.from('caixa_movimentacoes').insert({
+      id: tx.id,
+      session_id: sessionId,
+      type: tx.type,
+      amount: Number(tx.amount) || 0,
+      currency: tx.currency || 'PYG',
+      reason: tx.reason,
+      category: tx.category || null,
+      document_number: tx.documentNumber || null,
+      employee_name: tx.employeeName || 'Operador',
+      created_at: tx.timestamp || new Date().toISOString(),
+    });
+  } catch {}
+}
+
+export async function insertEstoqueMovimentacaoDb(m: StockMovement): Promise<void> {
+  try {
+    await supabase.from('estoque_movimentacoes').insert({
+      id: m.id,
+      product_id: m.productId,
+      product_name: m.productName,
+      type: m.type,
+      quantity: Number(m.quantity) || 0,
+      unit: m.unit || 'un',
+      reason: m.reason,
+      employee_name: m.employeeName || 'Operador',
+      previous_stock: Number(m.previousStock) || 0,
+      new_stock: Number(m.newStock) || 0,
+      created_at: m.timestamp || new Date().toISOString(),
+    });
+  } catch {}
+}
+
+export async function insertFornadaProducaoDb(f: FornadaLog): Promise<void> {
+  try {
+    await supabase.from('fornadas_producao').insert({
+      id: f.id,
+      product_id: f.productId,
+      product_name: f.productName,
+      quantity: Number(f.quantity) || 0,
+      unit: f.unit || 'un',
+      baker_name: f.bakerName || 'Padeiro',
+      batch_number: f.batchNumber || null,
+      created_at: f.timestamp || new Date().toISOString(),
+    });
+  } catch {}
+}
+
 
 
