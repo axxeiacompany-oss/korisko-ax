@@ -699,15 +699,17 @@ export const CustomersView: React.FC = () => {
 
         {canManage && (
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => zeroAllNumbersForRealTest()}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
-              title="Zerar todos os números financeiros, comandas, vendas e fiado para iniciar teste real"
-            >
-              <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Zerar Todos os Números (Teste Real)</span>
-            </button>
+            {currentUser?.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => zeroAllNumbersForRealTest()}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
+                title="Zerar todos os números financeiros, comandas, vendas e fiado para iniciar teste real (Exclusivo Admin)"
+              >
+                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Zerar Todos os Números (Teste Real)</span>
+              </button>
+            )}
             <button
               onClick={handleOpenCreate}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
@@ -731,12 +733,12 @@ export const CustomersView: React.FC = () => {
               </h2>
             </div>
             <div className="flex items-center gap-2">
-              {customerEntries.length > 0 && (
+              {currentUser?.role === 'admin' && customerEntries.length > 0 && (
                 <button
                   type="button"
                   onClick={() => clearAllCustomerEntries()}
                   className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                  title="Apagar todos os registros da tabela de Fiado & Conta Corrente e zerar saldos"
+                  title="Apagar todos os registros da tabela de Fiado & Conta Corrente e zerar saldos (Exclusivo Admin)"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>Apagar Todos ({customerEntries.length})</span>
@@ -791,14 +793,16 @@ export const CustomersView: React.FC = () => {
                           <span className="font-mono-nums font-black text-sm text-amber-400">
                             {formatCurrency(chk.amountBrl, 'PYG')}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => clearCheckoutSession(chk.id)}
-                            className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
-                            title="Apagar esta cobrança em tempo real"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          {currentUser?.role === 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => clearCheckoutSession(chk.id)}
+                              className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
+                              title="Apagar esta cobrança em tempo real (Exclusivo Admin)"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -881,15 +885,17 @@ export const CustomersView: React.FC = () => {
                           {formatCurrency(entry.amountBrl, 'BRL')}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => deleteCustomerEntry(entry.id)}
-                        className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                        title="Apagar este registro de Fiado / Conta Corrente"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Apagar</span>
-                      </button>
+                      {currentUser?.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomerEntry(entry.id)}
+                          className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                          title="Apagar este registro de Fiado / Conta Corrente (Exclusivo Admin)"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Apagar</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1741,15 +1747,17 @@ export const CustomersView: React.FC = () => {
                                     Ver Cupom da Venda #{entrySale.saleNumber} →
                                   </button>
                                 ) : <span />}
-                                <button
-                                  type="button"
-                                  onClick={() => deleteCustomerEntry(entry.id)}
-                                  className="px-2 py-0.5 rounded bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                                  title="Apagar este lançamento"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                  <span>Apagar</span>
-                                </button>
+                                {currentUser?.role === 'admin' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteCustomerEntry(entry.id)}
+                                    className="px-2 py-0.5 rounded bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Apagar este lançamento (Exclusivo Admin)"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Apagar</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -2157,15 +2165,17 @@ export const CustomersView: React.FC = () => {
                                 <span>Cupom #{entrySale.saleNumber}</span>
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => deleteCustomerEntry(entry.id)}
-                              className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                              title="Apagar este registro"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Apagar</span>
-                            </button>
+                            {currentUser?.role === 'admin' && (
+                              <button
+                                type="button"
+                                onClick={() => deleteCustomerEntry(entry.id)}
+                                className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                title="Apagar este registro (Exclusivo Admin)"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Apagar</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

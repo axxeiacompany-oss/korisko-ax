@@ -70,7 +70,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
   const [purchaseNotes, setPurchaseNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'gerente';
+  const isAdmin = currentUser?.role === 'admin';
 
   // Build complete list of purchases for this customer (merging SQL table registro_compras_clientes + sales + fiado entries)
   const allCustomerPurchases = useMemo<CustomerPurchaseRecord[]>(() => {
@@ -924,12 +924,12 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                           </button>
                         )}
 
-                        {isAdmin && purch.id.startsWith('purch-manual-') && (
+                        {isAdmin && (
                           <button
                             type="button"
                             onClick={() => deleteCustomerPurchase(purch.id)}
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 cursor-pointer"
-                            title="Excluir registro manual"
+                            title="Excluir registro de compra (Exclusivo Admin)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

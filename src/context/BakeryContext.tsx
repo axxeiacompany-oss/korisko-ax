@@ -2817,6 +2817,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentUser.name, data.customers]);
 
   const deleteCustomerPurchase = useCallback(async (purchaseId: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Acesso restrito: Apenas o Administrador pode apagar registros.', 'error');
+      return;
+    }
     deleteRegistroCompraClienteDb(purchaseId).catch(() => {});
     setData(prev => {
       const target = (prev.customerPurchases || []).find(p => p.id === purchaseId);
@@ -2845,10 +2849,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       saveSystemStateDoc(next);
       return next;
     });
-  }, []);
+  }, [currentUser.role, showToast]);
 
-  // Delete single Fiado / Conta Corrente entry and reconcile customer balance in real time
+  // Delete single Fiado / Conta Corrente entry and reconcile customer balance in real time (Admin only)
   const deleteCustomerEntry = useCallback(async (entryId: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Acesso restrito: Apenas o Administrador pode apagar registros de Fiado & Conta Corrente.', 'error');
+      return;
+    }
     deleteLancamentoFiadoDb(entryId).catch(() => {});
     deleteRegistroCompraClienteDb(`purch-debt-${entryId}`).catch(() => {});
 
@@ -2929,10 +2937,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     showToast('Registro apagado da Tabela de Fiado & Conta Corrente!', 'success');
-  }, [currentUser.name, showToast]);
+  }, [currentUser.name, currentUser.role, showToast]);
 
-  // Clear all Fiado & Conta Corrente entries (either for one customer or all customers)
+  // Clear all Fiado & Conta Corrente entries (either for one customer or all customers) - Admin only
   const clearAllCustomerEntries = useCallback(async (customerId?: string) => {
+    if (currentUser.role !== 'admin') {
+      showToast('Acesso restrito: Apenas o Administrador pode limpar a Tabela de Fiado & Conta Corrente.', 'error');
+      return;
+    }
     if (customerId) {
       supabase.from('lancamentos_fiado').delete().eq('customer_id', customerId).then(() => {}, () => {});
       supabase.from('saldos_devedores_tempo_real').delete().eq('customer_id', customerId).then(() => {}, () => {});
@@ -2980,10 +2992,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         : 'Todos os registros da Tabela de Fiado & Conta Corrente foram apagados!',
       'success'
     );
-  }, [showToast]);
+  }, [currentUser.role, showToast]);
 
-  // Zero out all financial and operational numbers to initiate a fresh Real Test (preserving Products, Recipes & Team)
+  // Zero out all financial and operational numbers to initiate a fresh Real Test (Admin only)
   const zeroAllNumbersForRealTest = useCallback(async () => {
+    if (currentUser.role !== 'admin') {
+      showToast('Acesso restrito: Apenas o Administrador pode zerar todos os números do sistema.', 'error');
+      return;
+    }
     try {
       await Promise.all([
         supabase.from('vendas').delete().neq('id', 'none'),

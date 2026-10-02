@@ -218,38 +218,40 @@ export const LiveSalesStream: React.FC<Props> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
-            {/* Zerar Todos os Números (Iniciar Teste Real) */}
-            {!confirmZeroAll ? (
-              <button
-                type="button"
-                onClick={() => setConfirmZeroAll(true)}
-                className="px-2.5 py-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Zerar todos os números (vendas, fiado, saldos e caixa) para iniciar teste real"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                <span>Zerar Todos os Números</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/50 rounded-lg px-2 py-1">
-                <span className="text-[10px] font-bold text-rose-200">Confirmar zerar tudo?</span>
+            {/* Zerar Todos os Números (Iniciar Teste Real - Exclusivo Admin) */}
+            {isAdmin && (
+              !confirmZeroAll ? (
                 <button
                   type="button"
-                  onClick={async () => {
-                    await zeroAllNumbersForRealTest();
-                    setConfirmZeroAll(false);
-                  }}
-                  className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black cursor-pointer"
+                  onClick={() => setConfirmZeroAll(true)}
+                  className="px-2.5 py-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Zerar todos os números (vendas, fiado, saldos e caixa) para iniciar teste real (Exclusivo Admin)"
                 >
-                  Sim, Zerar
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Zerar Todos os Números</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmZeroAll(false)}
-                  className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] cursor-pointer"
-                >
-                  Não
-                </button>
-              </div>
+              ) : (
+                <div className="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/50 rounded-lg px-2 py-1">
+                  <span className="text-[10px] font-bold text-rose-200">Confirmar zerar tudo?</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await zeroAllNumbersForRealTest();
+                      setConfirmZeroAll(false);
+                    }}
+                    className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black cursor-pointer"
+                  >
+                    Sim, Zerar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmZeroAll(false)}
+                    className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] cursor-pointer"
+                  >
+                    Não
+                  </button>
+                </div>
+              )
             )}
 
             {/* Filter today / all */}
@@ -416,12 +418,12 @@ export const LiveSalesStream: React.FC<Props> = ({
                 {recentFiadoEntries.length} {recentFiadoEntries.length === 1 ? 'lançamento' : 'lançamentos'}
               </span>
 
-              {recentFiadoEntries.length > 0 && (
+              {isAdmin && recentFiadoEntries.length > 0 && (
                 <button
                   type="button"
                   onClick={() => clearAllCustomerEntries()}
                   className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Apagar todos os registros da Tabela de Fiado & Conta Corrente"
+                  title="Apagar todos os registros da Tabela de Fiado & Conta Corrente (Exclusivo Admin)"
                 >
                   <Trash2 className="w-3 h-3 text-rose-400" />
                   <span>Apagar Todos</span>
@@ -484,15 +486,17 @@ export const LiveSalesStream: React.FC<Props> = ({
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => deleteCustomerEntry(entry.id)}
-                        className="px-2 py-1.5 rounded-lg border border-rose-500/35 bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Apagar este registro da Tabela de Fiado & Conta Corrente"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Apagar</span>
-                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomerEntry(entry.id)}
+                          className="px-2 py-1.5 rounded-lg border border-rose-500/35 bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Apagar este registro da Tabela de Fiado & Conta Corrente (Exclusivo Admin)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Apagar</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
