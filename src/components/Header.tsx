@@ -22,6 +22,7 @@ export type TabType =
   | 'estoque' 
   | 'fichas_tecnicas'
   | 'crm'
+  | 'clientes'
   | 'caixa' 
   | 'mais_vendidos' 
   | 'metas' 
@@ -57,6 +58,7 @@ export const Header: React.FC<Props> = ({ activeTab, onSelectTab }) => {
     { id: 'pdv', label: t.tabPdv },
     { id: 'estoque', label: t.tabInventory },
     { id: 'fichas_tecnicas', label: t.tabRecipes },
+    { id: 'clientes', label: language === 'es' ? 'Clientes' : 'Clientes' },
     { id: 'crm', label: t.tabCrm },
     { id: 'caixa', label: t.tabCashRegister },
     { id: 'mais_vendidos', label: t.tabTopProducts },

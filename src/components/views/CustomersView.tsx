@@ -53,7 +53,12 @@ import { ReceiptModal } from '../modals/ReceiptModal';
 import { CustomerPurchasesModal } from '../modals/CustomerPurchasesModal';
 import { FinancialPurchasesAnalytics } from '../FinancialPurchasesAnalytics';
 
-export const CustomersView: React.FC = () => {
+interface CustomersViewProps {
+  initialTab?: 'all' | 'debtors' | 'birthdays' | 'history';
+  onNavigateClientes?: () => void;
+}
+
+export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavigateClientes }) => {
   const { 
     customers, 
     customerEntries, 
@@ -82,7 +87,7 @@ export const CustomersView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
   const [onlyDebtors, setOnlyDebtors] = useState(false);
-  const [activeViewTab, setActiveViewTab] = useState<'all' | 'debtors' | 'birthdays' | 'history'>('all');
+  const [activeViewTab, setActiveViewTab] = useState<'all' | 'debtors' | 'birthdays' | 'history'>(initialTab || 'debtors');
   const [displayMode, setDisplayMode] = useState<'cards' | 'table'>('cards');
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showLiveStreamBanner, setShowLiveStreamBanner] = useState(false);
@@ -792,44 +797,58 @@ export const CustomersView: React.FC = () => {
           </div>
         </div>
 
-        {canManage && (
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Toggle Gráficos Financeiros */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {onNavigateClientes && (
             <button
               type="button"
-              onClick={() => setShowAnalytics(!showAnalytics)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                showAnalytics 
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
-                  : 'bg-[#080B12] border-[#1C2538] text-neutral-300 hover:text-white hover:bg-neutral-800'
-              }`}
-              title="Exibir ou ocultar painel de gráficos e ranking de compras"
+              onClick={onNavigateClientes}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#080B12] hover:bg-neutral-800 border border-[#1C2538] text-indigo-300 hover:text-indigo-200 text-xs font-semibold transition-all cursor-pointer"
+              title="Ir para o Diretório & Cadastro de Clientes"
             >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>{showAnalytics ? 'Ocultar Gráficos' : 'Gráficos & Análise'}</span>
+              <Users className="w-3.5 h-3.5" />
+              <span>Cadastro de Clientes →</span>
             </button>
+          )}
 
-            {currentUser?.role === 'admin' && (
+          {canManage && (
+            <>
+              {/* Toggle Gráficos Financeiros */}
               <button
                 type="button"
-                onClick={() => zeroAllNumbersForRealTest()}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
-                title="Zerar todos os números para iniciar teste real (Exclusivo Admin)"
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  showAnalytics 
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                    : 'bg-[#080B12] border-[#1C2538] text-neutral-300 hover:text-white hover:bg-neutral-800'
+                }`}
+                title="Exibir ou ocultar painel de gráficos e ranking de compras"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Zerar Teste</span>
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>{showAnalytics ? 'Ocultar Gráficos' : 'Gráficos & Análise'}</span>
               </button>
-            )}
 
-            <button
-              onClick={handleOpenCreate}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>{language === 'es' ? '+ Nuevo Cliente' : '+ Novo Cliente'}</span>
-            </button>
-          </div>
-        )}
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => zeroAllNumbersForRealTest()}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
+                  title="Zerar todos os números para iniciar teste real (Exclusivo Admin)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Zerar Teste</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleOpenCreate}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>{language === 'es' ? '+ Nuevo Cliente' : '+ Novo Cliente'}</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards - Fáceis de ler e com atalho para filtrar */}

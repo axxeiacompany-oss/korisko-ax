@@ -11,6 +11,7 @@ export type AppFeature =
   | 'estoque' 
   | 'fichas_tecnicas'
   | 'crm'
+  | 'clientes'
   | 'caixa' 
   | 'mais_vendidos' 
   | 'metas' 

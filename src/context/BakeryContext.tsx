@@ -1600,13 +1600,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return true;
     }
 
+    if (feature === 'clientes' && Array.isArray(currentUser.allowedFeatures) && currentUser.allowedFeatures.includes('crm')) {
+      return true;
+    }
+
     if (Array.isArray(currentUser.allowedFeatures)) {
       return currentUser.allowedFeatures.includes(feature);
     }
 
     if (currentUser.role === 'gerente') return true;
     if (currentUser.role === 'caixa') {
-      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
+      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'clientes', 'caixa', 'mais_vendidos'].includes(feature);
     }
     if (currentUser.role === 'padeiro') {
       return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);

@@ -23,6 +23,7 @@ import { CurrencyReportsView } from './components/views/CurrencyReportsView';
 import { BackupView } from './components/views/BackupView';
 import { FichaTecnicaView } from './components/views/FichaTecnicaView';
 import { CustomersView } from './components/views/CustomersView';
+import { ClientesView } from './components/views/ClientesView';
 import { DirectSaleView } from './components/views/DirectSaleView';
 import { AfiliadosView } from './components/views/AfiliadosView';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -429,7 +430,8 @@ function MainAppShell() {
               )}
               {activeTab === 'estoque' && <InventoryView />}
               {activeTab === 'fichas_tecnicas' && <FichaTecnicaView />}
-              {activeTab === 'crm' && <CustomersView />}
+              {activeTab === 'clientes' && <ClientesView onNavigateCrm={() => handleSelectTab('crm')} />}
+              {activeTab === 'crm' && <CustomersView onNavigateClientes={() => handleSelectTab('clientes')} />}
               {activeTab === 'caixa' && <CashRegisterView />}
               {activeTab === 'mais_vendidos' && <MonthlyTopProductsView />}
               {activeTab === 'metas' && <GoalsView />}

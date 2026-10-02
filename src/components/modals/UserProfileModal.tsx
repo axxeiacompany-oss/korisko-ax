@@ -23,7 +23,8 @@ import {
   Coins,
   Cloud,
   Users,
-  Store
+  Store,
+  CreditCard
 } from 'lucide-react';
 import { AppFeature } from '../../types';
 
@@ -36,7 +37,8 @@ const FEATURE_INFO: Record<AppFeature, { label: string; icon: any; color: string
   dashboard: { label: 'Dashboard Geral', icon: Layers, color: 'text-indigo-400 bg-indigo-500/10' },
   pdv: { label: 'PDV & Caixa Balcão', icon: ShoppingBag, color: 'text-amber-400 bg-amber-500/10' },
   venda_direta: { label: 'Venda Direta Expressa', icon: Zap, color: 'text-emerald-400 bg-emerald-500/10' },
-  crm: { label: 'CRM & Fiado (Clientes)', icon: Users, color: 'text-sky-400 bg-sky-500/10' },
+  crm: { label: 'CRM & Fiado (Contas em Aberto)', icon: CreditCard, color: 'text-rose-400 bg-rose-500/10' },
+  clientes: { label: 'Cadastro de Clientes', icon: Users, color: 'text-indigo-400 bg-indigo-500/10' },
   estoque: { label: 'Controle de Estoque', icon: Boxes, color: 'text-rose-400 bg-rose-500/10' },
   fichas_tecnicas: { label: 'Fichas Técnicas & Receitas', icon: ChefHat, color: 'text-orange-400 bg-orange-500/10' },
   caixa: { label: 'Fechamento de Caixa', icon: Vault, color: 'text-yellow-400 bg-yellow-500/10' },

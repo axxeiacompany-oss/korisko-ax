@@ -28,6 +28,7 @@ import {
   Zap,
   ShieldCheck,
   Store,
+  CreditCard,
   X
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
@@ -125,11 +126,18 @@ export const Sidebar: React.FC<Props> = ({
           badgeColor: 'bg-sky-500/20 text-sky-300',
         },
         {
-          id: 'crm' as TabType,
-          label: t.tabCrm,
+          id: 'clientes' as TabType,
+          label: language === 'es' ? 'Clientes' : 'Clientes',
           icon: Users,
+          badge: `${customers.length}`,
+          badgeColor: 'bg-indigo-500/20 text-indigo-300',
+        },
+        {
+          id: 'crm' as TabType,
+          label: language === 'es' ? 'CRM & Fiado' : 'CRM & Fiado',
+          icon: CreditCard,
           badge: customersWithDebt > 0 ? `${customersWithDebt} ${language === 'es' ? 'a cobrar' : 'a receber'}` : null,
-          badgeColor: 'bg-amber-500/20 text-amber-300',
+          badgeColor: 'bg-rose-500/20 text-rose-300',
         },
       ]
     },
