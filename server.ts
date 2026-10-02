@@ -457,7 +457,6 @@ app.post('/api/reset', async (_req, res) => {
 // Reset State to Factory Zero (Admin Ax Permanently Preserved)
 app.post('/api/factory-zero', async (_req, res) => {
   try {
-    const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
     const adminUser = {
       id: 'emp-admin-ax',
       name: 'Ax',
@@ -467,9 +466,9 @@ app.post('/api/factory-zero', async (_req, res) => {
       pin: '9APG_47z-EgF4yz',
       avatarColor: 'bg-indigo-600',
       allowedFeatures: [
-        'dashboard', 'pdv', 'venda_direta', 'estoque', 
+        'dashboard', 'pdv', 'venda_direta', 'loja', 'estoque', 
         'fichas_tecnicas', 'crm', 'caixa', 'mais_vendidos', 
-        'metas', 'cambio', 'backup', 'afiliados'
+        'metas', 'cambio', 'backup', 'afiliados', 'portal_afiliado'
       ],
       active: true,
     };
@@ -483,15 +482,14 @@ app.post('/api/factory-zero', async (_req, res) => {
       sales: [],
       currentSession: {
         id: `sess-${Date.now()}`,
+        sessionNumber: 1,
         openedAt: new Date().toISOString(),
         closedAt: new Date().toISOString(),
-        openedById: 'emp-admin-ax',
-        openedByName: 'Ax',
-        initialCashBrl: 0,
+        openedBy: 'Ax',
+        closedBy: 'Ax',
+        initialFloat: { brl: 0, pyg: 0, usd: 0 },
         status: 'fechado',
-        movements: [],
-        totalSalesBrl: 0,
-        differenceBrl: 0,
+        transactions: [],
       },
       sessionHistory: [],
       openComandas: [],
@@ -499,6 +497,8 @@ app.post('/api/factory-zero', async (_req, res) => {
       fichasTecnicas: [],
       customers: [],
       customerEntries: [],
+      customerPurchases: [],
+      activeCheckouts: [],
     };
 
     safeWriteJsonFile(LOCAL_STATE_FILE, zeroState);
@@ -519,6 +519,11 @@ app.post('/api/factory-zero', async (_req, res) => {
       supabaseServer.from('vendas').delete().neq('id', 'none').then(() => {}, () => {});
       supabaseServer.from('caixa_sessoes').delete().neq('id', 'none').then(() => {}, () => {});
       supabaseServer.from('clientes').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('comandas').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('lancamentos_fiado').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('registro_compras_clientes').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('fluxo_cobrancas_tempo_real').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('saldos_devedores_tempo_real').delete().neq('customer_id', 'none').then(() => {}, () => {});
     }
 
     safeSupabaseUpsert('korisko_system_state', {
@@ -528,6 +533,88 @@ app.post('/api/factory-zero', async (_req, res) => {
     }, 'id');
 
     return res.json({ success: true, message: 'Sistema zerado para padrão de fábrica com Admin Ax preservado.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Zero all financial and operational numbers for Real Testing while keeping Products, Recipes & Team
+app.post('/api/zero-numbers', async (_req, res) => {
+  try {
+    const currentState = safeReadJsonFile(LOCAL_STATE_FILE);
+    const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
+    const products = (currentState?.products && currentState.products.length > 0)
+      ? currentState.products
+      : (defaultSeed?.products || []);
+    const employees = (currentState?.employees && currentState.employees.length > 0)
+      ? currentState.employees
+      : (defaultSeed?.employees || []);
+    const fichasTecnicas = currentState?.fichasTecnicas || defaultSeed?.fichasTecnicas || [];
+    const goals = currentState?.goals || defaultSeed?.goals || [];
+    const exchangeRates = currentState?.exchangeRates || defaultSeed?.exchangeRates || { BRL_TO_PYG: 1, USD_TO_BRL: 1, USD_TO_PYG: 1 };
+    const customers = (currentState?.customers || [])
+      .filter((c: any) => !['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5'].includes(c.id))
+      .map((c: any) => ({
+        ...c,
+        outstandingBalanceBrl: 0,
+        totalSpentBrl: 0,
+        purchaseCount: 0,
+        loyaltyPoints: 0,
+      }));
+
+    const zeroedTestState = {
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      employees,
+      products,
+      stockMovements: [],
+      sales: [],
+      currentSession: {
+        id: `sess-${Date.now()}`,
+        sessionNumber: 1,
+        openedAt: new Date().toISOString(),
+        openedBy: 'Ax',
+        initialFloat: { brl: 0, pyg: 0, usd: 0 },
+        status: 'aberto',
+        transactions: [],
+      },
+      sessionHistory: [],
+      exchangeRates,
+      goals,
+      openComandas: [],
+      fornadas: [],
+      fichasTecnicas,
+      customers,
+      customerEntries: [],
+      customerPurchases: [],
+      activeCheckouts: [],
+    };
+
+    safeWriteJsonFile(LOCAL_STATE_FILE, zeroedTestState);
+
+    if (supabaseServer) {
+      supabaseServer.from('vendas').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('caixa_sessoes').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('comandas').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('lancamentos_fiado').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('registro_compras_clientes').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('fluxo_cobrancas_tempo_real').delete().neq('id', 'none').then(() => {}, () => {});
+      supabaseServer.from('saldos_devedores_tempo_real').delete().neq('customer_id', 'none').then(() => {}, () => {});
+      supabaseServer.from('clientes').delete().in('id', ['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5']).then(() => {}, () => {});
+      supabaseServer
+        .from('clientes')
+        .update({ outstanding_balance_brl: 0, total_spent_brl: 0, purchase_count: 0, loyalty_points: 0 })
+        .neq('id', 'none')
+        .then(() => {}, () => {});
+    }
+
+    safeSupabaseUpsert('korisko_system_state', {
+      id: 'active_state',
+      data: zeroedTestState,
+      updated_at: new Date().toISOString(),
+    }, 'id');
+
+    return res.json({ success: true, data: zeroedTestState });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

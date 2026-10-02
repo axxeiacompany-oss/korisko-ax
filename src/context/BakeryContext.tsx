@@ -180,6 +180,9 @@ interface BakeryContextType {
     comandaNumber?: string;
   }) => Promise<CustomerPurchaseRecord>;
   deleteCustomerPurchase: (purchaseId: string) => Promise<void>;
+  deleteCustomerEntry: (entryId: string) => Promise<void>;
+  clearAllCustomerEntries: (customerId?: string) => Promise<void>;
+  zeroAllNumbersForRealTest: () => Promise<void>;
   redeemCustomerPoints: (customerId: string, points: number) => number;
 
   // Comandas & Mesas (Tempo Real por Setor Responsável + Admin Total + Saldo Devedor Imediato)
@@ -394,6 +397,42 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     async function loadAllFromSupabase() {
       setIsLoadingDb(true);
       try {
+        // Automatic one-time zeroing of all test numbers so user starts real testing at 0
+        const shouldZeroForRealTest =
+          typeof localStorage !== 'undefined' &&
+          localStorage.getItem('KORIZKO_REAL_TEST_ZERO_V3') !== 'true';
+
+        if (shouldZeroForRealTest) {
+          try {
+            localStorage.setItem('KORIZKO_REAL_TEST_ZERO_V3', 'true');
+            await Promise.all([
+              supabase.from('vendas').delete().neq('id', 'none'),
+              supabase.from('comandas').delete().neq('id', 'none'),
+              supabase.from('lancamentos_fiado').delete().neq('id', 'none'),
+              supabase.from('registro_compras_clientes').delete().neq('id', 'none'),
+              supabase.from('fluxo_cobrancas_tempo_real').delete().neq('id', 'none'),
+              supabase.from('saldos_devedores_tempo_real').delete().neq('customer_id', 'none'),
+              supabase.from('amortizacoes_pagamentos_fiado').delete().neq('id', 'none'),
+              supabase.from('comandas_historico_setores').delete().neq('id', 'none'),
+              supabase.from('caixa_sessoes').delete().neq('id', 'none'),
+              supabase.from('caixa_movimentacoes').delete().neq('id', 'none'),
+              supabase.from('estoque_movimentacoes').delete().neq('id', 'none'),
+              supabase.from('fornadas_producao').delete().neq('id', 'none'),
+              supabase.from('clientes').delete().in('id', ['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5']),
+              supabase
+                .from('clientes')
+                .update({
+                  outstanding_balance_brl: 0,
+                  total_spent_brl: 0,
+                  purchase_count: 0,
+                  loyalty_points: 0,
+                })
+                .neq('id', 'none'),
+              fetch('/api/zero-numbers', { method: 'POST' }).catch(() => {}),
+            ]);
+          } catch {}
+        }
+
         const [
           dbProducts, 
           dbCustomers, 
@@ -470,12 +509,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return c;
           });
 
-          // Merge sales
-          const sales = dbSales.length > 0 
-            ? dbSales 
-            : (dbExtra?.sales && dbExtra.sales.length > 0 
-              ? dbExtra.sales 
-              : (serverFallback?.sales && serverFallback.sales.length > 0 ? serverFallback.sales : prev.sales));
+          // Merge sales (if zeroed for real test or DB has 0 sales, keep 0)
+          const sales = shouldZeroForRealTest
+            ? []
+            : (dbSales.length > 0
+              ? dbSales
+              : (dbExtra && Array.isArray(dbExtra.sales)
+                ? dbExtra.sales
+                : (serverFallback?.sales && serverFallback.sales.length > 0 ? serverFallback.sales : prev.sales)));
           // Merge employees: ensure Admin Ax always preserved
           let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
@@ -484,34 +525,56 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           // Active session
           let currentSession = prev.currentSession;
-          let sessionHistory = prev.sessionHistory;
-          if (dbSessions.length > 0) {
+          let sessionHistory = shouldZeroForRealTest ? [] : prev.sessionHistory;
+          if (!shouldZeroForRealTest && dbSessions.length > 0) {
             const activeOne = dbSessions.find(s => s.status === 'aberto');
             currentSession = activeOne || dbSessions[0];
             sessionHistory = dbSessions.filter(s => s.id !== currentSession.id);
+          } else if (shouldZeroForRealTest) {
+            currentSession = {
+              id: `sess-${Date.now()}`,
+              sessionNumber: 1,
+              status: 'aberto',
+              openedAt: new Date().toISOString(),
+              openedBy: 'Ax',
+              initialFloat: { brl: 0, pyg: 0, usd: 0 },
+              transactions: [],
+            };
           }
 
           // Merge real-time comandas from comandas table + korisko_system_state
-          const extraComandas: Comanda[] = Array.isArray(dbExtra?.openComandas) ? dbExtra.openComandas : (prev.openComandas ?? []);
+          const extraComandas: Comanda[] = shouldZeroForRealTest
+            ? []
+            : (dbExtra && Array.isArray(dbExtra.openComandas) ? dbExtra.openComandas : (prev.openComandas ?? []));
           const comandasMap = new Map<string, Comanda>();
           extraComandas.forEach(c => comandasMap.set(c.id || c.number, c));
-          dbComandas.forEach(c => comandasMap.set(c.id || c.number, c));
+          if (!shouldZeroForRealTest) {
+            dbComandas.forEach(c => comandasMap.set(c.id || c.number, c));
+          }
           const mergedComandas = Array.from(comandasMap.values()).filter(c => c.status !== 'pago' && c.status !== 'cancelado');
 
           // Merge real-time fiado entries from lancamentos_fiado table + korisko_system_state
-          const extraEntries: CustomerAccountEntry[] = Array.isArray(dbExtra?.customerEntries) ? dbExtra.customerEntries : (prev.customerEntries ?? []);
+          const extraEntries: CustomerAccountEntry[] = shouldZeroForRealTest
+            ? []
+            : (dbExtra && Array.isArray(dbExtra.customerEntries) ? dbExtra.customerEntries : (prev.customerEntries ?? []));
           const entriesMap = new Map<string, CustomerAccountEntry>();
           extraEntries.forEach(e => entriesMap.set(e.id, e));
-          dbFiadoEntries.forEach(e => entriesMap.set(e.id, e));
+          if (!shouldZeroForRealTest) {
+            dbFiadoEntries.forEach(e => entriesMap.set(e.id, e));
+          }
           const mergedEntries = Array.from(entriesMap.values()).sort(
             (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
           );
 
           // Merge real-time active checkouts from fluxo_cobrancas_tempo_real table + korisko_system_state
-          const extraCheckouts: ActiveCheckoutSession[] = Array.isArray(dbExtra?.activeCheckouts) ? dbExtra.activeCheckouts : (prev.activeCheckouts ?? []);
+          const extraCheckouts: ActiveCheckoutSession[] = shouldZeroForRealTest
+            ? []
+            : (dbExtra && Array.isArray(dbExtra.activeCheckouts) ? dbExtra.activeCheckouts : (prev.activeCheckouts ?? []));
           const checkoutsMap = new Map<string, ActiveCheckoutSession>();
           extraCheckouts.forEach(s => checkoutsMap.set(s.id, s));
-          dbCheckouts.forEach(s => checkoutsMap.set(s.id, s));
+          if (!shouldZeroForRealTest) {
+            dbCheckouts.forEach(s => checkoutsMap.set(s.id, s));
+          }
           const nowMs = Date.now();
           const mergedCheckouts = Array.from(checkoutsMap.values())
             .filter(s => s.status !== 'cancelado' && (nowMs - new Date(s.updatedAt).getTime() < 24 * 60 * 60 * 1000))
@@ -519,12 +582,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             .slice(0, 40);
 
           // Merge & synthesize customer purchases (registro_compras_clientes + sales + fiado entries + open comandas)
-          const extraPurchases: CustomerPurchaseRecord[] = Array.isArray(dbExtra?.customerPurchases)
-            ? dbExtra.customerPurchases
-            : (prev.customerPurchases ?? []);
+          const extraPurchases: CustomerPurchaseRecord[] = shouldZeroForRealTest
+            ? []
+            : (dbExtra && Array.isArray(dbExtra.customerPurchases)
+              ? dbExtra.customerPurchases
+              : (prev.customerPurchases ?? []));
           const purchasesMap = new Map<string, CustomerPurchaseRecord>();
           extraPurchases.forEach(p => purchasesMap.set(p.id, p));
-          (dbCustomerPurchases || []).forEach(p => purchasesMap.set(p.id, p));
+          if (!shouldZeroForRealTest) {
+            (dbCustomerPurchases || []).forEach(p => purchasesMap.set(p.id, p));
+          }
 
           const recordedSaleIds = new Set<string>();
           const recordedComandaNumbers = new Set<string>();
@@ -2780,6 +2847,219 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
+  // Delete single Fiado / Conta Corrente entry and reconcile customer balance in real time
+  const deleteCustomerEntry = useCallback(async (entryId: string) => {
+    deleteLancamentoFiadoDb(entryId).catch(() => {});
+    deleteRegistroCompraClienteDb(`purch-debt-${entryId}`).catch(() => {});
+
+    setData(prev => {
+      const target = (prev.customerEntries || []).find(e => e.id === entryId);
+      const nextEntries = (prev.customerEntries || []).filter(e => e.id !== entryId);
+      const nextPurchases = (prev.customerPurchases || []).filter(p => p.id !== `purch-debt-${entryId}`);
+
+      let targetCustId = target?.customerId;
+      if (!targetCustId && entryId.startsWith('initial-')) {
+        targetCustId = entryId.replace('initial-', '');
+      }
+
+      const nextCustomers = (prev.customers || []).map(c => {
+        if (targetCustId && c.id === targetCustId) {
+          const remainingEntries = nextEntries.filter(e => e.customerId === c.id);
+          let nextBal = c.outstandingBalanceBrl || 0;
+          if (entryId.startsWith('initial-')) {
+            nextBal = 0;
+          } else if (target) {
+            if (remainingEntries.length === 0) {
+              nextBal = 0;
+            } else if (target.type === 'debito_compra') {
+              nextBal = Math.max(0, Math.round((nextBal - target.amountBrl) * 100) / 100);
+            } else {
+              // Recalculate from remaining entries
+              const sumDebits = remainingEntries
+                .filter(e => e.type === 'debito_compra')
+                .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
+              const sumPaid = remainingEntries
+                .filter(e => e.type === 'pagamento_amortizacao')
+                .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
+              nextBal = Math.max(0, Math.round((sumDebits - sumPaid) * 100) / 100);
+            }
+          }
+
+          const custPurchases = nextPurchases.filter(p => p.customerId === c.id);
+          const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+
+          const updatedCust: Customer = {
+            ...c,
+            outstandingBalanceBrl: nextBal,
+            totalSpentBrl: sumPurchases,
+            purchaseCount: custPurchases.length,
+          };
+          upsertCliente(updatedCust).catch(() => {});
+          if (nextBal <= 0) {
+            supabase.from('saldos_devedores_tempo_real').delete().eq('customer_id', c.id).then(() => {}, () => {});
+          } else {
+            upsertSaldoDevedorTempoRealDb({
+              customerId: c.id,
+              customerName: c.name,
+              customerPhone: c.phone,
+              previousBalanceBrl: c.outstandingBalanceBrl || 0,
+              lastComandaAmountBrl: 0,
+              currentDebtBalanceBrl: nextBal,
+              creditLimitBrl: c.creditLimitBrl || 500000,
+              openComandasCount: 0,
+              lastOperationType: 'pagamento_amortizacao',
+              updatedBy: currentUser.name,
+              updatedAt: new Date().toISOString(),
+            }).catch(() => {});
+          }
+          return updatedCust;
+        }
+        return c;
+      });
+
+      const next = {
+        ...prev,
+        customers: nextCustomers,
+        customerEntries: nextEntries,
+        customerPurchases: nextPurchases,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+
+    showToast('Registro apagado da Tabela de Fiado & Conta Corrente!', 'success');
+  }, [currentUser.name, showToast]);
+
+  // Clear all Fiado & Conta Corrente entries (either for one customer or all customers)
+  const clearAllCustomerEntries = useCallback(async (customerId?: string) => {
+    if (customerId) {
+      supabase.from('lancamentos_fiado').delete().eq('customer_id', customerId).then(() => {}, () => {});
+      supabase.from('saldos_devedores_tempo_real').delete().eq('customer_id', customerId).then(() => {}, () => {});
+      supabase.from('fluxo_cobrancas_tempo_real').delete().eq('customer_id', customerId).then(() => {}, () => {});
+    } else {
+      supabase.from('lancamentos_fiado').delete().neq('id', 'none').then(() => {}, () => {});
+      supabase.from('saldos_devedores_tempo_real').delete().neq('customer_id', 'none').then(() => {}, () => {});
+      supabase.from('fluxo_cobrancas_tempo_real').delete().neq('id', 'none').then(() => {}, () => {});
+      supabase.from('amortizacoes_pagamentos_fiado').delete().neq('id', 'none').then(() => {}, () => {});
+    }
+
+    setData(prev => {
+      const nextEntries = customerId
+        ? (prev.customerEntries || []).filter(e => e.customerId !== customerId)
+        : [];
+      const nextCheckouts = customerId
+        ? (prev.activeCheckouts || []).filter(s => s.customerId !== customerId)
+        : [];
+      const nextCustomers = (prev.customers || []).map(c => {
+        if (!customerId || c.id === customerId) {
+          const updatedCust: Customer = {
+            ...c,
+            outstandingBalanceBrl: 0,
+          };
+          upsertCliente(updatedCust).catch(() => {});
+          return updatedCust;
+        }
+        return c;
+      });
+
+      const next = {
+        ...prev,
+        customers: nextCustomers,
+        customerEntries: nextEntries,
+        activeCheckouts: nextCheckouts,
+      };
+      StorageService.saveState(next);
+      saveSystemStateDoc(next);
+      return next;
+    });
+
+    showToast(
+      customerId
+        ? 'Extrato e saldo devedor do cliente zerados!'
+        : 'Todos os registros da Tabela de Fiado & Conta Corrente foram apagados!',
+      'success'
+    );
+  }, [showToast]);
+
+  // Zero out all financial and operational numbers to initiate a fresh Real Test (preserving Products, Recipes & Team)
+  const zeroAllNumbersForRealTest = useCallback(async () => {
+    try {
+      await Promise.all([
+        supabase.from('vendas').delete().neq('id', 'none'),
+        supabase.from('comandas').delete().neq('id', 'none'),
+        supabase.from('lancamentos_fiado').delete().neq('id', 'none'),
+        supabase.from('registro_compras_clientes').delete().neq('id', 'none'),
+        supabase.from('fluxo_cobrancas_tempo_real').delete().neq('id', 'none'),
+        supabase.from('saldos_devedores_tempo_real').delete().neq('customer_id', 'none'),
+        supabase.from('amortizacoes_pagamentos_fiado').delete().neq('id', 'none'),
+        supabase.from('comandas_historico_setores').delete().neq('id', 'none'),
+        supabase.from('caixa_sessoes').delete().neq('id', 'none'),
+        supabase.from('caixa_movimentacoes').delete().neq('id', 'none'),
+        supabase.from('estoque_movimentacoes').delete().neq('id', 'none'),
+        supabase.from('fornadas_producao').delete().neq('id', 'none'),
+        supabase.from('clientes').delete().in('id', ['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5']),
+        supabase
+          .from('clientes')
+          .update({
+            outstanding_balance_brl: 0,
+            total_spent_brl: 0,
+            purchase_count: 0,
+            loyalty_points: 0,
+          })
+          .neq('id', 'none'),
+        fetch('/api/zero-numbers', { method: 'POST' }).catch(() => {}),
+      ]);
+    } catch {}
+
+    setData(prev => {
+      const zeroedCustomers = (prev.customers || [])
+        .filter(c => !['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5'].includes(c.id))
+        .map(c => {
+          const cleanCust: Customer = {
+            ...c,
+            outstandingBalanceBrl: 0,
+            totalSpentBrl: 0,
+            purchaseCount: 0,
+            loyaltyPoints: 0,
+          };
+          upsertCliente(cleanCust).catch(() => {});
+          return cleanCust;
+        });
+
+      const freshSession: CashRegisterSession = {
+        id: `sess-${Date.now()}`,
+        sessionNumber: 1,
+        status: 'aberto',
+        openedAt: new Date().toISOString(),
+        openedBy: currentUser.name || 'Ax',
+        initialFloat: { brl: 0, pyg: 0, usd: 0 },
+        transactions: [],
+      };
+      upsertCaixaSessao(freshSession).catch(() => {});
+
+      const nextState: SystemBackupData = {
+        ...prev,
+        sales: [],
+        openComandas: [],
+        fornadas: [],
+        stockMovements: [],
+        customers: zeroedCustomers,
+        customerEntries: [],
+        customerPurchases: [],
+        activeCheckouts: [],
+        currentSession: freshSession,
+        sessionHistory: [],
+      };
+
+      StorageService.saveState(nextState);
+      saveSystemStateDoc(nextState);
+      return nextState;
+    });
+
+    showToast('Todos os números foram zerados! Sistema pronto para o Teste Real.', 'success');
+  }, [currentUser.name, showToast]);
+
   // ==========================================
   // REQUIREMENT 5 & 6: COMPLETE SALE
   // 5. Database generates sale_number via trigger. Do NOT send sale_number.
@@ -3666,6 +3946,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     recordCustomerPayment,
     recordCustomerPurchase,
     deleteCustomerPurchase,
+    deleteCustomerEntry,
+    clearAllCustomerEntries,
+    zeroAllNumbersForRealTest,
     redeemCustomerPoints,
     openComandas: data.openComandas || [],
     saveComanda,
@@ -3709,7 +3992,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,
     executeProductionFromRecipe, broadcastCheckoutSession, clearCheckoutSession,
     addCustomer, updateCustomer, deleteCustomer,
-    recordCustomerDebt, recordCustomerPayment, recordCustomerPurchase, deleteCustomerPurchase, redeemCustomerPoints,
+    recordCustomerDebt, recordCustomerPayment, recordCustomerPurchase, deleteCustomerPurchase,
+    deleteCustomerEntry, clearAllCustomerEntries, zeroAllNumbersForRealTest, redeemCustomerPoints,
     saveComanda, updateComandaStatus, removeComanda, completeSale, deleteSale,
     openRegister, closeRegister, recordSaidaCaixa, recordEntradaCaixa,
     recordSangria, recordSuprimento, getCurrentGoal, updateGoal,

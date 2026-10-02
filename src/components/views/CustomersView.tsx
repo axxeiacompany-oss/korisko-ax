@@ -66,6 +66,10 @@ export const CustomersView: React.FC = () => {
     hasPermission,
     exchangeRates,
     language,
+    deleteCustomerEntry,
+    clearAllCustomerEntries,
+    clearCheckoutSession,
+    zeroAllNumbersForRealTest,
     showToast
   } = useBakery();
 
@@ -694,7 +698,16 @@ export const CustomersView: React.FC = () => {
         </div>
 
         {canManage && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => zeroAllNumbersForRealTest()}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
+              title="Zerar todos os números financeiros, comandas, vendas e fiado para iniciar teste real"
+            >
+              <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Zerar Todos os Números (Teste Real)</span>
+            </button>
             <button
               onClick={handleOpenCreate}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
@@ -714,84 +727,175 @@ export const CustomersView: React.FC = () => {
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
               <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-rose-400" />
-                <span>Fluxo ao Vivo de Cobranças & Lançamentos de Fiado (Na Hora)</span>
+                <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
               </h2>
             </div>
-            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-              Sincronizado: saldos_devedores_tempo_real • lancamentos_fiado • comandas_abertas
-            </span>
+            <div className="flex items-center gap-2">
+              {customerEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => clearAllCustomerEntries()}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                  title="Apagar todos os registros da tabela de Fiado & Conta Corrente e zerar saldos"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Apagar Todos ({customerEntries.length})</span>
+                </button>
+              )}
+              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                Sincronizado em Tempo Real
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {(activeCheckouts || []).slice(0, 3).map(chk => {
-              const isFiado = chk.paymentMethod === 'fiado';
-              const isChargingNow = chk.status === 'em_cobranca';
-              const isComandaLancada = chk.status === 'comanda_lancada';
-              const linkedCust = customers.find(c => c.id === chk.customerId || c.name.toLowerCase() === chk.customerName.toLowerCase());
-              return (
-                <div
-                  key={chk.id}
-                  className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
-                    isChargingNow || isComandaLancada
-                      ? isFiado
-                        ? 'bg-rose-950/40 border-rose-500/60 shadow-md shadow-rose-950/30'
-                        : 'bg-amber-950/30 border-amber-500/50'
-                      : isFiado
-                        ? 'bg-rose-950/20 border-rose-500/30'
-                        : 'bg-[#090D16] border-[#1E273A]'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        isChargingNow
-                          ? 'bg-amber-500 text-neutral-950 animate-pulse'
-                          : isComandaLancada
-                            ? 'bg-rose-500 text-white animate-pulse'
-                            : isFiado
-                              ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
-                              : 'bg-emerald-500/20 text-emerald-300'
-                      }`}>
-                        {isChargingNow
-                          ? `COBRANDO AGORA: ${chk.paymentMethod.toUpperCase()}`
-                          : isComandaLancada
-                            ? `COMANDA LANÇADA ${chk.comandaNumber ? `#${chk.comandaNumber}` : ''} • SALDO ATUALIZADO`
-                            : isFiado
-                              ? 'FIADO CONFIRMADO'
-                              : `PAGO (${chk.paymentMethod.toUpperCase()})`}
-                      </span>
-                      <span className="font-mono-nums font-black text-sm text-amber-400">
-                        {formatCurrency(chk.amountBrl, 'PYG')}
-                      </span>
-                    </div>
-
-                    <div className="font-bold text-white truncate">
-                      Cliente: {chk.customerName}
-                    </div>
-
-                    {isFiado && (
-                      <div className="text-[11px] text-rose-200 font-mono-nums">
-                        Anterior: {formatCurrency(chk.previousDebtBrl || 0, 'PYG')} → Novo Saldo: <strong>{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong>
+          {activeCheckouts && activeCheckouts.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {activeCheckouts.slice(0, 3).map(chk => {
+                const isFiado = chk.paymentMethod === 'fiado';
+                const isChargingNow = chk.status === 'em_cobranca';
+                const isComandaLancada = chk.status === 'comanda_lancada';
+                const linkedCust = customers.find(c => c.id === chk.customerId || c.name.toLowerCase() === chk.customerName.toLowerCase());
+                return (
+                  <div
+                    key={chk.id}
+                    className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
+                      isChargingNow || isComandaLancada
+                        ? isFiado
+                          ? 'bg-rose-950/40 border-rose-500/60 shadow-md shadow-rose-950/30'
+                          : 'bg-amber-950/30 border-amber-500/50'
+                        : isFiado
+                          ? 'bg-rose-950/20 border-rose-500/30'
+                          : 'bg-[#090D16] border-[#1E273A]'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          isChargingNow
+                            ? 'bg-amber-500 text-neutral-950 animate-pulse'
+                            : isComandaLancada
+                              ? 'bg-rose-500 text-white animate-pulse'
+                              : isFiado
+                                ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
+                                : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {isChargingNow
+                            ? `COBRANDO AGORA: ${chk.paymentMethod.toUpperCase()}`
+                            : isComandaLancada
+                              ? `COMANDA LANÇADA ${chk.comandaNumber ? `#${chk.comandaNumber}` : ''} • SALDO ATUALIZADO`
+                              : isFiado
+                                ? 'FIADO CONFIRMADO'
+                                : `PAGO (${chk.paymentMethod.toUpperCase()})`}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono-nums font-black text-sm text-amber-400">
+                            {formatCurrency(chk.amountBrl, 'PYG')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => clearCheckoutSession(chk.id)}
+                            className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
+                            title="Apagar esta cobrança em tempo real"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[10px] text-neutral-400">
-                    <span>Op: {chk.operatorName} {chk.comandaNumber ? `• #${chk.comandaNumber}` : ''}</span>
-                    {linkedCust && (
+                      <div className="font-bold text-white truncate">
+                        Cliente: {chk.customerName}
+                      </div>
+
+                      {isFiado && (
+                        <div className="text-[11px] text-rose-200 font-mono-nums">
+                          Anterior: {formatCurrency(chk.previousDebtBrl || 0, 'PYG')} → Novo Saldo: <strong>{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[10px] text-neutral-400">
+                      <span>Op: {chk.operatorName} {chk.comandaNumber ? `• #${chk.comandaNumber}` : ''}</span>
+                      {linkedCust && (
+                        <button
+                          type="button"
+                          onClick={() => setStatementCustomer(linkedCust)}
+                          className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                        >
+                          Abrir Extrato
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {customerEntries && customerEntries.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+              {customerEntries.slice(0, 9).map(entry => {
+                const cust = customers.find(c => c.id === entry.customerId);
+                const isDebit = entry.type === 'debito_compra';
+                return (
+                  <div
+                    key={entry.id}
+                    className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2.5 transition-all ${
+                      isDebit
+                        ? 'bg-rose-950/20 border-rose-500/30 hover:border-rose-500/50'
+                        : 'bg-emerald-950/20 border-emerald-500/30 hover:border-emerald-500/50'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                          isDebit ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {isDebit ? 'FIADO / DÉBITO' : 'AMORTIZAÇÃO'}
+                        </span>
+                        {entry.comandaNumber && (
+                          <span className="text-[10px] font-mono font-bold text-amber-300">
+                            #{entry.comandaNumber}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold text-white truncate">
+                          {cust?.name || 'Cliente'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-300 truncate mt-1">
+                        {entry.description}
+                      </p>
+                      <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                        {new Date(entry.date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {entry.recordedBy ? ` • Op: ${entry.recordedBy}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <span className={`text-xs font-mono font-black block ${
+                          isDebit ? 'text-rose-400' : 'text-emerald-400'
+                        }`}>
+                          {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
+                        </span>
+                        <span className="text-[10px] font-mono text-neutral-400 block">
+                          {formatCurrency(entry.amountBrl, 'BRL')}
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setStatementCustomer(linkedCust)}
-                        className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                        onClick={() => deleteCustomerEntry(entry.id)}
+                        className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                        title="Apagar este registro de Fiado / Conta Corrente"
                       >
-                        Abrir Extrato
+                        <Trash2 className="w-3 h-3" />
+                        <span>Apagar</span>
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1627,8 +1731,8 @@ export const CustomersView: React.FC = () => {
                                 </div>
                               )}
 
-                              {entrySale && (
-                                <div className="text-right pt-0.5">
+                              <div className="flex items-center justify-between pt-1 no-print">
+                                {entrySale ? (
                                   <button
                                     type="button"
                                     onClick={() => setSelectedSaleForReceipt(entrySale)}
@@ -1636,8 +1740,17 @@ export const CustomersView: React.FC = () => {
                                   >
                                     Ver Cupom da Venda #{entrySale.saleNumber} →
                                   </button>
-                                </div>
-                              )}
+                                ) : <span />}
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCustomerEntry(entry.id)}
+                                  className="px-2 py-0.5 rounded bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Apagar este lançamento"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Apagar</span>
+                                </button>
+                              </div>
                             </div>
                           );
                         })
@@ -2028,21 +2141,32 @@ export const CustomersView: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-[#151E30] shrink-0 gap-1">
+                        <div className="flex items-center sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-[#151E30] shrink-0 gap-1.5">
                           <div className={`font-mono font-black text-sm sm:text-base ${isDebit ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'BRL')}
                           </div>
 
-                          {entrySale && (
+                          <div className="flex items-center gap-2">
+                            {entrySale && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSaleForReceipt(entrySale)}
+                                className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
+                              >
+                                <Receipt className="w-3 h-3" />
+                                <span>Cupom #{entrySale.saleNumber}</span>
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setSelectedSaleForReceipt(entrySale)}
-                              className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
+                              onClick={() => deleteCustomerEntry(entry.id)}
+                              className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Apagar este registro"
                             >
-                              <Receipt className="w-3 h-3" />
-                              <span>Cupom #{entrySale.saleNumber}</span>
+                              <Trash2 className="w-3 h-3" />
+                              <span>Apagar</span>
                             </button>
-                          )}
+                          </div>
                         </div>
                       </div>
                     );

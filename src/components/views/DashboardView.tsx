@@ -19,7 +19,8 @@ import {
   Users,
   Zap,
   ShieldCheck,
-  Store
+  Store,
+  RotateCcw
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import { Sale, Customer } from '../../types';
@@ -45,6 +46,7 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
     openComandas,
     fichasTecnicas,
     customers,
+    zeroAllNumbersForRealTest,
     t,
     language
   } = useBakery();
@@ -202,6 +204,15 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
           >
             <Store className="w-4 h-4 text-[#C89B6E]" />
             <span>Loja & Vitrine</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => zeroAllNumbersForRealTest()}
+            className="px-3 py-2.5 rounded-xl border border-rose-500/40 bg-rose-600/20 hover:bg-rose-600 active:scale-95 text-rose-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            title="Zerar todas as vendas, fiado, comandas e valores de caixa para iniciar teste real"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Zerar Todos os Números</span>
           </button>
           {isAx && (
             <button

@@ -17,7 +17,8 @@ import {
   BookOpen,
   ShieldCheck,
   UserCheck,
-  Landmark
+  Landmark,
+  RotateCcw
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ReceiptModal } from './modals/ReceiptModal';
@@ -34,13 +35,24 @@ export const LiveSalesStream: React.FC<Props> = ({
   onClose,
   onNavigateToPdv 
 }) => {
-  const { sales, activeCheckouts, customerEntries, language, currentUser } = useBakery();
+  const {
+    sales,
+    activeCheckouts,
+    customerEntries,
+    language,
+    currentUser,
+    deleteCustomerEntry,
+    clearAllCustomerEntries,
+    clearCheckoutSession,
+    zeroAllNumbersForRealTest,
+  } = useBakery();
   const isAdmin = currentUser.role === 'admin';
   
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
+  const [confirmZeroAll, setConfirmZeroAll] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [filterPeriod, setFilterPeriod] = useState<'today' | 'all'>('today');
+  const [filterPeriod, setFilterPeriod] = useState<'today' | 'all'>('all');
   const [nowTime, setNowTime] = useState<number>(Date.now());
   const prevSalesLengthRef = useRef<number>(sales.length);
   const prevEntriesLengthRef = useRef<number>((customerEntries || []).length);
@@ -205,20 +217,54 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            {/* Zerar Todos os Números (Iniciar Teste Real) */}
+            {!confirmZeroAll ? (
+              <button
+                type="button"
+                onClick={() => setConfirmZeroAll(true)}
+                className="px-2.5 py-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Zerar todos os números (vendas, fiado, saldos e caixa) para iniciar teste real"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                <span>Zerar Todos os Números</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/50 rounded-lg px-2 py-1">
+                <span className="text-[10px] font-bold text-rose-200">Confirmar zerar tudo?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await zeroAllNumbersForRealTest();
+                    setConfirmZeroAll(false);
+                  }}
+                  className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black cursor-pointer"
+                >
+                  Sim, Zerar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmZeroAll(false)}
+                  className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] cursor-pointer"
+                >
+                  Não
+                </button>
+              </div>
+            )}
+
             {/* Filter today / all */}
             <div className="flex items-center bg-neutral-950 rounded-lg p-0.5 border border-neutral-800 text-[11px]">
               <button
                 type="button"
                 onClick={() => setFilterPeriod('today')}
-                className={`px-2.5 py-1 rounded-md transition-colors ${filterPeriod === 'today' ? 'bg-neutral-800 text-neutral-100 font-semibold' : 'text-neutral-400 hover:text-neutral-200'}`}
+                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${filterPeriod === 'today' ? 'bg-neutral-800 text-neutral-100 font-semibold' : 'text-neutral-400 hover:text-neutral-200'}`}
               >
                 {language === 'es' ? 'Hoy' : 'Hoje'}
               </button>
               <button
                 type="button"
                 onClick={() => setFilterPeriod('all')}
-                className={`px-2.5 py-1 rounded-md transition-colors ${filterPeriod === 'all' ? 'bg-neutral-800 text-neutral-100 font-semibold' : 'text-neutral-400 hover:text-neutral-200'}`}
+                className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${filterPeriod === 'all' ? 'bg-neutral-800 text-neutral-100 font-semibold' : 'text-neutral-400 hover:text-neutral-200'}`}
               >
                 {language === 'es' ? 'Todas' : 'Todas'}
               </button>
@@ -357,19 +403,40 @@ export const LiveSalesStream: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Recent Real-Time Fiado & Amortization Ledger Entries */}
-        {recentFiadoEntries.length > 0 && (
-          <div className="mb-3.5 p-3 rounded-xl bg-neutral-950/90 border border-neutral-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-rose-400" />
-                <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
-              </span>
+        {/* Recent Real-Time Fiado & Amortization Ledger Entries with Full Delete & Zero Controls */}
+        <div className="mb-3.5 p-3.5 rounded-xl bg-neutral-950/90 border border-neutral-800 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-rose-400" />
+              <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
+            </span>
+
+            <div className="flex items-center gap-2">
               <span className="text-[10px] text-neutral-400 font-mono-nums">
-                {recentFiadoEntries.length} lançamentos
+                {recentFiadoEntries.length} {recentFiadoEntries.length === 1 ? 'lançamento' : 'lançamentos'}
               </span>
+
+              {recentFiadoEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => clearAllCustomerEntries()}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Apagar todos os registros da Tabela de Fiado & Conta Corrente"
+                >
+                  <Trash2 className="w-3 h-3 text-rose-400" />
+                  <span>Apagar Todos</span>
+                </button>
+              )}
             </div>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+          </div>
+
+          {recentFiadoEntries.length === 0 ? (
+            <div className="py-3 px-3 rounded-lg bg-[#080B12] border border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+              <span>Nenhum registro na Tabela de Fiado & Conta Corrente. Números zerados para teste real.</span>
+              <span className="text-[10px] font-mono-nums text-emerald-400 font-bold">₲ 0</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {recentFiadoEntries.map(entry => {
                 const isDebt = entry.type === 'debito_compra';
                 return (
@@ -381,7 +448,7 @@ export const LiveSalesStream: React.FC<Props> = ({
                         : 'bg-emerald-950/20 border-emerald-500/30'
                     }`}
                   >
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
                           isDebt ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
@@ -400,27 +467,39 @@ export const LiveSalesStream: React.FC<Props> = ({
                           {getRelativeTime(entry.date)}
                         </span>
                       </div>
-                      <div className="text-[11px] text-neutral-400">
+                      <div className="text-[11px] text-neutral-400 break-words">
                         {entry.description}
                       </div>
                     </div>
 
-                    <div className="text-right font-mono-nums shrink-0">
-                      <div className={`font-black ${isDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {isDebt ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
-                      </div>
-                      {entry.resultingBalanceBrl !== undefined && (
-                        <div className="text-[10px] text-neutral-400">
-                          Saldo: <strong className="text-amber-300">{formatCurrency(entry.resultingBalanceBrl, 'PYG')}</strong>
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                      <div className="text-right font-mono-nums">
+                        <div className={`font-black ${isDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {isDebt ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
                         </div>
-                      )}
+                        {entry.resultingBalanceBrl !== undefined && (
+                          <div className="text-[10px] text-neutral-400">
+                            Saldo: <strong className="text-amber-300">{formatCurrency(entry.resultingBalanceBrl, 'PYG')}</strong>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteCustomerEntry(entry.id)}
+                        className="px-2 py-1.5 rounded-lg border border-rose-500/35 bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 hover:text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Apagar este registro da Tabela de Fiado & Conta Corrente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Apagar</span>
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Stream List / Timeline Feed */}
         <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[480px] pr-1 scrollbar-thin scrollbar-thumb-neutral-800">
