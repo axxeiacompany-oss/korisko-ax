@@ -2094,9 +2094,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       finalItems.reduce((sum, item) => sum + (Number(item.subtotalBrl) || 0), 0) * 100
     ) / 100;
 
-    const shouldUpdateDebtor = extraOptions?.updateDebtorBalance !== false;
+    const shouldUpdateDebtor = Boolean(extraOptions?.updateDebtorBalance || extraOptions?.isFiado);
 
-    // Resolve or auto-create Debtor Customer so Comanda launch immediately updates Debtor Balance in real time
+    // Resolve or auto-create Debtor Customer so Comanda launch updates Debtor Balance only when explicitly requested as Fiado
     const rawTypedName = (customerName || existing?.customerName || '').trim();
     const effectiveDebtorName =
       rawTypedName && rawTypedName !== 'Cliente Balcão'
@@ -2168,6 +2168,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       confirmedAt: existing?.confirmedAt || nowIso,
       updatedAt: nowIso,
       source: extraOptions?.source || existing?.source || 'pdv',
+      formaPagamento: extraOptions?.intendedPaymentMethod || (extraOptions?.isFiado ? 'fiado' : existing?.formaPagamento),
       totalBrl,
       debtAppliedBrl: shouldUpdateDebtor && targetCustomer ? totalBrl : (existing?.debtAppliedBrl || 0),
       previousDebtBrl: initialBeforeComandaBal,
@@ -3633,6 +3634,32 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const sectorInfo = resolveSetoresFromItems(items);
     const resolvedComandaNumber = comandaNumber || `CMD-${String(Date.now()).slice(-4)}`;
 
+    // 1. Sanitize payments when Fiado is used:
+    // If the sale is marked as Fiado (or total fiado covers the bill), ensure NO cash payment lingers!
+    let sanitizedPayments: PaymentEntry[] = [...payments];
+    if (primaryMethod === 'fiado' || fiadoAmountBrl >= finalTotalBrl) {
+      sanitizedPayments = [{
+        id: payments[0]?.id || `pay-${Date.now()}`,
+        currency: 'PYG',
+        amountReceived: finalTotalBrl,
+        exchangeRateUsed: 1,
+        equivalentBrl: finalTotalBrl,
+        method: 'fiado',
+      }];
+    }
+
+    // 2. Anti-duplication check: if a sale with this comandaNumber was already recorded (e.g. from an accidental cash attempt),
+    // delete it from Supabase so there are NEVER two sales or duplicate charges for the same order!
+    const existingSaleForComanda = resolvedComandaNumber
+      ? (data.sales || []).find(
+          s => s.comandaNumber && s.comandaNumber.trim().toLowerCase() === resolvedComandaNumber.trim().toLowerCase() && s.id !== tempId
+        )
+      : undefined;
+
+    if (existingSaleForComanda) {
+      deleteVenda(existingSaleForComanda.id).catch(() => {});
+    }
+
     // Prepare payload without sale_number (DB trigger generates it!)
     const salePayload = {
       id: tempId,
@@ -3643,8 +3670,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       subtotalBrl: Math.round(rawTotal * 100) / 100,
       discountBrl: discountBrl ? Math.round(discountBrl * 100) / 100 : undefined,
       totalBrl: finalTotalBrl,
-      payments,
-      changeGiven,
+      payments: sanitizedPayments,
+      changeGiven: primaryMethod === 'fiado' ? undefined : changeGiven,
       customerId: targetCustomerId,
       customerName: resolvedCustomerName,
       comandaNumber: resolvedComandaNumber,
@@ -3756,7 +3783,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (fiadoAmountBrl > 0) {
         fiadoAccountEntry = {
-          id: linkedComanda ? `entry-cmd-${linkedComanda.id}` : `entry-${Date.now()}`,
+          id: `entry-sale-${persistedSale.id}`,
           customerId: targetCustomerId,
           customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Fiado',
           date: nowIso,
@@ -3774,6 +3801,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         upsertLancamentoFiadoDb(fiadoAccountEntry).catch(() => {});
+
+        // If an entry for the comanda existed, delete it so there's never duplicate ledger rows
+        if (linkedComanda) {
+          deleteLancamentoFiadoDb(`entry-cmd-${linkedComanda.id}`).catch(() => {});
+        }
       } else if (linkedComanda && alreadyAppliedComandaDebt > 0) {
         // Comanda was launched on debtor balance, and now customer paid in Cash/PIX/Card at checkout
         removedEntryId = `entry-cmd-${linkedComanda.id}`;
@@ -3886,7 +3918,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const paidAmountBrl = Math.max(0, finalTotalBrl - fiadoAmountBrl);
 
       salePurchaseRecord = {
-        id: linkedComanda ? `purch-cmd-${linkedComanda.id}` : `purch-sale-${persistedSale.id}`,
+        id: `purch-sale-${persistedSale.id}`,
         customerId: targetCustomerId,
         customerName: resolvedCustomerName || targetCustomer?.name || 'Cliente Cadastrado',
         customerPhone: targetCustomer?.phone,
@@ -3935,9 +3967,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 !(
                   resolvedComandaNumber &&
                   p.comandaNumber &&
-                  p.comandaNumber.trim().toLowerCase() === resolvedComandaNumber.trim().toLowerCase() &&
-                  p.id.startsWith('purch-cmd-')
-                )
+                  p.comandaNumber.trim().toLowerCase() === resolvedComandaNumber.trim().toLowerCase()
+                ) &&
+                !(existingSaleForComanda && p.saleId === existingSaleForComanda.id)
             ),
           ]
         : (prev.customerPurchases || []);
@@ -3978,9 +4010,19 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (removedEntryId) {
         nextEntries = nextEntries.filter(e => e.id !== removedEntryId);
       }
+      if (linkedComanda) {
+        nextEntries = nextEntries.filter(e => e.id !== `entry-cmd-${linkedComanda.id}`);
+      }
+      if (existingSaleForComanda) {
+        nextEntries = nextEntries.filter(e => e.saleId !== existingSaleForComanda.id);
+      }
       if (fiadoAccountEntry) {
         nextEntries = [fiadoAccountEntry, ...nextEntries.filter(e => e.id !== fiadoAccountEntry!.id)];
       }
+
+      const cleanPrevSales = (prev.sales || []).filter(
+        s => s.id !== persistedSale.id && (!existingSaleForComanda || s.id !== existingSaleForComanda.id)
+      );
 
       const nextState: SystemBackupData = {
         ...prev,
@@ -3991,7 +4033,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         customerEntries: nextEntries,
         customerPurchases: nextPurchases,
         activeCheckouts: [completedCheckoutFlow, ...filteredCheckouts].slice(0, 40),
-        sales: [persistedSale, ...prev.sales.filter(s => s.id !== persistedSale.id)],
+        sales: [persistedSale, ...cleanPrevSales],
       };
       StorageService.saveState(nextState);
       saveSystemStateDoc(nextState);

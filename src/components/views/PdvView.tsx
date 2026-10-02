@@ -16,7 +16,8 @@ import {
   Flame,
   Tag,
   Bookmark,
-  Zap
+  Zap,
+  BookOpen
 } from 'lucide-react';
 import { PaymentModal } from '../modals/PaymentModal';
 import { ReceiptModal } from '../modals/ReceiptModal';
@@ -34,6 +35,7 @@ export const PdvView: React.FC = () => {
   
   // Modals state
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentMethodForModal, setPaymentMethodForModal] = useState<PaymentMethod>('dinheiro');
   const [lastCompletedSale, setLastCompletedSale] = useState<Sale | null>(null);
   const [isComandasOpen, setIsComandasOpen] = useState(false);
   const [isFornadaOpen, setIsFornadaOpen] = useState(false);

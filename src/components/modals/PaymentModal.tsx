@@ -30,6 +30,7 @@ interface Props {
   onSaleCompleted: (sale: Sale) => void;
   comandaNumber?: string;
   initialCustomerName?: string;
+  initialPaymentMethod?: PaymentMethod;
 }
 
 export const PaymentModal: React.FC<Props> = ({
@@ -39,6 +40,7 @@ export const PaymentModal: React.FC<Props> = ({
   onSaleCompleted,
   comandaNumber,
   initialCustomerName,
+  initialPaymentMethod,
 }) => {
   const {
     completeSale,
@@ -113,7 +115,7 @@ export const PaymentModal: React.FC<Props> = ({
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
 
   // Current input for adding a payment entry (Moeda única oficial: Guaraní ₲)
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('dinheiro');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>(initialPaymentMethod || 'dinheiro');
   const [inputAmount, setInputAmount] = useState<string>('');
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
 
@@ -127,6 +129,7 @@ export const PaymentModal: React.FC<Props> = ({
       setDiscountValue('');
       setLoyaltyDiscountBrl(0);
       setCustomerName(initialCustomerName || '');
+      setSelectedMethod(initialPaymentMethod || 'dinheiro');
       if (initialCustomerName) {
         const match = customers.find(
           c => c.name.trim().toLowerCase() === initialCustomerName.trim().toLowerCase()
@@ -138,7 +141,7 @@ export const PaymentModal: React.FC<Props> = ({
       setShowQuickAddCustomer(false);
       setIsFinishing(false);
     }
-  }, [isOpen, initialCustomerName, customers]);
+  }, [isOpen, initialCustomerName, initialPaymentMethod, customers]);
 
   // Preferred currency for change (Guaraní ₲)
   const changeCurrency: Currency = 'PYG';
@@ -331,16 +334,21 @@ export const PaymentModal: React.FC<Props> = ({
     setInputAmount('');
   };
 
-  const handleQuickAddBill = (val: number) => {
-    setInputAmount(val.toString());
+  const handleSelectMethod = (m: PaymentMethod) => {
+    setSelectedMethod(m);
+    if (m === 'fiado') {
+      // Switching to fiado clears cash entries so zero cash enters drawer!
+      setPayments([]);
+      setInputAmount('');
+    }
   };
 
   const handleFinishSale = async () => {
     let finalPayments = [...payments];
 
-    // Se nenhum pagamento avulso foi adicionado, assume o valor exato no método selecionado
-    if (finalPayments.length === 0 && totalBrl > 0) {
-      if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+    // Se Fiado estiver ativo ou selecionado, garante 100% em Fiado (NENHUMA entrada em dinheiro no caixa!)
+    if (selectedMethod === 'fiado' || isFiadoActive) {
+      if (!selectedCustomerId && !customerName.trim()) {
         showToast(
           language === 'es'
             ? 'Para registrar venta como Fiado, seleccione o escriba el nombre del cliente.'
@@ -349,6 +357,15 @@ export const PaymentModal: React.FC<Props> = ({
         );
         return;
       }
+      finalPayments = [{
+        id: `pay-${Date.now()}`,
+        currency: 'PYG',
+        amountReceived: totalBrl,
+        exchangeRateUsed: 1,
+        equivalentBrl: totalBrl,
+        method: 'fiado',
+      }];
+    } else if (finalPayments.length === 0 && totalBrl > 0) {
       finalPayments = [{
         id: `pay-${Date.now()}`,
         currency: 'PYG',
@@ -440,6 +457,44 @@ export const PaymentModal: React.FC<Props> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
+
+          {/* Top Quick Billing Mode Switcher: Caixa À Vista vs Fiado Caderneta */}
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-neutral-950 rounded-2xl border border-neutral-800">
+            <button
+              type="button"
+              onClick={() => handleSelectMethod('dinheiro')}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                !isFiadoActive
+                  ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Pagar no Caixa (À Vista)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectMethod('fiado')}
+              className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                isFiadoActive
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                  : 'text-rose-400/80 hover:text-rose-300'
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-rose-400" />
+              <span>Deixar no Fiado (Caderneta)</span>
+            </button>
+          </div>
+
+          {/* Informational Alert when in Fiado Mode */}
+          {isFiadoActive && (
+            <div className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 animate-in fade-in">
+              <ShieldCheck className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>
+                <strong>Modo Fiado Ativo:</strong> Nenhum valor entrará como dinheiro no caixa. O pedido será registrado unicamente como dívida a receber de <strong>{selectedCustomer?.name || customerName || 'um cliente'}</strong> sem duplicar cobranças.
+              </span>
+            </div>
+          )}
 
           {/* CRM / Customer Selection Box */}
           <div className={`p-3.5 rounded-xl border space-y-2.5 transition-all ${
@@ -671,7 +726,7 @@ export const PaymentModal: React.FC<Props> = ({
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setSelectedMethod(m.id as PaymentMethod)}
+                    onClick={() => handleSelectMethod(m.id as PaymentMethod)}
                     className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
                       isSelected
                         ? m.id === 'fiado' 
@@ -883,10 +938,10 @@ export const PaymentModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleFinishSale}
-              disabled={isFinishing || (payments.length > 0 && remainingBrl > 0.05)}
+              disabled={isFinishing || (!isFiadoActive && payments.length > 0 && remainingBrl > 0.05)}
               className={`flex-1 py-3 sm:py-2.5 px-4 sm:px-5 rounded-xl text-white text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                 isFiadoActive
-                  ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+                  ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
                   : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
               }`}
             >
@@ -895,7 +950,7 @@ export const PaymentModal: React.FC<Props> = ({
                 {isFinishing
                   ? (language === 'es' ? 'Registrando en tiempo real...' : 'Gravando em tempo real...')
                   : isFiadoActive
-                    ? 'Confirmar Fiado em Tempo Real & Cupom'
+                    ? 'Confirmar no Fiado (Sem Entrada de Dinheiro no Caixa)'
                     : (language === 'es' ? 'Concluir Venta & Ticket' : 'Confirmar Pagamento na Hora & Cupom')}
               </span>
             </button>
