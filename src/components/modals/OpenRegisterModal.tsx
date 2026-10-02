@@ -56,7 +56,7 @@ export const OpenRegisterModal: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleOpen} className="p-6 space-y-4">
+        <form onSubmit={handleOpen} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
           <div className="text-xs text-neutral-400 pb-1">
             {language === 'es' ? 'Operador de apertura:' : 'Operador de abertura:'} <strong className="text-neutral-200">{currentUser.name}</strong>
           </div>
@@ -96,7 +96,7 @@ export const OpenRegisterModal: React.FC<Props> = ({ isOpen, onClose }) => {
             ))}
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-4">
+          <div className="shrink-0 flex items-center justify-end gap-2 pt-4 border-t border-neutral-800">
             <button
               type="button"
               onClick={onClose}

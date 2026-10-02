@@ -93,11 +93,19 @@ export const ExchangeRatesModal: React.FC<Props> = ({ isOpen, onClose }) => {
     : 'Nunca';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div 
+        className="w-full max-w-xl max-h-[92vh] flex flex-col bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-950/60">
+        <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-4 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <Coins className="w-4 h-4" />
@@ -121,7 +129,7 @@ export const ExchangeRatesModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
+        <div className="flex-1 p-5 sm:p-6 space-y-5 overflow-y-auto overscroll-contain">
 
           {/* Live API Feed Card */}
           <div className="p-4 rounded-xl border border-emerald-900/40 bg-emerald-950/20 space-y-3">
@@ -347,20 +355,20 @@ export const ExchangeRatesModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-800">
+            <div className="shrink-0 flex items-center justify-end gap-3 pt-4 border-t border-neutral-800 bg-neutral-900 sticky bottom-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-neutral-800 text-xs font-semibold text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
               >
                 Fechar
               </button>
               {canEdit && (
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-4 h-4 stroke-[2.5]" />
                   Salvar Novas Taxas
                 </button>
               )}

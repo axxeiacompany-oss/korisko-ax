@@ -103,7 +103,7 @@ export const CloseRegisterModal: React.FC<Props> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleConfirmClose} className="p-6 space-y-4">
+        <form onSubmit={handleConfirmClose} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between text-xs pb-1">
             <div>
               <span className="text-neutral-400">{language === 'es' ? 'Operador responsable:' : 'Operador responsável:'}</span>
@@ -190,17 +190,17 @@ export const CloseRegisterModal: React.FC<Props> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+          <div className="shrink-0 flex items-center justify-end gap-3 pt-4 border-t border-neutral-800 bg-neutral-900 sticky bottom-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-neutral-800 text-xs font-medium text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-neutral-800 text-xs font-semibold text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer"
             >
               {language === 'es' ? 'Cancelar' : 'Cancelar'}
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5" />
               {language === 'es' ? 'Cerrar y Lacrar Caja' : 'Concluir e Lacrar Caixa'}

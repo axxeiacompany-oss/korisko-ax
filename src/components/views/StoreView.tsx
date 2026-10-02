@@ -881,23 +881,28 @@ export const StoreView: React.FC<Props> = ({
 
       {/* Admin Quick Edit Product Modal */}
       {editingStoreProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#0C101A] border border-[#C89B6E]/40 rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#1A2234] pb-3">
-              <h3 className="text-sm font-bold text-[#F2D6B8] flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-[#C89B6E]" />
-                <span>Editar Item na Loja: {editingStoreProduct.name}</span>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
+          onClick={e => {
+            if (e.target === e.currentTarget) setEditingStoreProduct(null);
+          }}
+        >
+          <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-[#0C101A] border border-[#C89B6E]/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="shrink-0 flex items-center justify-between border-b border-[#1A2234] px-5 py-3.5 bg-[#080B12]/80">
+              <h3 className="text-sm font-bold text-[#F2D6B8] flex items-center gap-2 truncate">
+                <Edit3 className="w-4 h-4 text-[#C89B6E] shrink-0" />
+                <span className="truncate">Editar Item na Loja: {editingStoreProduct.name}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingStoreProduct(null)}
-                className="text-neutral-400 hover:text-white"
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 transition-colors shrink-0 ml-2"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProductEdit} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveProductEdit} className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3.5 text-xs">
               <div>
                 <label className="text-neutral-300 font-semibold block mb-1">Preço de Venda (₲ PYG)</label>
                 <input
@@ -912,35 +917,35 @@ export const StoreView: React.FC<Props> = ({
               <div>
                 <label className="text-neutral-300 font-semibold block mb-1">Descrição Gourmet na Vitrine</label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={editDesc}
                   onChange={e => setEditDesc(e.target.value)}
                   placeholder="Ex: Fermentação natural com manteiga francesa..."
-                  className="w-full px-3 py-2 bg-[#080B12] border border-[#1E273A] rounded-xl text-white focus:outline-none focus:border-[#C89B6E]"
+                  className="w-full px-3 py-2 bg-[#080B12] border border-[#1E273A] rounded-xl text-white focus:outline-none focus:border-[#C89B6E] resize-none"
                 />
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
+              <label className="flex items-center gap-2 cursor-pointer pt-1 p-2 rounded-xl bg-[#080B12] border border-[#1E273A]">
                 <input
                   type="checkbox"
                   checked={editFeatured}
                   onChange={e => setEditFeatured(e.target.checked)}
-                  className="rounded accent-[#C89B6E]"
+                  className="w-4 h-4 rounded accent-[#C89B6E]"
                 />
                 <span className="text-neutral-200 font-medium">Destacar como "Seleção do Chef" na vitrine</span>
               </label>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#1A2234]">
+              <div className="shrink-0 flex justify-end gap-2 pt-3 border-t border-[#1A2234]">
                 <button
                   type="button"
                   onClick={() => setEditingStoreProduct(null)}
-                  className="px-4 py-2 rounded-xl border border-[#1E273A] text-neutral-400 hover:text-white"
+                  className="px-4 py-2.5 rounded-xl border border-[#1E273A] text-neutral-400 hover:text-white transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#C89B6E] hover:bg-[#DFB78C] text-neutral-950 font-bold cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#C89B6E] hover:bg-[#DFB78C] text-neutral-950 font-bold cursor-pointer transition-all shadow-md shadow-[#C89B6E]/20"
                 >
                   Salvar na Vitrine
                 </button>

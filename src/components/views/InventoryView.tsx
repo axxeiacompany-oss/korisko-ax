@@ -22,7 +22,7 @@ import { ConfirmModal } from '../modals/ConfirmModal';
 import { resolveProductImageUrl } from '../../lib/db';
 
 export const InventoryView: React.FC = () => {
-  const { products, stockMovements, deleteProduct, hasPermission, showToast, language } = useBakery();
+  const { products, stockMovements, deleteProduct, hasPermission, currentUser, showToast, language } = useBakery();
 
   const [activeTab, setActiveTab] = useState<'catalogo' | 'historico'>('catalogo');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,7 +36,9 @@ export const InventoryView: React.FC = () => {
   const [movementTargetProduct, setMovementTargetProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const canManageProducts = hasPermission(['admin', 'gerente']);
+  const canManageProducts = 
+    hasPermission(['admin', 'gerente', 'padeiro', 'estoquista']) || 
+    Boolean(currentUser?.allowedFeatures?.includes('estoque'));
 
   // Inventory stats
   const totalItemsCount = products.length;
