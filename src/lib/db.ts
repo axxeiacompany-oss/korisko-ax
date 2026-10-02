@@ -20,7 +20,8 @@ import {
   CashTransaction,
   CustomerPurchaseRecord,
   CustomerPurchaseItem,
-  FinancialFlowCategory
+  FinancialFlowCategory,
+  PaymentStageRecord
 } from '../types';
 
 // ==========================================
@@ -983,7 +984,9 @@ export function rowToComanda(r: any): Comanda {
 export async function listComandas(): Promise<Comanda[]> {
   try {
     const rows = await fetchAllRowsPaged<any>('comandas');
-    return rows.map(rowToComanda);
+    return rows
+      .map(rowToComanda)
+      .filter(c => c.status !== 'pago' && c.status !== 'cancelado');
   } catch {
     return [];
   }
@@ -1014,6 +1017,87 @@ export async function deleteComandaDb(id: string): Promise<void> {
     await supabase.from('comandas').delete().eq('id', id);
   } catch {
     // fallback handled by korisko_system_state
+  }
+}
+
+// Marca comanda como paga imediatamente e deleta das pendentes para evitar pedidos fantasmas
+export async function markComandaAsPaidDb(idOrNumber: string): Promise<void> {
+  const clean = String(idOrNumber || '').trim();
+  if (!clean) return;
+  try {
+    await supabase
+      .from('comandas')
+      .update({
+        status: 'pago',
+        confirmed_by_customer: true,
+        updated_at: new Date().toISOString(),
+      })
+      .or(`id.eq.${clean},number.eq.${clean}`);
+  } catch {}
+  try {
+    await supabase
+      .from('comandas')
+      .delete()
+      .or(`id.eq.${clean},number.eq.${clean}`);
+  } catch {}
+}
+
+// ==========================================
+// DATA ACCESS LAYER: PAGAMENTOS VENDAS SEPARADOS POR ETAPAS (DINHEIRO, CARTÃO, PIX, FIADO)
+// Tabela: public.pagamentos_vendas_etapas
+// ==========================================
+
+export async function insertPagamentoEtapaDb(record: PaymentStageRecord): Promise<void> {
+  try {
+    await supabase.from('pagamentos_vendas_etapas').upsert({
+      id: record.id,
+      sale_id: record.saleId,
+      sale_number: record.saleNumber || null,
+      comanda_number: record.comandaNumber || null,
+      customer_id: record.customerId || null,
+      customer_name: record.customerName || null,
+      method: record.method,
+      currency: record.currency,
+      amount_received: record.amountReceived,
+      exchange_rate_used: record.exchangeRateUsed,
+      equivalent_brl: record.equivalentBrl,
+      stage_status: record.stageStatus,
+      destination_type: record.destinationType,
+      recorded_by: record.recordedBy,
+      created_at: record.createdAt,
+    }, { onConflict: 'id' });
+  } catch {
+    // Non-blocking fallback handled in local state
+  }
+}
+
+export async function listPagamentosEtapasDb(saleId?: string): Promise<PaymentStageRecord[]> {
+  try {
+    let query = supabase.from('pagamentos_vendas_etapas').select('*');
+    if (saleId) {
+      query = query.eq('sale_id', saleId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(100);
+    if (error || !data) return [];
+    return data.map((r: any) => ({
+      id: r.id,
+      saleId: r.sale_id,
+      saleNumber: r.sale_number,
+      comandaNumber: r.comanda_number,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      method: r.method,
+      currency: r.currency,
+      amountReceived: Number(r.amount_received) || 0,
+      exchangeRateUsed: Number(r.exchange_rate_used) || 1,
+      equivalentBrl: Number(r.equivalent_brl) || 0,
+      stageStatus: r.stage_status || 'liquidado',
+      destinationType: r.destination_type || 'gaveta_caixa',
+      recordedBy: r.recorded_by || 'Caixa',
+      createdAt: r.created_at || new Date().toISOString(),
+    }));
+  } catch {
+    return [];
   }
 }
 

@@ -163,6 +163,26 @@ async function initPostgres() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pagamentos_vendas_etapas (
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL,
+        sale_number INTEGER,
+        comanda_number TEXT,
+        customer_id TEXT,
+        customer_name TEXT,
+        method TEXT NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'PYG',
+        amount_received NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        exchange_rate_used NUMERIC(14, 4) NOT NULL DEFAULT 1,
+        equivalent_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        stage_status TEXT NOT NULL DEFAULT 'liquidado',
+        destination_type TEXT NOT NULL,
+        recorded_by TEXT NOT NULL DEFAULT 'Caixa',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
     isPgConnected = true;
   } catch (err) {

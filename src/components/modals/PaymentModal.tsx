@@ -341,36 +341,24 @@ export const PaymentModal: React.FC<Props> = ({
 
   const handleSelectMethod = (m: PaymentMethod) => {
     setSelectedMethod(m);
-    if (m === 'fiado') {
-      // Switching to fiado clears cash entries so zero cash enters drawer!
-      setPayments([]);
-      setInputAmount('');
-    }
   };
 
   const handleFinishSale = async () => {
     let finalPayments = [...payments];
 
-    // Se Fiado estiver ativo ou selecionado, garante 100% em Fiado (NENHUMA entrada em dinheiro no caixa!)
-    if (selectedMethod === 'fiado' || isFiadoActive) {
-      if (!selectedCustomerId && !customerName.trim()) {
-        showToast(
-          language === 'es'
-            ? 'Para registrar venta como Fiado, seleccione o escriba el nombre del cliente.'
-            : 'Para lançar venda como Fiado sem perdas, selecione ou digite o nome do cliente.',
-          'error'
-        );
-        return;
+    // Se nenhum pagamento fracionado foi adicionado manualmente, utiliza o valor total no método selecionado
+    if (finalPayments.length === 0 && totalBrl > 0) {
+      if (selectedMethod === 'fiado') {
+        if (!selectedCustomerId && !customerName.trim()) {
+          showToast(
+            language === 'es'
+              ? 'Para registrar venta como Fiado, seleccione o escriba el nombre del cliente.'
+              : 'Para lançar venda como Fiado sem perdas, selecione ou digite o nome do cliente.',
+            'error'
+          );
+          return;
+        }
       }
-      finalPayments = [{
-        id: `pay-${Date.now()}`,
-        currency: 'PYG',
-        amountReceived: totalBrl,
-        exchangeRateUsed: 1,
-        equivalentBrl: totalBrl,
-        method: 'fiado',
-      }];
-    } else if (finalPayments.length === 0 && totalBrl > 0) {
       finalPayments = [{
         id: `pay-${Date.now()}`,
         currency: 'PYG',
@@ -380,8 +368,33 @@ export const PaymentModal: React.FC<Props> = ({
         method: selectedMethod,
       }];
     } else if (remainingBrl > 0.05) {
+      // Se há um restante não quitado, aloca o restante no método selecionado
+      if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+        showToast(
+          language === 'es'
+            ? 'Para registrar saldo restante como Fiado, seleccione o escriba el nombre del cliente.'
+            : 'Para lançar o saldo restante no Fiado, selecione ou digite o nome do cliente.',
+          'error'
+        );
+        return;
+      }
+      finalPayments.push({
+        id: `pay-${Date.now()}`,
+        currency: 'PYG',
+        amountReceived: remainingBrl,
+        exchangeRateUsed: 1,
+        equivalentBrl: remainingBrl,
+        method: selectedMethod,
+      });
+    }
+
+    // Validação de fiado caso alguma das parcelas seja fiado
+    const hasFiadoPayment = finalPayments.some(p => p.method === 'fiado');
+    if (hasFiadoPayment && !selectedCustomerId && !customerName.trim()) {
       showToast(
-        language === 'es' ? 'El valor recibido aún es menor que el total de la venta.' : 'O valor recebido ainda é menor que o total da venda.',
+        language === 'es'
+          ? 'Para registrar venta con parte en Fiado, seleccione o escriba el nombre del cliente.'
+          : 'Para registrar venda com parcela no Fiado, selecione ou digite o nome do cliente.',
         'error'
       );
       return;

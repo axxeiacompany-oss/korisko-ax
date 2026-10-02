@@ -102,6 +102,24 @@ export interface PaymentEntry {
   method: PaymentMethod;
 }
 
+export interface PaymentStageRecord {
+  id: string;
+  saleId: string;
+  saleNumber?: number;
+  comandaNumber?: string;
+  customerId?: string;
+  customerName?: string;
+  method: PaymentMethod;
+  currency: Currency;
+  amountReceived: number;
+  exchangeRateUsed: number;
+  equivalentBrl: number;
+  stageStatus: 'liquidado' | 'a_receber';
+  destinationType: 'gaveta_caixa' | 'operadora_cartao' | 'banco_digital' | 'caderneta_fiado';
+  recordedBy: string;
+  createdAt: string;
+}
+
 export type SetorResponsavel = 'panificacao' | 'confeitaria' | 'balcao' | 'caixa' | 'todos';
 
 export type ComandaStatus = 
@@ -411,6 +429,7 @@ export interface SystemBackupData {
   customerEntries?: CustomerAccountEntry[];
   customerPurchases?: CustomerPurchaseRecord[];
   activeCheckouts?: ActiveCheckoutSession[];
+  paymentStages?: PaymentStageRecord[];
 }
 
 // =============================================================

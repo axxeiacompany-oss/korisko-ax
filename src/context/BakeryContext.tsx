@@ -27,7 +27,8 @@ import {
   AppLanguage,
   CashTransaction,
   CustomerPurchaseRecord,
-  CustomerPurchaseItem
+  CustomerPurchaseItem,
+  PaymentStageRecord
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
@@ -61,6 +62,8 @@ import {
   listComandas,
   upsertComandaDb,
   deleteComandaDb,
+  markComandaAsPaidDb,
+  insertPagamentoEtapaDb,
   rowToComanda,
   resolveSetoresFromItems,
   resolveProductImageUrl,
@@ -303,6 +306,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [data, setData] = useState<SystemBackupData>(() => StorageService.loadState());
   const [isLoadingDb, setIsLoadingDb] = useState<boolean>(true);
   const realtimeChannelRef = React.useRef<any>(null);
+  const finalizedComandasRef = React.useRef<Set<string>>(new Set());
 
   const [currentUser, setCurrentUser] = useState<Employee>(() => {
     try {
@@ -612,7 +616,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (!shouldZeroForRealTest) {
             dbComandas.forEach(c => comandasMap.set(c.id || c.number, c));
           }
-          const mergedComandas = Array.from(comandasMap.values()).filter(c => c.status !== 'pago' && c.status !== 'cancelado');
+          const mergedComandas = Array.from(comandasMap.values()).filter(
+            c => c.status !== 'pago' &&
+                 c.status !== 'cancelado' &&
+                 !finalizedComandasRef.current.has(c.id) &&
+                 !finalizedComandasRef.current.has(c.number.trim().toLowerCase())
+          );
 
           // Merge real-time fiado entries from lancamentos_fiado table (authoritative SQL table) + fallback
           const activeSaleIds = new Set((sales || []).map((s: Sale) => s.id));
@@ -1143,13 +1152,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comandas' }, (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const cmd = rowToComanda(payload.new);
+            const cmdNum = cmd.number.trim().toLowerCase();
+            if (
+              cmd.status === 'pago' ||
+              cmd.status === 'cancelado' ||
+              finalizedComandasRef.current.has(cmd.id) ||
+              finalizedComandasRef.current.has(cmdNum)
+            ) {
+              setData(prev => ({
+                ...prev,
+                openComandas: (prev.openComandas || []).filter(c => c.id !== cmd.id && c.number.trim().toLowerCase() !== cmdNum),
+              }));
+              return;
+            }
             setData(prev => {
-              if (cmd.status === 'pago' || cmd.status === 'cancelado') {
-                return {
-                  ...prev,
-                  openComandas: (prev.openComandas || []).filter(c => c.id !== cmd.id && c.number !== cmd.number),
-                };
-              }
               const exists = (prev.openComandas || []).some(c => c.id === cmd.id || c.number === cmd.number);
               const nextComandas = exists
                 ? (prev.openComandas || []).map(c => (c.id === cmd.id || c.number === cmd.number) ? cmd : c)
@@ -2468,7 +2484,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       let nextPurchases = prev.customerPurchases || [];
 
       if (target) {
+        finalizedComandasRef.current.add(target.id);
+        finalizedComandasRef.current.add(target.number.trim().toLowerCase());
         deleteComandaDb(target.id).catch(() => {});
+        markComandaAsPaidDb(target.id).catch(() => {});
+        markComandaAsPaidDb(target.number).catch(() => {});
 
         // If comanda is being cancelled (not settled in a sale), reverse debtor balance and remove draft purchase record
         if (!options?.settledInSale) {
@@ -3638,17 +3658,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const sectorInfo = resolveSetoresFromItems(items);
     const resolvedComandaNumber = comandaNumber || `CMD-${String(Date.now()).slice(-4)}`;
 
-    // 1. Sanitize payments when Fiado is used:
-    // If the sale is marked as Fiado (or total fiado covers the bill), ensure NO cash payment lingers!
+    // 1. Separação de etapas de pagamento (Dinheiro, Cartão Débito, Cartão Crédito, PIX, Fiado):
+    // Preserva cada forma de pagamento de maneira isolada sem sobrescrever uma com a outra!
     let sanitizedPayments: PaymentEntry[] = [...payments];
-    if (primaryMethod === 'fiado' || fiadoAmountBrl >= finalTotalBrl) {
+    if (sanitizedPayments.length === 0 && finalTotalBrl > 0) {
       sanitizedPayments = [{
-        id: payments[0]?.id || `pay-${Date.now()}`,
+        id: `pay-${Date.now()}`,
         currency: 'PYG',
         amountReceived: finalTotalBrl,
         exchangeRateUsed: 1,
         equivalentBrl: finalTotalBrl,
-        method: 'fiado',
+        method: primaryMethod,
       }];
     }
 
@@ -3891,9 +3911,52 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch {}
 
-    // Close comanda if attached (passing settledInSale: true so removeComanda knows completeSale already reconciled debtor balance)
-    if (comandaNumber) {
-      removeComanda(comandaNumber, { settledInSale: true });
+    // Grava cada etapa de pagamento de forma separada na tabela public.pagamentos_vendas_etapas
+    const paymentStages: PaymentStageRecord[] = sanitizedPayments.map((p, idx) => {
+      let dest: PaymentStageRecord['destinationType'] = 'gaveta_caixa';
+      if (p.method === 'cartao_debito' || p.method === 'cartao_credito') {
+        dest = 'operadora_cartao';
+      } else if (p.method === 'pix' || p.method === 'transferencia') {
+        dest = 'banco_digital';
+      } else if (p.method === 'fiado') {
+        dest = 'caderneta_fiado';
+      }
+
+      return {
+        id: `etapa-${persistedSale.id}-${idx}-${Date.now()}`,
+        saleId: persistedSale.id,
+        saleNumber: persistedSale.saleNumber,
+        comandaNumber: resolvedComandaNumber,
+        customerId: targetCustomerId,
+        customerName: resolvedCustomerName,
+        method: p.method,
+        currency: p.currency,
+        amountReceived: p.amountReceived,
+        exchangeRateUsed: p.exchangeRateUsed,
+        equivalentBrl: p.equivalentBrl,
+        stageStatus: p.method === 'fiado' ? 'a_receber' : 'liquidado',
+        destinationType: dest,
+        recordedBy: currentUser.name,
+        createdAt: nowIso,
+      };
+    });
+
+    paymentStages.forEach(stage => {
+      insertPagamentoEtapaDb(stage).catch(() => {});
+    });
+
+    // Close comanda if attached (fluxo contínuo sem atraso e anti-fantasma):
+    if (comandaNumber || linkedComanda) {
+      const cId = linkedComanda?.id || comandaNumber;
+      const cNum = comandaNumber || linkedComanda?.number;
+      if (cId) finalizedComandasRef.current.add(cId);
+      if (cNum) finalizedComandasRef.current.add(cNum.trim().toLowerCase());
+      if (resolvedComandaNumber) finalizedComandasRef.current.add(resolvedComandaNumber.trim().toLowerCase());
+
+      markComandaAsPaidDb(cId || cNum || resolvedComandaNumber).catch(() => {});
+      if (comandaNumber) {
+        removeComanda(comandaNumber, { settledInSale: true });
+      }
     }
 
     // Record customer purchase in dedicated SQL table public.registro_compras_clientes
@@ -4028,8 +4091,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         s => s.id !== persistedSale.id && (!existingSaleForComanda || s.id !== existingSaleForComanda.id)
       );
 
+      // Garante que comanda finalizada é removida atomicamente do estado aberto para evitar pedidos fantasmas
+      const cleanOpenComandas = (prev.openComandas || []).filter(c => {
+        const cNum = c.number.trim().toLowerCase();
+        if (resolvedComandaNumber && cNum === resolvedComandaNumber.trim().toLowerCase()) return false;
+        if (comandaNumber && (c.id === comandaNumber || cNum === comandaNumber.trim().toLowerCase())) return false;
+        if (linkedComanda && (c.id === linkedComanda.id || cNum === linkedComanda.number.trim().toLowerCase())) return false;
+        if (finalizedComandasRef.current.has(c.id) || finalizedComandasRef.current.has(cNum)) return false;
+        return c.status !== 'pago' && c.status !== 'cancelado';
+      });
+
       const nextState: SystemBackupData = {
         ...prev,
+        openComandas: cleanOpenComandas,
+        paymentStages: [...paymentStages, ...(prev.paymentStages || [])].slice(0, 100),
         products: stockUpdates.size > 0
           ? prev.products.map(p => stockUpdates.has(p.id) ? { ...p, stock: stockUpdates.get(p.id)! } : p)
           : prev.products,

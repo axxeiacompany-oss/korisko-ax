@@ -49,6 +49,8 @@ export const CashRegisterView: React.FC = () => {
     let totalPix = 0;
     let totalDebito = 0;
     let totalCredito = 0;
+    let totalTransferencia = 0;
+    let totalFiado = 0;
 
     currentSessionSales.forEach(s => {
       s.payments.forEach(p => {
@@ -61,6 +63,10 @@ export const CashRegisterView: React.FC = () => {
           totalDebito += val;
         } else if (p.method === 'cartao_credito') {
           totalCredito += val;
+        } else if (p.method === 'transferencia') {
+          totalTransferencia += val;
+        } else if (p.method === 'fiado') {
+          totalFiado += val;
         }
       });
 
@@ -82,6 +88,8 @@ export const CashRegisterView: React.FC = () => {
       totalPix,
       totalDebito,
       totalCredito,
+      totalTransferencia,
+      totalFiado,
     };
   }, [currentSession, currentSessionSales]);
 
@@ -238,24 +246,30 @@ export const CashRegisterView: React.FC = () => {
         </div>
       </div>
 
-      {/* Other Payment Methods (Electronic / Digital) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Other Payment Methods (Electronic / Digital / Fiado Separados) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Transferencia / QR:</span>
-          <span className="text-sm font-bold text-neutral-100 font-mono-nums">
-            {formatCurrency(drawerBalances.totalPix, 'PYG')}
+          <span className="text-xs text-neutral-400">PIX / Transferência:</span>
+          <span className="text-sm font-bold text-cyan-400 font-mono-nums">
+            {formatCurrency(drawerBalances.totalPix + drawerBalances.totalTransferencia, 'PYG')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
           <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Débito:' : 'Cartão de Débito:'}</span>
-          <span className="text-sm font-bold text-neutral-100 font-mono-nums">
+          <span className="text-sm font-bold text-sky-400 font-mono-nums">
             {formatCurrency(drawerBalances.totalDebito, 'PYG')}
           </span>
         </div>
         <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
           <span className="text-xs text-neutral-400">{language === 'es' ? 'Tarjeta Crédito:' : 'Cartão de Crédito:'}</span>
-          <span className="text-sm font-bold text-neutral-100 font-mono-nums">
+          <span className="text-sm font-bold text-indigo-400 font-mono-nums">
             {formatCurrency(drawerBalances.totalCredito, 'PYG')}
+          </span>
+        </div>
+        <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between">
+          <span className="text-xs text-rose-300 font-medium">Fiado / Caderneta:</span>
+          <span className="text-sm font-bold text-rose-400 font-mono-nums">
+            {formatCurrency(drawerBalances.totalFiado, 'PYG')}
           </span>
         </div>
       </div>
