@@ -85,15 +85,26 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
     const recordedSaleIds = new Set<string>();
     const recordedComandas = new Set<string>();
 
+    const activeSaleIds = new Set((sales || []).map(s => s.id));
     const custRawPurchases = (customerPurchases || []).filter(p => p.customerId === customer.id);
+    const hasRealPurchases = custRawPurchases.some(p => !p.id.startsWith('purch-debt-'));
     const finalizedComandaNums = new Set<string>();
     custRawPurchases.forEach(p => {
-      if (p.saleId && p.comandaNumber) {
+      if (p.saleId && p.comandaNumber && activeSaleIds.has(p.saleId)) {
         finalizedComandaNums.add(p.comandaNumber.trim().toLowerCase());
       }
     });
 
     custRawPurchases.forEach(p => {
+      // Skip synthetic debt-backfill record if real purchases exist or if linked sale was deleted
+      if (p.id.startsWith('purch-debt-')) {
+        if (hasRealPurchases) return;
+        if (p.saleId && !activeSaleIds.has(p.saleId)) return;
+      }
+      // Skip purchase record whose sale was deleted
+      if (p.id.startsWith('purch-sale-') && p.saleId && sales && sales.length > 0 && !activeSaleIds.has(p.saleId)) {
+        return;
+      }
       // Skip draft comanda record if a finalized sale record already exists for the same comandaNumber
       if (
         p.id.startsWith('purch-cmd-') &&
@@ -174,47 +185,50 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
         if (s.comandaNumber) recordedComandas.add(s.comandaNumber.trim().toLowerCase());
       });
 
-    // Also include any fiado debit entries not yet in map
-    (customerEntries || [])
-      .filter(e => e.customerId === customer.id && e.type === 'debito_compra')
-      .forEach(e => {
-        if (e.saleId && recordedSaleIds.has(e.saleId)) return;
-        if (e.comandaNumber && recordedComandas.has(e.comandaNumber.trim().toLowerCase())) return;
-        const synthId = `purch-debt-${e.id}`;
-        if (map.has(synthId)) return;
+    // Only synthesize from fiado debit entries if customer has no real purchase records in map
+    if (map.size === 0) {
+      (customerEntries || [])
+        .filter(e => e.customerId === customer.id && e.type === 'debito_compra')
+        .forEach(e => {
+          if (e.saleId && !activeSaleIds.has(e.saleId)) return;
+          if (e.saleId && recordedSaleIds.has(e.saleId)) return;
+          if (e.comandaNumber && recordedComandas.has(e.comandaNumber.trim().toLowerCase())) return;
+          const synthId = `purch-debt-${e.id}`;
+          if (map.has(synthId)) return;
 
-        map.set(synthId, {
-          id: synthId,
-          customerId: customer.id,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          saleId: e.saleId,
-          comandaNumber: e.comandaNumber,
-          items: [
-            {
-              productId: 'item-fiado',
-              productName: e.description || 'Compra no Fiado',
-              category: 'paes',
-              quantity: 1,
-              unit: 'un',
-              unitPriceBrl: e.amountBrl,
-              costPriceBrl: 0,
-              subtotalBrl: e.amountBrl,
-            },
-          ],
-          itemsSummary: e.description || 'Compra no Fiado',
-          totalAmountBrl: e.amountBrl,
-          estimatedCostBrl: 0,
-          paidAmountBrl: 0,
-          fiadoAmountBrl: e.amountBrl,
-          paymentMethod: 'fiado',
-          flowType: 'fiado_pendente',
-          setorResponsavel: e.setorResponsavel || 'Panificação & Confeitaria Artesanal',
-          recordedBy: e.recordedBy || 'Caixa',
-          purchaseDate: e.date || new Date().toISOString(),
+          map.set(synthId, {
+            id: synthId,
+            customerId: customer.id,
+            customerName: customer.name,
+            customerPhone: customer.phone,
+            saleId: e.saleId,
+            comandaNumber: e.comandaNumber,
+            items: [
+              {
+                productId: 'item-fiado',
+                productName: e.description || 'Compra no Fiado',
+                category: 'paes',
+                quantity: 1,
+                unit: 'un',
+                unitPriceBrl: e.amountBrl,
+                costPriceBrl: 0,
+                subtotalBrl: e.amountBrl,
+              },
+            ],
+            itemsSummary: e.description || 'Compra no Fiado',
+            totalAmountBrl: e.amountBrl,
+            estimatedCostBrl: 0,
+            paidAmountBrl: 0,
+            fiadoAmountBrl: e.amountBrl,
+            paymentMethod: 'fiado',
+            flowType: 'fiado_pendente',
+            setorResponsavel: e.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+            recordedBy: e.recordedBy || 'Caixa',
+            purchaseDate: e.date || new Date().toISOString(),
+          });
+          if (e.comandaNumber) recordedComandas.add(e.comandaNumber.trim().toLowerCase());
         });
-        if (e.comandaNumber) recordedComandas.add(e.comandaNumber.trim().toLowerCase());
-      });
+    }
 
     return Array.from(map.values()).sort(
       (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()
@@ -237,6 +251,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
         purchaseCount: 0,
         paidAtCheckout: 0,
         totalEnteredCash: 0,
+        outstandingFiado: 0,
         totalEstimatedCost: 0,
         estimatedNetProfit: 0,
         ticketMedio: 0,
@@ -254,17 +269,33 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
     ) / 100;
 
     const totalPurchased = allCustomerPurchases.length > 0
-      ? Math.max(sumPurchases, customer.outstandingBalanceBrl || 0)
+      ? sumPurchases
       : Math.max(customer.totalSpentBrl || 0, customer.outstandingBalanceBrl || 0);
     const purchaseCount = allCustomerPurchases.length > 0
       ? allCustomerPurchases.length
       : Math.max(customer.purchaseCount || 0, totalPurchased > 0 ? 1 : 0);
 
-    const paidAtCheckout = allCustomerPurchases.reduce((acc, p) => acc + (Number(p.paidAmountBrl) || 0), 0);
+    // Paid at checkout is strictly the sum of paidAmountBrl on each purchase (or totalAmountBrl - fiadoAmountBrl when paid upfront)
+    const paidAtCheckout = Math.round(
+      allCustomerPurchases.reduce((acc, p) => {
+        const pTotal = Number(p.totalAmountBrl) || 0;
+        const pFiado = Number(p.fiadoAmountBrl) || 0;
+        const pPaid = p.paidAmountBrl !== undefined && p.paidAmountBrl !== null
+          ? Number(p.paidAmountBrl)
+          : (p.paymentMethod === 'fiado' ? 0 : Math.max(0, pTotal - pFiado));
+        return acc + Math.max(0, pPaid);
+      }, 0) * 100
+    ) / 100;
+
+    // Entrada no Caixa = strictly Paid Purchases at Checkout + Fiado Amortizations (never invented from balance diffs)
     const totalEnteredCash = Math.min(
       totalPurchased,
-      Math.max(paidAtCheckout + customerAmortizationsTotal, Math.max(0, totalPurchased - (customer.outstandingBalanceBrl || 0)))
+      Math.max(0, Math.round((paidAtCheckout + customerAmortizationsTotal) * 100) / 100)
     );
+
+    const outstandingFiado = allCustomerPurchases.length > 0
+      ? Math.max(0, Math.round((totalPurchased - totalEnteredCash) * 100) / 100)
+      : Math.max(0, Number(customer.outstandingBalanceBrl) || 0);
 
     // Preço de Custo / CMV é um controle exclusivo do Admin e Setores Responsáveis (calculado apenas sobre produtos com custo cadastrado)
     const rawCost = allCustomerPurchases.reduce((acc, p) => {
@@ -286,6 +317,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
       purchaseCount,
       paidAtCheckout,
       totalEnteredCash,
+      outstandingFiado,
       totalEstimatedCost,
       estimatedNetProfit,
       ticketMedio,
@@ -471,9 +503,15 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
 
   // Percentages for customer's Entry vs Exit/Cost vs Fiado bar
   const maxBarRef = Math.max(metrics.totalPurchased, 1);
-  const entryPct = Math.min(100, Math.round((metrics.totalEnteredCash / maxBarRef) * 100));
-  const costPct = Math.min(100, Math.round((metrics.totalEstimatedCost / maxBarRef) * 100));
-  const fiadoPct = Math.min(100, Math.round(((customer.outstandingBalanceBrl || 0) / maxBarRef) * 100));
+  const entryPct = metrics.totalPurchased > 0
+    ? Math.min(100, Math.round((metrics.totalEnteredCash / maxBarRef) * 100))
+    : 0;
+  const costPct = metrics.totalPurchased > 0
+    ? Math.min(100, Math.round((metrics.totalEstimatedCost / maxBarRef) * 100))
+    : 0;
+  const fiadoPct = metrics.totalPurchased > 0
+    ? Math.min(100, Math.round((metrics.outstandingFiado / maxBarRef) * 100))
+    : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
@@ -574,8 +612,8 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                 <span>Pendente na Comanda / Fiado</span>
                 <Clock className="w-4 h-4 text-amber-400" />
               </div>
-              <div className={`text-lg sm:text-xl font-black font-mono-nums mt-1 ${customer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {formatCurrency(customer.outstandingBalanceBrl, 'PYG')}
+              <div className={`text-lg sm:text-xl font-black font-mono-nums mt-1 ${metrics.outstandingFiado > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {formatCurrency(metrics.outstandingFiado, 'PYG')}
               </div>
               <div className="text-[10px] text-neutral-400 mt-0.5">
                 Limite: {formatCurrency(customer.creditLimitBrl, 'PYG')}
@@ -651,12 +689,12 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                     Em Aberto na Comanda / Fiado (A Receber do Cliente)
                   </span>
                   <span className="font-mono-nums font-bold text-amber-400">
-                    {formatCurrency(customer.outstandingBalanceBrl, 'PYG')} ({fiadoPct}%)
+                    {formatCurrency(metrics.outstandingFiado, 'PYG')} ({fiadoPct}%)
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
                   <div
-                    style={{ width: `${customer.outstandingBalanceBrl > 0 ? Math.max(4, fiadoPct) : 0}%` }}
+                    style={{ width: `${metrics.outstandingFiado > 0 ? Math.max(4, fiadoPct) : 0}%` }}
                     className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-500"
                   />
                 </div>
@@ -740,8 +778,8 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                       </label>
                       <input
                         type="number"
-                        min="100"
-                        step="500"
+                        min="0"
+                        step="any"
                         value={customUnitPrice}
                         onChange={e => setCustomUnitPrice(e.target.value)}
                         placeholder="15000"

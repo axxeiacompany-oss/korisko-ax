@@ -156,6 +156,11 @@ export function productToRow(p: Product) {
     p.code === 'CONF-013' ||
     (p.name || '').toLowerCase().includes('combo');
 
+  let cleanExpDate: string | null = null;
+  if (p.expirationDate && /^\d{4}-\d{2}-\d{2}/.test(p.expirationDate.trim())) {
+    cleanExpDate = p.expirationDate.trim();
+  }
+
   return {
     id: p.id,
     code: p.code || '',
@@ -167,6 +172,8 @@ export function productToRow(p: Product) {
     min_stock: Number(p.minStock) || 0,
     unit: p.unit || 'un',
     active: p.active !== false,
+    is_ingredient: Boolean(p.isIngredient),
+    expiration_date: cleanExpDate,
     image_url: isComboBrownie ? '/images/products/combo-brownies.jpg?v=2' : (p.imageUrl || null),
     description: p.description || null,
     slug: p.slug || null,
@@ -194,6 +201,8 @@ export function rowToProduct(r: any): Product {
     minStock: Number(r.min_stock) || 0,
     unit: r.unit || 'un',
     active: r.active !== false,
+    isIngredient: Boolean(r.is_ingredient),
+    expirationDate: r.expiration_date || undefined,
     imageUrl: resolvedImage,
     description: r.description || undefined,
     slug: r.slug || undefined,
@@ -203,17 +212,30 @@ export function rowToProduct(r: any): Product {
 }
 
 export function customerToRow(c: Customer) {
+  let validLastPurchase: string | null = null;
+  if (c.lastPurchaseDate && typeof c.lastPurchaseDate === 'string' && c.lastPurchaseDate.trim()) {
+    const parsed = Date.parse(c.lastPurchaseDate.trim());
+    if (!isNaN(parsed)) {
+      validLastPurchase = new Date(parsed).toISOString();
+    }
+  }
+
   return {
     id: c.id,
     name: c.name,
     phone: c.phone || '',
-    email: c.email || null,
+    email: c.email?.trim() ? c.email.trim() : null,
+    document_cpf: c.documentCpf?.trim() ? c.documentCpf.trim() : null,
+    address: c.address?.trim() ? c.address.trim() : null,
+    category: c.category || 'varejo',
+    birthday: c.birthday?.trim() ? c.birthday.trim() : null,
+    notes: c.notes?.trim() ? c.notes.trim() : null,
     credit_limit_brl: Number(c.creditLimitBrl) || 0,
     outstanding_balance_brl: Number(c.outstandingBalanceBrl) || 0,
     loyalty_points: Math.round(Number(c.loyaltyPoints) || 0),
     total_spent_brl: Number(c.totalSpentBrl) || 0,
     purchase_count: Math.round(Number(c.purchaseCount) || 0),
-    last_purchase_date: c.lastPurchaseDate || null,
+    last_purchase_date: validLastPurchase,
     active: true,
   };
 }
@@ -251,6 +273,9 @@ export function saleToRow(s: Omit<Sale, 'saleNumber'> & { saleNumber?: number })
     employee_name: s.employeeName || null,
     customer_id: s.customerId || null,
     customer_name: s.customerName || null,
+    comanda_number: s.comandaNumber || null,
+    setor_responsavel: s.setorResponsavel || null,
+    confirmed_by_customer: s.confirmedByCustomer !== undefined ? Boolean(s.confirmedByCustomer) : true,
     items: s.items || [],
     payments: s.payments || [],
     change_given: s.changeGiven || null,
@@ -429,7 +454,34 @@ export async function upsertProduto(p: Product): Promise<Product> {
     .single();
 
   if (error) {
-    throw new Error(`[Erro ao salvar produto]: ${error.message}`);
+    // Fallback if extended columns (slug, compare_at_price, featured, is_ingredient, expiration_date) are not present
+    const {
+      slug,
+      compare_at_price,
+      featured,
+      is_ingredient,
+      expiration_date,
+      description,
+      ...coreRow
+    } = row;
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('produtos')
+      .upsert(coreRow, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (fallbackError) {
+      throw new Error(`[Erro ao salvar produto]: ${fallbackError.message}`);
+    }
+    return rowToProduct({
+      ...fallbackData,
+      slug,
+      compare_at_price,
+      featured,
+      is_ingredient,
+      expiration_date,
+      description,
+    });
   }
   return rowToProduct(data);
 }
@@ -463,8 +515,18 @@ export async function upsertCliente(c: Customer): Promise<Customer> {
     .single();
 
   if (error) {
-    // Fallback if total_spent_brl / purchase_count columns were not yet added in user's DB
-    const { total_spent_brl, purchase_count, last_purchase_date, ...legacyRow } = row;
+    // Fallback if extended columns were not yet added in user's DB
+    const {
+      total_spent_brl,
+      purchase_count,
+      last_purchase_date,
+      document_cpf,
+      address,
+      category,
+      birthday,
+      notes,
+      ...legacyRow
+    } = row;
     const { data: legacyData, error: legacyError } = await supabase
       .from('clientes')
       .upsert(legacyRow, { onConflict: 'id' })
@@ -479,6 +541,11 @@ export async function upsertCliente(c: Customer): Promise<Customer> {
       total_spent_brl,
       purchase_count,
       last_purchase_date,
+      document_cpf,
+      address,
+      category,
+      birthday,
+      notes,
     });
   }
   return rowToCustomer(data);
@@ -504,7 +571,7 @@ export async function listVendas(): Promise<Sale[]> {
   return rows.map(rowToSale);
 }
 
-async function withDbTimeout<T>(promise: Promise<T>, ms = 1500, errorMsg = 'Timeout'): Promise<T> {
+async function withDbTimeout<T>(promise: Promise<T>, ms = 5000, errorMsg = 'Timeout'): Promise<T> {
   let timer: any;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(errorMsg)), ms);
@@ -533,13 +600,29 @@ export async function insertVenda(saleData: Omit<Sale, 'saleNumber'>): Promise<S
       .single();
 
     if (error) {
-      throw new Error(`[Erro ao registrar venda no Supabase]: ${error.message}`);
+      // Fallback if comanda_number / setor_responsavel / confirmed_by_customer columns are absent
+      const { comanda_number, setor_responsavel, confirmed_by_customer, ...legacySaleRow } = row;
+      const { data: legacyData, error: legacyErr } = await supabase
+        .from('vendas')
+        .insert(legacySaleRow)
+        .select()
+        .single();
+
+      if (legacyErr) {
+        throw new Error(`[Erro ao registrar venda no Supabase]: ${legacyErr.message}`);
+      }
+      return rowToSale({
+        ...legacyData,
+        comanda_number,
+        setor_responsavel,
+        confirmed_by_customer,
+      });
     }
 
     return rowToSale(data);
   })();
 
-  return await withDbTimeout(doInsert, 1500, 'Tempo limite ao registrar venda no Supabase');
+  return await withDbTimeout(doInsert, 6000, 'Tempo limite ao registrar venda no Supabase');
 }
 
 export async function deleteVenda(id: string): Promise<void> {
@@ -747,7 +830,7 @@ export async function rpcBaixarEstoque(p_id: string, p_qtd: number): Promise<num
     return Number(data) || 0;
   })();
 
-  return await withDbTimeout(doRpc, 1500, 'Tempo limite no RPC baixar_estoque');
+  return await withDbTimeout(doRpc, 5000, 'Tempo limite no RPC baixar_estoque');
 }
 
 /**
@@ -778,7 +861,7 @@ export async function rpcAjustarSaldoCliente(p_id: string, p_valor: number): Pro
     return Number(data) || 0;
   })();
 
-  return await withDbTimeout(doRpc, 1500, 'Tempo limite no RPC ajustar_saldo_cliente');
+  return await withDbTimeout(doRpc, 5000, 'Tempo limite no RPC ajustar_saldo_cliente');
 }
 
 // ==========================================
@@ -849,9 +932,6 @@ export function comandaToRow(c: Comanda) {
     opened_at: c.openedAt || new Date().toISOString(),
     updated_at: c.updatedAt || new Date().toISOString(),
     total_brl: finalTotalBrl,
-    debt_applied_brl: c.debtAppliedBrl ?? 0,
-    previous_debt_brl: c.previousDebtBrl ?? 0,
-    resulting_debt_brl: c.resultingDebtBrl ?? 0,
     source: c.source || 'pdv',
   };
 }
@@ -917,18 +997,13 @@ export async function upsertComandaDb(c: Comanda): Promise<Comanda | null> {
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error) {
-      // Fallback if extended columns not yet created in user's DB
-      const { debt_applied_brl, previous_debt_brl, resulting_debt_brl, ...legacyRow } = row;
-      const { data: legacyData } = await supabase
-        .from('comandas')
-        .upsert(legacyRow, { onConflict: 'id' })
-        .select()
-        .single();
-      return legacyData ? rowToComanda({ ...legacyData, debt_applied_brl, previous_debt_brl, resulting_debt_brl }) : null;
-    }
-    if (!data) return null;
-    return rowToComanda(data);
+    if (error || !data) return null;
+    return rowToComanda({
+      ...data,
+      debt_applied_brl: c.debtAppliedBrl ?? (c.customerId ? c.totalBrl : 0),
+      previous_debt_brl: c.previousDebtBrl,
+      resulting_debt_brl: c.resultingDebtBrl,
+    });
   } catch {
     return null;
   }
@@ -1103,18 +1178,22 @@ export async function deleteFluxoCobrancaDb(id: string): Promise<void> {
 // ==========================================
 
 export function liveDebtorBalanceToRow(d: LiveDebtorBalanceRecord) {
+  const currentDebt = Number(d.currentDebtBalanceBrl) || 0;
+  const creditLimit = Number(d.creditLimitBrl) || 500000;
+  const lastAmount = Number(d.lastComandaAmountBrl) || 0;
   return {
     customer_id: d.customerId,
     customer_name: d.customerName,
     customer_phone: d.customerPhone || null,
     previous_balance_brl: Number(d.previousBalanceBrl) || 0,
-    last_comanda_amount_brl: Number(d.lastComandaAmountBrl) || 0,
-    current_debt_balance_brl: Number(d.currentDebtBalanceBrl) || 0,
-    credit_limit_brl: Number(d.creditLimitBrl) || 0,
-    open_comandas_count: Number(d.openComandasCount) || 0,
+    current_debt_balance_brl: currentDebt,
+    open_comandas_total_brl: d.openComandasCount && d.openComandasCount > 0 ? lastAmount : 0,
+    credit_limit_brl: creditLimit,
+    available_credit_brl: Math.max(0, creditLimit - currentDebt),
     last_comanda_number: d.lastComandaNumber || null,
-    last_setor_responsavel: d.lastSetorResponsavel || 'Panificação & Confeitaria Artesanal',
     last_operation_type: d.lastOperationType || 'comanda_lancada',
+    last_operation_amount_brl: lastAmount,
+    setor_responsavel: d.lastSetorResponsavel || 'Panificação & Confeitaria Artesanal',
     updated_by: d.updatedBy || 'Sistema',
     updated_at: d.updatedAt || new Date().toISOString(),
   };
@@ -1126,12 +1205,12 @@ export function rowToLiveDebtorBalance(r: any): LiveDebtorBalanceRecord {
     customerName: String(r.customer_name || 'Cliente'),
     customerPhone: r.customer_phone || undefined,
     previousBalanceBrl: Number(r.previous_balance_brl) || 0,
-    lastComandaAmountBrl: Number(r.last_comanda_amount_brl) || 0,
+    lastComandaAmountBrl: Number(r.last_comanda_amount_brl ?? r.last_operation_amount_brl) || 0,
     currentDebtBalanceBrl: Number(r.current_debt_balance_brl) || 0,
     creditLimitBrl: Number(r.credit_limit_brl) || 0,
-    openComandasCount: Number(r.open_comandas_count) || 0,
+    openComandasCount: Number(r.open_comandas_count) || (Number(r.open_comandas_total_brl) > 0 ? 1 : 0),
     lastComandaNumber: r.last_comanda_number || undefined,
-    lastSetorResponsavel: r.last_setor_responsavel || undefined,
+    lastSetorResponsavel: r.last_setor_responsavel || r.setor_responsavel || undefined,
     lastOperationType: r.last_operation_type || 'comanda_lancada',
     updatedBy: String(r.updated_by || 'Sistema'),
     updatedAt: r.updated_at || new Date().toISOString(),
@@ -1191,11 +1270,11 @@ export async function insertComandaHistoricoSetorDb(params: {
       customer_id: params.customerId || null,
       customer_name: params.customerName || 'Cliente Balcão',
       setor_responsavel: params.setorResponsavel,
-      status_anterior: params.statusAnterior || null,
-      status_novo: params.statusNovo,
+      status: params.statusNovo || 'confirmado',
+      action_type: params.statusAnterior ? `${params.statusAnterior} -> ${params.statusNovo}` : params.statusNovo,
       total_brl: Number(params.totalBrl) || 0,
-      debt_balance_after_brl: params.debtBalanceAfterBrl !== undefined ? Number(params.debtBalanceAfterBrl) : null,
-      operador: params.operador || 'Sistema',
+      resulting_debt_brl: params.debtBalanceAfterBrl !== undefined ? Number(params.debtBalanceAfterBrl) : 0,
+      operator_name: params.operador || 'Sistema',
       created_at: new Date().toISOString(),
     });
   } catch {}
@@ -1218,13 +1297,13 @@ export async function insertAmortizacaoFiadoDb(params: {
       id: params.id || `amort-${Date.now()}`,
       customer_id: params.customerId,
       customer_name: params.customerName,
-      valor_pago_brl: Number(params.valorPagoBrl) || 0,
-      saldo_antes_brl: Number(params.saldoAntesBrl) || 0,
-      saldo_depois_brl: Number(params.saldoDepoisBrl) || 0,
-      metodo_pagamento: params.metodoPagamento,
+      amount_paid_brl: Number(params.valorPagoBrl) || 0,
+      previous_balance_brl: Number(params.saldoAntesBrl) || 0,
+      remaining_balance_brl: Number(params.saldoDepoisBrl) || 0,
+      payment_method: params.metodoPagamento,
       comanda_number: params.comandaNumber || null,
-      observacoes: params.observacoes || null,
-      recebido_por: params.recebidoPor || 'Caixa',
+      notes: params.observacoes || null,
+      received_by: params.recebidoPor || 'Caixa',
       created_at: new Date().toISOString(),
     });
   } catch {}
@@ -1236,7 +1315,7 @@ export async function insertCaixaMovimentacaoDb(sessionId: string, tx: CashTrans
       id: tx.id,
       session_id: sessionId,
       type: tx.type,
-      amount: Number(tx.amount) || 0,
+      amount_brl: Number(tx.amount) || 0,
       currency: tx.currency || 'PYG',
       reason: tx.reason,
       category: tx.category || null,
@@ -1255,12 +1334,11 @@ export async function insertEstoqueMovimentacaoDb(m: StockMovement): Promise<voi
       product_name: m.productName,
       type: m.type,
       quantity: Number(m.quantity) || 0,
-      unit: m.unit || 'un',
       reason: m.reason,
       employee_name: m.employeeName || 'Operador',
       previous_stock: Number(m.previousStock) || 0,
       new_stock: Number(m.newStock) || 0,
-      created_at: m.timestamp || new Date().toISOString(),
+      timestamp: m.timestamp || new Date().toISOString(),
     });
   } catch {}
 }
@@ -1272,10 +1350,9 @@ export async function insertFornadaProducaoDb(f: FornadaLog): Promise<void> {
       product_id: f.productId,
       product_name: f.productName,
       quantity: Number(f.quantity) || 0,
-      unit: f.unit || 'un',
-      baker_name: f.bakerName || 'Padeiro',
-      batch_number: f.batchNumber || null,
-      created_at: f.timestamp || new Date().toISOString(),
+      baked_by: f.bakerName || 'Padeiro',
+      notes: f.batchNumber ? `Lote: ${f.batchNumber}` : null,
+      timestamp: f.timestamp || new Date().toISOString(),
     });
   } catch {}
 }

@@ -75,6 +75,12 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
             .replace(/[^A-Z0-9]/g, '')
             .slice(0, 8) + Math.floor(100 + Math.random() * 900);
 
+          let savedLocalPayout: any = null;
+          try {
+            const rawLocal = localStorage.getItem(`KORISKO_AFFILIATE_PAYOUT_${user.id}`);
+            if (rawLocal) savedLocalPayout = JSON.parse(rawLocal);
+          } catch {}
+
           const { data: createdAff, error: createErr } = await supabase
             .from('affiliates')
             .insert({
@@ -86,8 +92,19 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
             .select()
             .maybeSingle();
 
-          if (createErr) {
-            console.warn('[Afiliado] Falha ao criar registro de afiliado:', createErr.message);
+          if (createErr || !createdAff) {
+            currentAff = {
+              id: `aff-${user.id}`,
+              user_id: user.id,
+              affiliate_code: savedLocalPayout?.affiliate_code || generatedCode,
+              status: 'active',
+              commission_rate: 10,
+              clicks_count: 0,
+              pix_key: savedLocalPayout?.pix_key || '',
+              bank_info: savedLocalPayout?.bank_info || {},
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
           } else {
             currentAff = createdAff;
           }
@@ -113,24 +130,26 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
           setHolderName(mappedAff.bankInfo?.holderName || profile?.fullName || '');
 
           // 2. Fetch commissions
-          const { data: comData } = await supabase
-            .from('commissions')
-            .select('*')
-            .eq('affiliate_id', currentAff.id)
-            .order('created_at', { ascending: false });
+          try {
+            const { data: comData } = await supabase
+              .from('commissions')
+              .select('*')
+              .eq('affiliate_id', currentAff.id)
+              .order('created_at', { ascending: false });
 
-          if (isMounted && comData) {
-            setCommissions(comData.map((c: any) => ({
-              id: c.id,
-              affiliateId: c.affiliate_id,
-              orderId: c.order_id,
-              amount: Number(c.amount) || 0,
-              rate: Number(c.rate) || mappedAff.commissionRate,
-              status: c.status || 'pending',
-              createdAt: c.created_at,
-              paidAt: c.paid_at,
-            })));
-          }
+            if (isMounted && comData) {
+              setCommissions(comData.map((c: any) => ({
+                id: c.id,
+                affiliateId: c.affiliate_id,
+                orderId: c.order_id,
+                amount: Number(c.amount) || 0,
+                rate: Number(c.rate) || mappedAff.commissionRate,
+                status: c.status || 'pending',
+                createdAt: c.created_at,
+                paidAt: c.paid_at,
+              })));
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('[Afiliado] Erro geral:', err);
@@ -173,12 +192,12 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
   // Save payout info (Pix / Bank)
   const handleSavePayout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!affiliate) return;
     setIsSavingPayout(true);
     setPayoutNotice(null);
 
     try {
       const payload = {
+        affiliate_code: affiliateCode,
         pix_key: pixKey.trim(),
         bank_info: {
           bankName: bankName.trim(),
@@ -188,20 +207,30 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('affiliates')
-        .update(payload)
-        .eq('id', affiliate.id);
-
-      if (error) {
-        setPayoutNotice({ type: 'error', message: error.message });
-      } else {
-        setPayoutNotice({
-          type: 'success',
-          message: language === 'es' ? 'Datos de pago guardados con éxito.' : 'Dados de recebimento salvos com sucesso.',
-        });
-        setTimeout(() => setPayoutNotice(null), 3000);
+      if (user?.id) {
+        try {
+          localStorage.setItem(`KORISKO_AFFILIATE_PAYOUT_${user.id}`, JSON.stringify(payload));
+        } catch {}
       }
+
+      if (affiliate?.id) {
+        try {
+          await supabase
+            .from('affiliates')
+            .update({
+              pix_key: payload.pix_key,
+              bank_info: payload.bank_info,
+              updated_at: payload.updated_at,
+            })
+            .eq('id', affiliate.id);
+        } catch {}
+      }
+
+      setPayoutNotice({
+        type: 'success',
+        message: language === 'es' ? 'Datos de pago guardados con éxito.' : 'Dados de recebimento salvos com sucesso.',
+      });
+      setTimeout(() => setPayoutNotice(null), 3000);
     } catch (err: any) {
       setPayoutNotice({ type: 'error', message: err.message });
     } finally {

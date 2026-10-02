@@ -157,24 +157,40 @@ export const CustomersView: React.FC = () => {
   // Map of live Total Comprado and purchase count per customer (combining SQL registro_compras_clientes + sales, deduplicating comandas)
   const customerPurchasesStatsMap = useMemo(() => {
     const map = new Map<string, { totalSpent: number; count: number }>();
+    const activeSaleIds = new Set((sales || []).map(s => s.id));
     customers.forEach(c => {
       const rawPurchList = (customerPurchases || []).filter(p => p.customerId === c.id);
+      const hasRealPurchases = rawPurchList.some(p => !p.id.startsWith('purch-debt-'));
       const finalizedCmds = new Set<string>();
       rawPurchList.forEach(p => {
-        if (p.saleId && p.comandaNumber) {
+        if (p.saleId && p.comandaNumber && activeSaleIds.has(p.saleId)) {
           finalizedCmds.add(p.comandaNumber.trim().toLowerCase());
         }
       });
-      const purchList = rawPurchList.filter(
-        p =>
-          !(
-            p.id.startsWith('purch-cmd-') &&
-            !p.saleId &&
-            p.comandaNumber &&
-            finalizedCmds.has(p.comandaNumber.trim().toLowerCase())
-          )
-      );
-      const sumPurch = purchList.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
+      const purchList = rawPurchList.filter(p => {
+        if (p.id.startsWith('purch-debt-') && (hasRealPurchases || (p.saleId && !activeSaleIds.has(p.saleId)))) {
+          return false;
+        }
+        if (p.id.startsWith('purch-sale-') && p.saleId && sales && sales.length > 0 && !activeSaleIds.has(p.saleId)) {
+          return false;
+        }
+        if (
+          p.id.startsWith('purch-cmd-') &&
+          !p.saleId &&
+          p.comandaNumber &&
+          finalizedCmds.has(p.comandaNumber.trim().toLowerCase())
+        ) {
+          return false;
+        }
+        return true;
+      });
+      const sumPurch = purchList.reduce((acc, p) => {
+        const itemsSum = Array.isArray(p.items) && p.items.length > 0
+          ? p.items.reduce((s, it) => s + (Number(it.subtotalBrl) || Number(it.unitPriceBrl || 0) * Number(it.quantity || 1)), 0)
+          : 0;
+        const effectiveTotal = Number(p.totalAmountBrl) > 0 ? Number(p.totalAmountBrl) : itemsSum;
+        return acc + effectiveTotal;
+      }, 0);
       const recordedSaleIds = new Set(purchList.filter(p => p.saleId).map(p => p.saleId));
       const recordedCmdNums = new Set(
         purchList
@@ -195,7 +211,7 @@ export const CustomersView: React.FC = () => {
       const exactCalculatedTotal = Math.round((sumPurch + extraSalesSum) * 100) / 100;
       const hasRecords = purchList.length > 0 || extraSales.length > 0;
       const finalTotalSpent = hasRecords
-        ? Math.max(exactCalculatedTotal, c.outstandingBalanceBrl || 0)
+        ? exactCalculatedTotal
         : Math.max(c.totalSpentBrl || 0, c.outstandingBalanceBrl || 0);
       const finalCount = hasRecords
         ? purchList.length + extraSales.length
@@ -2599,7 +2615,7 @@ export const CustomersView: React.FC = () => {
                     id="customer-limit-field"
                     name="customerCreditLimit"
                     type="number"
-                    step="1000"
+                    step="any"
                     placeholder={language === 'es' ? 'Ej: 500.000 ₲' : 'Ex: 500.000 ₲'}
                     value={formCreditLimit}
                     onChange={(e) => setFormCreditLimit(e.target.value)}

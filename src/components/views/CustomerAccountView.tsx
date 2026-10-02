@@ -248,19 +248,35 @@ export const CustomerAccountView: React.FC<Props> = ({ onNavigateStore, onLogout
     e.preventDefault();
     if (!user) return;
 
+    const newAddrId = `addr-${Date.now()}`;
+    const localAddr: CustomerAddress = {
+      id: newAddrId,
+      userId: user.id,
+      recipientName: newRecipient.trim() || fullName,
+      street: newStreet.trim(),
+      number: newNumber.trim(),
+      complement: newComplement.trim() || undefined,
+      neighborhood: newNeighborhood.trim(),
+      city: newCity.trim(),
+      state: newState.trim(),
+      country: 'Paraguai',
+      postalCode: newPostalCode.trim() || '7000',
+      isDefault: newIsDefault,
+    };
+
     try {
       const payload = {
+        id: newAddrId,
         user_id: user.id,
-        recipient_name: newRecipient.trim() || fullName,
-        street: newStreet.trim(),
-        number: newNumber.trim(),
-        complement: newComplement.trim() || null,
-        neighborhood: newNeighborhood.trim(),
-        city: newCity.trim(),
-        state: newState.trim(),
-        country: 'Paraguai',
-        postal_code: newPostalCode.trim() || '7000',
-        is_default: newIsDefault,
+        recipient_name: localAddr.recipientName,
+        street: localAddr.street,
+        number: localAddr.number,
+        complement: localAddr.complement || null,
+        neighborhood: localAddr.neighborhood,
+        city: localAddr.city,
+        state: localAddr.state,
+        zip_code: localAddr.postalCode,
+        is_default: localAddr.isDefault,
       };
 
       const { data, error } = await supabase
@@ -269,22 +285,47 @@ export const CustomerAccountView: React.FC<Props> = ({ onNavigateStore, onLogout
         .select()
         .single();
 
-      if (error) {
-        alert(`Erro ao cadastrar endereço: ${error.message}`);
-        return;
-      }
+      const savedAddr: CustomerAddress = !error && data
+        ? {
+            id: String(data.id),
+            userId: data.user_id,
+            recipientName: data.recipient_name || localAddr.recipientName,
+            street: data.street || localAddr.street,
+            number: data.number || localAddr.number,
+            complement: data.complement || localAddr.complement,
+            neighborhood: data.neighborhood || localAddr.neighborhood,
+            city: data.city || localAddr.city,
+            state: data.state || localAddr.state,
+            country: 'Paraguai',
+            postalCode: data.zip_code || data.postal_code || localAddr.postalCode,
+            isDefault: Boolean(data.is_default),
+          }
+        : localAddr;
 
-      if (data) {
-        setAddresses(prev => [data as CustomerAddress, ...prev]);
-        setIsNewAddressModalOpen(false);
-        // Reset fields
-        setNewStreet('');
-        setNewNumber('');
-        setNewComplement('');
-        setNewNeighborhood('');
-      }
+      setAddresses(prev => {
+        const next = [savedAddr, ...prev];
+        try {
+          localStorage.setItem(`KORISKO_ADDRESSES_${user.id}`, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setIsNewAddressModalOpen(false);
+      setNewStreet('');
+      setNewNumber('');
+      setNewComplement('');
+      setNewNeighborhood('');
+      setProfileNotice({
+        type: 'success',
+        message: language === 'es' ? 'Dirección guardada con éxito.' : 'Endereço salvo com sucesso!',
+      });
+      setTimeout(() => setProfileNotice(null), 3000);
     } catch (err: any) {
-      alert(`Falha ao salvar endereço: ${err.message}`);
+      setAddresses(prev => [localAddr, ...prev]);
+      setIsNewAddressModalOpen(false);
+      setNewStreet('');
+      setNewNumber('');
+      setNewComplement('');
+      setNewNeighborhood('');
     }
   };
 

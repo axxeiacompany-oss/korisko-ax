@@ -714,23 +714,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile) return { error: new Error('Usuário não autenticado.') };
 
     try {
+      const nowIso = new Date().toISOString();
       const payload: any = {
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       };
       if (updates.fullName !== undefined) payload.full_name = updates.fullName;
       if (updates.phone !== undefined) payload.phone = updates.phone;
       if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(payload)
-        .eq('user_id', user.id);
+      // Attempt update on profiles if table exists
+      try {
+        await supabase
+          .from('profiles')
+          .update(payload)
+          .eq('user_id', user.id);
+      } catch {}
 
-      if (error) {
-        return { error: new Error(error.message) };
-      }
+      // Also sync to clientes / usuarios table in Supabase
+      try {
+        const custUpdates: any = { updated_at: nowIso };
+        if (updates.fullName !== undefined) custUpdates.name = updates.fullName;
+        if (updates.phone !== undefined) custUpdates.phone = updates.phone;
+        await supabase.from('clientes').update(custUpdates).eq('id', user.id);
+      } catch {}
 
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      try {
+        if (updates.fullName !== undefined) {
+          await supabase.from('usuarios').update({ name: updates.fullName }).eq('id', user.id);
+        }
+      } catch {}
+
+      const nextProfile: UserProfile = {
+        ...profile,
+        ...updates,
+        updatedAt: nowIso,
+      };
+      setProfile(nextProfile);
+      try {
+        localStorage.setItem('KORISKO_SAVED_PROFILE', JSON.stringify(nextProfile));
+      } catch {}
+
       return { error: null };
     } catch (err: any) {
       return { error: err };

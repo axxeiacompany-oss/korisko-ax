@@ -306,7 +306,13 @@ export const StoreView: React.FC<Props> = ({
         isDefault: true,
       };
 
+      let orderId = `ord-${Date.now()}`;
+      let orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
+      const comandaNumber = `CMD-${orderNumber.replace('PED-', '')}`;
+
       const orderPayload = {
+        id: orderId,
+        order_number: orderNumber,
         user_id: user?.id || null,
         affiliate_id: resolvedAffiliateId,
         status: 'confirmed',
@@ -317,10 +323,6 @@ export const StoreView: React.FC<Props> = ({
         shipping_address: shippingAddress,
         notes: notes.trim() || null,
       };
-
-      let orderId = `ord-${Date.now()}`;
-      let orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
-      const comandaNumber = `CMD-${orderNumber.replace('PED-', '')}`;
 
       const saleItems = cart.map(it => ({
         product: it.product,
