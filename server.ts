@@ -202,6 +202,8 @@ app.get('/api/health', async (_req, res) => {
     persistence: 'tempo_real',
     timestamp: new Date().toISOString(),
   });
+});
+
 // Live Currency Exchange Rates Proxy (Server-side fetch prevents browser CORS and network failures)
 let cachedRatesData: any = null;
 let cachedRatesExpiry = 0;

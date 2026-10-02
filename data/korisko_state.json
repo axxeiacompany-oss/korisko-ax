@@ -297,8 +297,50 @@
   "openComandas": [],
   "fornadas": [],
   "fichasTecnicas": [],
-  "customers": [],
-  "customerEntries": [],
-  "customerPurchases": [],
+  "customers": [
+    {
+      "id": "cust-1790902679673",
+      "name": "Damasceno",
+      "phone": "4584162315",
+      "outstandingBalanceBrl": 170000,
+      "totalSpentBrl": 170000,
+      "purchaseCount": 1,
+      "creditLimitBrl": 500000,
+      "category": "varejo",
+      "loyaltyPoints": 17
+    }
+  ],
+  "customerEntries": [
+    {
+      "id": "entry-damasceno-fiado-1",
+      "customerId": "cust-1790902679673",
+      "customerName": "Damasceno",
+      "customerPhone": "4584162315",
+      "date": "2026-10-02T16:03:43.167Z",
+      "type": "debito_compra",
+      "amountBrl": 170000,
+      "description": "Compra no Fiado / Comanda Balcão #01",
+      "comandaNumber": "01",
+      "setorResponsavel": "Panificação & Confeitaria Artesanal",
+      "recordedBy": "Caixa Principal"
+    }
+  ],
+  "customerPurchases": [
+    {
+      "id": "purch-damasceno-1",
+      "customerId": "cust-1790902679673",
+      "customerName": "Damasceno",
+      "customerPhone": "4584162315",
+      "comandaNumber": "01",
+      "totalAmountBrl": 170000,
+      "fiadoAmountBrl": 170000,
+      "paidAmountBrl": 0,
+      "paymentMethod": "fiado",
+      "flowType": "fiado_pendente",
+      "itemsSummary": "Produtos de Panificação & Confeitaria",
+      "purchaseDate": "2026-10-02T16:03:43.168Z",
+      "recordedBy": "Caixa Principal"
+    }
+  ],
   "activeCheckouts": []
 }

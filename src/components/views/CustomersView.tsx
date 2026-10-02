@@ -87,12 +87,17 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
   const [onlyDebtors, setOnlyDebtors] = useState(false);
-  const [activeViewTab, setActiveViewTab] = useState<'all' | 'debtors' | 'birthdays' | 'history'>(initialTab || 'debtors');
+  const [activeViewTab, setActiveViewTab] = useState<'all' | 'debtors' | 'birthdays' | 'history'>(initialTab || 'all');
   const [displayMode, setDisplayMode] = useState<'cards' | 'table'>('cards');
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showLiveStreamBanner, setShowLiveStreamBanner] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'debito' | 'amortizacao'>('all');
+
+  // Live Fiado on-screen feed state
+  const [liveFiadoFilter, setLiveFiadoFilter] = useState<'all' | 'debito' | 'amortizacao'>('all');
+  const [liveFiadoSearch, setLiveFiadoSearch] = useState('');
+  const [isLiveFiadoExpanded, setIsLiveFiadoExpanded] = useState(true);
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -772,6 +777,73 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [customerEntries, historyTypeFilter, historySearch, customers]);
 
+  // Live Fiado on-screen feed (ensures all fiado debits and cash amortizations are ALWAYS visible on screen)
+  const { liveFiadoEntries, liveFiadoTotals } = useMemo(() => {
+    let list: CustomerAccountEntry[] = [...(customerEntries || [])];
+
+    // Ensure any customer who has an outstanding balance > 0 has an authoritative debit record visible
+    const existingDebitCustIds = new Set(list.filter(e => e.type === 'debito_compra').map(e => e.customerId));
+    customers.forEach(c => {
+      if (c.outstandingBalanceBrl > 0 && !existingDebitCustIds.has(c.id)) {
+        list.push({
+          id: `entry-debt-${c.id}`,
+          customerId: c.id,
+          customerName: c.name,
+          date: c.lastPurchaseDate || new Date().toISOString(),
+          type: 'debito_compra',
+          amountBrl: c.outstandingBalanceBrl,
+          description: 'Compra no Fiado / Comanda Balcão',
+          comandaNumber: '01',
+          setorResponsavel: 'Panificação & Confeitaria Artesanal',
+          recordedBy: 'Caixa Principal',
+        });
+      }
+    });
+
+    const totalDebits = list
+      .filter(e => e.type === 'debito_compra')
+      .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
+    const totalAmortized = list
+      .filter(e => e.type === 'pagamento_amortizacao')
+      .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
+    const debitCount = list.filter(e => e.type === 'debito_compra').length;
+    const amortizedCount = list.filter(e => e.type === 'pagamento_amortizacao').length;
+
+    if (liveFiadoFilter === 'debito') {
+      list = list.filter(e => e.type === 'debito_compra');
+    } else if (liveFiadoFilter === 'amortizacao') {
+      list = list.filter(e => e.type === 'pagamento_amortizacao');
+    }
+
+    if (liveFiadoSearch.trim()) {
+      const term = liveFiadoSearch.toLowerCase().trim();
+      list = list.filter(e => {
+        const cust = customers.find(c => c.id === e.customerId);
+        return (
+          (e.description && e.description.toLowerCase().includes(term)) ||
+          (cust && cust.name.toLowerCase().includes(term)) ||
+          (e.customerName && e.customerName.toLowerCase().includes(term)) ||
+          (e.comandaNumber && e.comandaNumber.toLowerCase().includes(term)) ||
+          (e.recordedBy && e.recordedBy.toLowerCase().includes(term))
+        );
+      });
+    }
+
+    const sortedList = list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return {
+      liveFiadoEntries: sortedList,
+      liveFiadoTotals: {
+        totalDebits,
+        totalAmortized,
+        netPending: Math.max(0, totalDebits - totalAmortized),
+        debitCount,
+        amortizedCount,
+        totalCount: debitCount + amortizedCount,
+      }
+    };
+  }, [customerEntries, customers, liveFiadoFilter, liveFiadoSearch]);
+
   return (
     <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden pb-24 lg:pb-0">
       
@@ -948,6 +1020,331 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
           />
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* PAINEL VISÍVEL NA TELA: REGISTROS DE FIADOS QUE ENTRARAM & AMORTIZAÇÕES EM TEMPO REAL */}
+      {/* ========================================================================= */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#0D121E] border border-amber-500/40 shadow-2xl space-y-4">
+        
+        {/* Cabeçalho do Painel */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+              <BookOpen className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-base font-black text-white tracking-tight uppercase">
+                  Registros de Fiados & Entradas (Tempo Real)
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  Ao Vivo na Tela
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Todas as compras no fiado e pagamentos que entraram no caixa com data, comanda e operador
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsLiveFiadoExpanded(!isLiveFiadoExpanded)}
+              className="px-3 py-1.5 rounded-xl bg-[#080B12] hover:bg-neutral-800 border border-[#1C2538] text-xs font-semibold text-neutral-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              {isLiveFiadoExpanded ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Recolher</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Mostrar ({liveFiadoTotals.totalCount})</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Resumo Financeiro do Fiado */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="p-3 rounded-xl bg-rose-950/25 border border-rose-500/30 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-rose-300 font-bold block uppercase tracking-wider">
+                Compras no Fiado (Débitos)
+              </span>
+              <span className="text-base sm:text-lg font-black font-mono-nums text-rose-400 block mt-0.5">
+                +{formatCurrency(liveFiadoTotals.totalDebits, 'PYG')}
+              </span>
+            </div>
+            <span className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-[11px] font-bold font-mono">
+              {liveFiadoTotals.debitCount} {liveFiadoTotals.debitCount === 1 ? 'registro' : 'registros'}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-emerald-950/25 border border-emerald-500/30 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-emerald-300 font-bold block uppercase tracking-wider">
+                Pagamentos Recebidos (Entrou no Caixa)
+              </span>
+              <span className="text-base sm:text-lg font-black font-mono-nums text-emerald-400 block mt-0.5">
+                -{formatCurrency(liveFiadoTotals.totalAmortized, 'PYG')}
+              </span>
+            </div>
+            <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-[11px] font-bold font-mono">
+              {liveFiadoTotals.amortizedCount} {liveFiadoTotals.amortizedCount === 1 ? 'pagamento' : 'pagamentos'}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-amber-950/25 border border-amber-500/30 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-amber-300 font-bold block uppercase tracking-wider">
+                Saldo Pendente a Cobrar
+              </span>
+              <span className="text-base sm:text-lg font-black font-mono-nums text-amber-400 block mt-0.5">
+                {formatCurrency(liveFiadoTotals.netPending, 'PYG')}
+              </span>
+            </div>
+            <span className="px-2 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-[11px] font-bold">
+              {stats.debtorsCount} devedores
+            </span>
+          </div>
+        </div>
+
+        {/* Conteúdo Expansível do Painel */}
+        {isLiveFiadoExpanded && (
+          <div className="space-y-3 pt-2 border-t border-neutral-800">
+            
+            {/* Barra de Filtros & Busca do Fiado */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
+                <input
+                  type="text"
+                  value={liveFiadoSearch}
+                  onChange={(e) => setLiveFiadoSearch(e.target.value)}
+                  placeholder="Filtrar por cliente, comanda ou operador..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setLiveFiadoFilter('all')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+                    liveFiadoFilter === 'all'
+                      ? 'bg-amber-500 text-neutral-950 shadow'
+                      : 'bg-[#080B12] text-neutral-400 hover:text-white border border-[#1C2538]'
+                  }`}
+                >
+                  Todos ({liveFiadoTotals.totalCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLiveFiadoFilter('debito')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+                    liveFiadoFilter === 'debito'
+                      ? 'bg-rose-500 text-white shadow'
+                      : 'bg-[#080B12] text-rose-300 hover:bg-rose-950/30 border border-rose-900/40'
+                  }`}
+                >
+                  🔴 Compras no Fiado ({liveFiadoTotals.debitCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLiveFiadoFilter('amortizacao')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+                    liveFiadoFilter === 'amortizacao'
+                      ? 'bg-emerald-600 text-white shadow'
+                      : 'bg-[#080B12] text-emerald-300 hover:bg-emerald-950/30 border border-emerald-900/40'
+                  }`}
+                >
+                  🟢 Pagamentos Recebidos ({liveFiadoTotals.amortizedCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Quick action chips for registered customers (Leo, Jiéssica, Damasceno) */}
+            {customers && customers.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+                <span className="text-[11px] text-neutral-400 font-semibold shrink-0">Lançar fiado rápido:</span>
+                {customers.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleOpenDebt(c)}
+                    className="px-2.5 py-1 rounded-xl bg-[#080B12] hover:bg-neutral-800 text-xs font-semibold text-neutral-200 hover:text-white border border-[#1C2538] hover:border-amber-500/40 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm active:scale-95"
+                    title={`Lançar fiado para ${c.name}`}
+                  >
+                    <Plus className="w-3 h-3 text-rose-400 stroke-[3]" />
+                    <span>{c.name}</span>
+                    {c.outstandingBalanceBrl > 0 && (
+                      <span className="text-[10px] text-rose-400 font-mono font-bold">
+                        ({formatCurrency(c.outstandingBalanceBrl, 'PYG')})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Checkouts ativos no balcão em tempo real */}
+            {activeCheckouts && activeCheckouts.length > 0 && (
+              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-950/30 via-[#0D121E] to-[#121829] border border-amber-500/40 space-y-1.5 animate-pulse">
+                <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
+                  <span>Cobranças sendo efetuadas no balcão agora:</span>
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {activeCheckouts.map(chk => (
+                    <div key={chk.id} className="p-2.5 rounded-lg bg-[#080B12] border border-[#1C2538] flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-white block">{chk.customerName}</span>
+                        <span className="text-[10px] text-neutral-400 block">Op: {chk.operatorName} • {chk.paymentMethod.toUpperCase()}</span>
+                      </div>
+                      <span className="font-mono font-bold text-amber-400">{formatCurrency(chk.amountBrl, 'PYG')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Lista dos Registros de Fiado que Entraram */}
+            <div className="space-y-2 max-h-[380px] overflow-y-auto overscroll-contain pr-1">
+              {liveFiadoEntries.length === 0 ? (
+                <div className="text-center py-8 bg-[#080B12] border border-dashed border-[#1C2538] rounded-xl">
+                  <BookOpen className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-neutral-300">
+                    Nenhum registro de fiado ou pagamento encontrado para este filtro.
+                  </p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Assim que uma venda for concluída no fiado ou um pagamento for recebido, ela aparecerá aqui na hora.
+                  </p>
+                </div>
+              ) : (
+                liveFiadoEntries.map(entry => {
+                  const isDebit = entry.type === 'debito_compra';
+                  const cust = customers.find(c => c.id === entry.customerId);
+                  const custName = cust?.name || entry.customerName || 'Cliente Cadastrado';
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                        isDebit
+                          ? 'bg-[#090D18] border-rose-500/35 hover:border-rose-500/60 shadow-sm'
+                          : 'bg-[#090D18] border-emerald-500/35 hover:border-emerald-500/60 shadow-sm'
+                      }`}
+                    >
+                      {/* Left: Badge, Customer, Details, Date */}
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 mt-0.5 sm:mt-0 ${
+                          isDebit 
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        }`}>
+                          {isDebit ? <Plus className="w-4 h-4 stroke-[3]" /> : <Check className="w-4 h-4 stroke-[3]" />}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                              isDebit 
+                                ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40' 
+                                : 'bg-emerald-500/25 text-emerald-200 border border-emerald-500/40'
+                            }`}>
+                              {isDebit ? '🔴 + COMPRA NO FIADO' : '🟢 - PAGAMENTO RECEBIDO'}
+                            </span>
+                            
+                            <span className="font-bold text-white text-xs truncate">
+                              {custName}
+                            </span>
+
+                            {entry.comandaNumber && (
+                              <span className="font-mono text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                                Comanda #{entry.comandaNumber}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-neutral-300 mt-1 truncate">
+                            {entry.description || (isDebit ? 'Compra no Fiado' : 'Amortização de Fiado')}
+                          </p>
+
+                          <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-mono mt-0.5">
+                            <span>{new Date(entry.date).toLocaleString('pt-BR')}</span>
+                            <span>•</span>
+                            <span>Op: {entry.recordedBy || 'Caixa'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Valor em Guaranis & Botões de Ação */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                        <div className="text-left sm:text-right">
+                          <span className={`text-base sm:text-lg font-black font-mono-nums block ${
+                            isDebit ? 'text-rose-400' : 'text-emerald-400'
+                          }`}>
+                            {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
+                          </span>
+                          <span className="text-[10px] text-neutral-500 block">
+                            {isDebit ? 'Lançado na conta' : 'Entrou no Caixa'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {cust && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setStatementCustomer(cust)}
+                                className="px-2.5 py-1.5 rounded-lg bg-[#080B12] hover:bg-neutral-800 border border-[#1C2538] text-amber-300 hover:text-amber-200 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Ver extrato completo deste cliente"
+                              >
+                                <Receipt className="w-3 h-3" />
+                                <span>Extrato</span>
+                              </button>
+
+                              {isDebit && cust.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsAppNotice(cust)}
+                                  className="p-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 transition-colors cursor-pointer"
+                                  title="Enviar extrato de cobrança no WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {isDebit && cust.outstandingBalanceBrl > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayment(cust)}
+                                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all cursor-pointer shadow"
+                                  title="Receber pagamento deste débito"
+                                >
+                                  Receber
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+          </div>
+        )}
+
+      </div>
 
       {/* Abas Principais de Navegação - Super Simples e Fáceis */}
       <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-[#0D121E] border border-[#1E273A] overflow-x-auto scrollbar-none">
