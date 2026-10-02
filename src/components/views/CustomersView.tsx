@@ -63,7 +63,6 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
     customers, 
     customerEntries, 
     customerPurchases,
-    activeCheckouts,
     sales,
     currentUser,
     addCustomer, 
@@ -1192,26 +1191,6 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
               </div>
             )}
 
-            {/* Checkouts ativos no balcão em tempo real */}
-            {activeCheckouts && activeCheckouts.length > 0 && (
-              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-950/30 via-[#0D121E] to-[#121829] border border-amber-500/40 space-y-1.5 animate-pulse">
-                <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
-                  <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                  <span>Cobranças sendo efetuadas no balcão agora:</span>
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {activeCheckouts.map(chk => (
-                    <div key={chk.id} className="p-2.5 rounded-lg bg-[#080B12] border border-[#1C2538] flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-white block">{chk.customerName}</span>
-                        <span className="text-[10px] text-neutral-400 block">Op: {chk.operatorName} • {chk.paymentMethod.toUpperCase()}</span>
-                      </div>
-                      <span className="font-mono font-bold text-amber-400">{formatCurrency(chk.amountBrl, 'PYG')}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Lista dos Registros de Fiado que Entraram */}
             <div className="space-y-2 max-h-[380px] overflow-y-auto overscroll-contain pr-1">
@@ -1921,26 +1900,6 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
             </div>
           </div>
 
-          {/* Feed de Checkouts Ativos em tempo real (se houver) */}
-          {activeCheckouts && activeCheckouts.length > 0 && (
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/20 via-[#0D121E] to-[#121829] border border-amber-500/30 space-y-2">
-              <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
-                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                <span>Cobranças sendo processadas agora no balcão:</span>
-              </span>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {activeCheckouts.map(chk => (
-                  <div key={chk.id} className="p-2.5 rounded-xl bg-[#080B12] border border-[#1C2538] flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-bold text-white block">{chk.customerName}</span>
-                      <span className="text-[10px] text-neutral-400 block">Op: {chk.operatorName} • {chk.paymentMethod.toUpperCase()}</span>
-                    </div>
-                    <span className="font-mono font-bold text-amber-400">{formatCurrency(chk.amountBrl, 'PYG')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Lista de Registros do Histórico */}
           <div className="space-y-2">
