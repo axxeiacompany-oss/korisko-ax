@@ -40,6 +40,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
       'dashboard', 
       'pdv', 
       'venda_direta',
+      'loja',
       'estoque', 
       'fichas_tecnicas', 
       'crm', 

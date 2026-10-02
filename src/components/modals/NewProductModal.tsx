@@ -14,7 +14,12 @@ export const NewProductModal: React.FC<Props> = ({
   onClose,
   productToEdit,
 }) => {
-  const { addProduct, updateProduct } = useBakery();
+  const { addProduct, updateProduct, currentUser } = useBakery();
+  const canEditCostPrice =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'gerente' ||
+    currentUser?.role === 'padeiro' ||
+    currentUser?.role === 'estoquista';
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -274,18 +279,19 @@ export const NewProductModal: React.FC<Props> = ({
               />
             </div>
 
-            {/* Cost Price */}
+            {/* Cost Price (Admin & Setores Responsáveis Control) */}
             <div>
-              <label className="text-xs font-medium text-neutral-300 block mb-1">
-                Custo (₲ PYG)
+              <label className="text-xs font-medium text-neutral-300 block mb-1" title="Controle exclusivo do Admin e Setores Responsáveis">
+                Custo (Admin/Setor)
               </label>
               <input
                 type="number"
                 step="100"
                 placeholder="8000"
+                disabled={!canEditCostPrice}
                 value={costPriceBrl}
                 onChange={(e) => setCostPriceBrl(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs font-mono-nums text-neutral-400 focus:outline-none focus:border-amber-500"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs font-mono-nums text-neutral-400 focus:outline-none focus:border-amber-500 disabled:opacity-50"
               />
             </div>
 

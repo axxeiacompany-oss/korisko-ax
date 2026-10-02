@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useBakery } from '../../context/BakeryContext';
 import { formatBrl, fromBrl, formatCurrency } from '../../utils/currency';
 import { CartItem, Comanda, ComandaStatus, SetorResponsavel } from '../../types';
@@ -29,6 +29,8 @@ interface ComandasModalProps {
   onClose: () => void;
   currentCart?: CartItem[];
   currentCartItems?: CartItem[];
+  activeComandaNumber?: string;
+  activeCustomerName?: string;
   onLoadComanda?: (comanda: Comanda) => void;
   onClearCart?: () => void;
 }
@@ -38,6 +40,8 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
   onClose,
   currentCart = [],
   currentCartItems,
+  activeComandaNumber,
+  activeCustomerName,
   onLoadComanda,
   onClearCart,
 }) => {
@@ -63,6 +67,17 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
   const [selectedSetor, setSelectedSetor] = useState<SetorResponsavel | 'auto'>('auto');
   const [activeSectorFilter, setActiveSectorFilter] = useState<SetorResponsavel | 'todas'>('todas');
 
+  useEffect(() => {
+    if (isOpen) {
+      if (activeComandaNumber) {
+        setComandaNumber(activeComandaNumber);
+      }
+      if (activeCustomerName) {
+        setCustomerName(activeCustomerName);
+      }
+    }
+  }, [isOpen, activeComandaNumber, activeCustomerName]);
+
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'gerente' || currentUser.id === 'emp-admin-ax';
 
   const autoDetectedSector = useMemo(() => {
@@ -82,6 +97,17 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
     });
   }, [openComandas, activeSectorFilter]);
 
+  const existingOpenComanda = useMemo(() => {
+    const clean = comandaNumber.trim().toLowerCase();
+    if (!clean) return undefined;
+    return openComandas.find(c => c.number.trim().toLowerCase() === clean);
+  }, [openComandas, comandaNumber]);
+
+  const isAppendingToExisting = Boolean(
+    existingOpenComanda &&
+    (!activeComandaNumber || activeComandaNumber.trim().toLowerCase() !== comandaNumber.trim().toLowerCase())
+  );
+
   const chosenCustomer = useMemo(() => {
     if (selectedCustomerId) {
       return customers.find(c => c.id === selectedCustomerId);
@@ -90,19 +116,50 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
       const normalized = customerName.trim().toLowerCase();
       return customers.find(c => c.name.trim().toLowerCase() === normalized);
     }
+    if (existingOpenComanda?.customerId) {
+      return customers.find(c => c.id === existingOpenComanda.customerId);
+    }
+    if (existingOpenComanda?.customerName) {
+      const normalized = existingOpenComanda.customerName.trim().toLowerCase();
+      return customers.find(c => c.name.trim().toLowerCase() === normalized);
+    }
     return undefined;
-  }, [customers, selectedCustomerId, customerName]);
+  }, [customers, selectedCustomerId, customerName, existingOpenComanda]);
 
   if (!isOpen) return null;
 
-  const cartTotalBrl = effectiveCart.reduce((acc, i) => acc + i.subtotalBrl, 0);
+  const cartTotalBrl = Math.round(
+    effectiveCart.reduce((acc, i) => {
+      const unitPrice = Number(i.unitPriceBrl ?? i.product?.priceBrl ?? 0);
+      const qty = Number(i.quantity) || 0;
+      const sub = i.subtotalBrl !== undefined && Number(i.subtotalBrl) > 0 ? Number(i.subtotalBrl) : unitPrice * qty;
+      return acc + sub;
+    }, 0) * 100
+  ) / 100;
   const cartTotalPyg = fromBrl(cartTotalBrl, 'PYG', exchangeRates);
+
+  const existingComandaTotalBrl = existingOpenComanda
+    ? Math.round(
+        existingOpenComanda.items.reduce((acc, i) => {
+          const unitPrice = Number(i.unitPriceBrl ?? i.product?.priceBrl ?? 0);
+          const qty = Number(i.quantity) || 0;
+          const sub = i.subtotalBrl !== undefined && Number(i.subtotalBrl) > 0 ? Number(i.subtotalBrl) : unitPrice * qty;
+          return acc + sub;
+        }, 0) * 100
+      ) / 100
+    : 0;
+
+  const projectedComandaTotalBrl = isAppendingToExisting
+    ? Math.round((existingComandaTotalBrl + cartTotalBrl) * 100) / 100
+    : cartTotalBrl;
 
   const handleSaveCurrentCart = (e: React.FormEvent) => {
     e.preventDefault();
     if (!comandaNumber.trim() || effectiveCart.length === 0) return;
 
-    const finalCustomerName = chosenCustomer ? chosenCustomer.name : (customerName.trim() || 'Cliente Balcão');
+    const finalCustomerName = chosenCustomer
+      ? chosenCustomer.name
+      : (customerName.trim() || existingOpenComanda?.customerName || 'Cliente Balcão');
     const targetSetor: SetorResponsavel = selectedSetor === 'auto'
       ? autoDetectedSector.primary
       : selectedSetor;
@@ -113,23 +170,24 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
       finalCustomerName,
       notes.trim() || undefined,
       {
-        customerId: chosenCustomer?.id,
-        customerPhone: chosenCustomer?.phone,
+        customerId: chosenCustomer?.id || existingOpenComanda?.customerId,
+        customerPhone: chosenCustomer?.phone || existingOpenComanda?.customerPhone,
         status: 'confirmado',
         setorResponsavel: targetSetor,
         confirmedByCustomer: true,
         source: 'pdv',
+        appendItems: isAppendingToExisting,
       }
     );
 
     if (saved.debtAppliedBrl && saved.debtAppliedBrl > 0) {
       showToast(
-        `Comanda #${saved.number} lançada! Saldo devedor de ${finalCustomerName} atualizado em tempo real para ${formatCurrency(saved.resultingDebtBrl || saved.debtAppliedBrl, 'PYG')}.`,
+        `Comanda #${saved.number} somada (${formatCurrency(saved.totalBrl || projectedComandaTotalBrl, 'PYG')})! Saldo devedor de ${finalCustomerName} atualizado para ${formatCurrency(saved.resultingDebtBrl || saved.debtAppliedBrl, 'PYG')}.`,
         'success'
       );
     } else {
       showToast(
-        `Comanda #${saved.number} confirmada e enviada em tempo real para ${formatSetorName(saved.setorResponsavel)}!`,
+        `Comanda #${saved.number} confirmada (${formatCurrency(saved.totalBrl || projectedComandaTotalBrl, 'PYG')}) e enviada para ${formatSetorName(saved.setorResponsavel)}!`,
         'success'
       );
     }
@@ -390,17 +448,24 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                     />
                   </div>
 
-                  {(chosenCustomer || customerName.trim().length > 0) && (
+                  {(chosenCustomer || customerName.trim().length > 0 || existingOpenComanda) && (
                     <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
                           <Radio className="w-3 h-3 text-rose-400 animate-pulse" />
-                          Atualização de Saldo Devedor em Tempo Real
+                          {isAppendingToExisting
+                            ? `Somando Novos Itens à Comanda #${existingOpenComanda?.number}`
+                            : 'Atualização de Saldo Devedor em Tempo Real'}
                         </span>
                         <span className="text-[10px] font-bold text-emerald-300">
                           {chosenCustomer ? 'Cliente Cadastrado' : 'Nova Ficha Automática'}
                         </span>
                       </div>
+                      {isAppendingToExisting && (
+                        <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2.5 py-1.5 font-mono">
+                          Comanda Atual: <strong>{formatCurrency(existingComandaTotalBrl, 'PYG')}</strong> + Novos Itens: <strong>{formatCurrency(cartTotalPyg, 'PYG')}</strong> = Total Comanda: <strong>{formatCurrency(projectedComandaTotalBrl, 'PYG')}</strong>
+                        </div>
+                      )}
                       <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
                         <div className="bg-neutral-950/80 p-2 rounded-lg border border-neutral-800">
                           <span className="text-[10px] text-neutral-400 block">Saldo Atual</span>
@@ -409,15 +474,31 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                           </span>
                         </div>
                         <div className="bg-neutral-950/80 p-2 rounded-lg border border-rose-500/30">
-                          <span className="text-[10px] text-rose-300 block">+ Comanda</span>
+                          <span className="text-[10px] text-rose-300 block">
+                            {isAppendingToExisting ? '+ Adicional' : '+ Comanda'}
+                          </span>
                           <span className="font-mono font-bold text-rose-400">
-                            +{formatCurrency(cartTotalPyg, 'PYG')}
+                            +{formatCurrency(
+                              isAppendingToExisting
+                                ? cartTotalPyg
+                                : Math.max(0, cartTotalBrl - (existingOpenComanda?.debtAppliedBrl || 0)),
+                              'PYG'
+                            )}
                           </span>
                         </div>
                         <div className="bg-rose-500/15 p-2 rounded-lg border border-rose-500/40">
                           <span className="text-[10px] text-amber-300 block font-semibold">Novo Saldo</span>
                           <span className="font-mono font-extrabold text-amber-300">
-                            {formatCurrency((chosenCustomer?.outstandingBalanceBrl || 0) + cartTotalBrl, 'PYG')}
+                            {formatCurrency(
+                              Math.max(
+                                0,
+                                (chosenCustomer?.outstandingBalanceBrl || 0) +
+                                  (isAppendingToExisting
+                                    ? cartTotalBrl
+                                    : cartTotalBrl - (existingOpenComanda?.debtAppliedBrl || 0))
+                              ),
+                              'PYG'
+                            )}
                           </span>
                         </div>
                       </div>
@@ -498,7 +579,14 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
             ) : (
               <div className="space-y-3 max-h-[540px] overflow-y-auto pr-1">
                 {filteredComandas.map((cmd) => {
-                  const cmdTotalBrl = cmd.items.reduce((acc, i) => acc + (i.subtotalBrl || (i.product?.priceBrl || 0) * i.quantity), 0);
+                  const cmdTotalBrl = Math.round(
+                    cmd.items.reduce((acc, i) => {
+                      const unitPrice = Number(i.unitPriceBrl ?? i.product?.priceBrl ?? 0);
+                      const qty = Number(i.quantity) || 0;
+                      const sub = i.subtotalBrl !== undefined && Number(i.subtotalBrl) > 0 ? Number(i.subtotalBrl) : unitPrice * qty;
+                      return acc + sub;
+                    }, 0) * 100
+                  ) / 100;
                   const cmdTotalPyg = fromBrl(cmdTotalBrl, 'PYG', exchangeRates);
                   const sectorInfo = resolveSetoresFromItems(cmd.items || []);
                   const activeSetor = cmd.setorResponsavel || sectorInfo.primary;
@@ -577,7 +665,16 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
                                 </span>
                               </div>
                               <span className="text-neutral-400 font-mono shrink-0 ml-2">
-                                {formatCurrency(fromBrl((item.product?.priceBrl || 0) * item.quantity, 'PYG', exchangeRates), 'PYG')}
+                                {formatCurrency(
+                                  fromBrl(
+                                    item.subtotalBrl !== undefined && Number(item.subtotalBrl) > 0
+                                      ? Number(item.subtotalBrl)
+                                      : (Number(item.unitPriceBrl ?? item.product?.priceBrl ?? 0) * Number(item.quantity || 0)),
+                                    'PYG',
+                                    exchangeRates
+                                  ),
+                                  'PYG'
+                                )}
                               </span>
                             </div>
                           );

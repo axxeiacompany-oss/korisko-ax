@@ -299,9 +299,9 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   const handleQuickToggleEmployeeFeature = async (emp: Employee, featureId: AppFeature) => {
     const isAxMember = emp.id === 'emp-admin-ax' || emp.email === 'axxeiacompany@gmail.com';
     if (isAxMember) return;
-    const currentList = emp.allowedFeatures && emp.allowedFeatures.length > 0
+    const currentList: AppFeature[] = Array.isArray(emp.allowedFeatures)
       ? emp.allowedFeatures
-      : AVAILABLE_FEATURES.map(f => f.id);
+      : ['dashboard', 'pdv', 'venda_direta', 'crm'];
     const hasFeature = currentList.includes(featureId);
     const nextFeatures = hasFeature
       ? currentList.filter(f => f !== featureId)
@@ -349,7 +349,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
       setName('');
       setEmail('');
       setPassword('');
-      setSelectedFeatures(['dashboard', 'pdv', 'venda_direta', 'crm']);
+      setSelectedFeatures(['dashboard', 'pdv', 'venda_direta', 'loja', 'crm']);
 
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
@@ -366,7 +366,11 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
     setEditEmail(emp.email || '');
     setEditPassword(emp.password || emp.pin || '');
     setEditRole(emp.role);
-    setEditFeatures(emp.allowedFeatures || AVAILABLE_FEATURES.map(f => f.id));
+    setEditFeatures(
+      Array.isArray(emp.allowedFeatures)
+        ? emp.allowedFeatures
+        : ['dashboard', 'pdv', 'venda_direta', 'crm']
+    );
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -660,7 +664,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                     O colaborador terá acesso apenas aos módulos marcados abaixo:
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedFeatures(AVAILABLE_FEATURES.map(f => f.id))}
@@ -671,10 +675,18 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                   <span className="text-neutral-600">·</span>
                   <button
                     type="button"
-                    onClick={() => setSelectedFeatures(['dashboard', 'venda_direta', 'pdv'])}
+                    onClick={() => setSelectedFeatures(['loja'])}
+                    className="text-[11px] text-[#F2D6B8] hover:text-[#C89B6E] font-semibold cursor-pointer"
+                  >
+                    Apenas Modo Loja
+                  </button>
+                  <span className="text-neutral-600">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFeatures(['dashboard', 'venda_direta', 'pdv', 'loja'])}
                     className="text-[11px] text-neutral-400 hover:text-neutral-200 cursor-pointer"
                   >
-                    Apenas Vendas
+                    Apenas Vendas & Loja
                   </button>
                 </div>
               </div>
@@ -756,7 +768,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
             const isThisPasswordVisible = visiblePasswordEmpId === emp.id;
             const unlockedCount = isAxCard 
               ? AVAILABLE_FEATURES.length 
-              : (emp.allowedFeatures ? emp.allowedFeatures.length : AVAILABLE_FEATURES.length);
+              : (Array.isArray(emp.allowedFeatures) ? emp.allowedFeatures.length : 4);
 
             return (
               <div 
@@ -872,9 +884,9 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                       </span>
                     ) : (
                       AVAILABLE_FEATURES.map(feat => {
-                        const empFeatures = emp.allowedFeatures && emp.allowedFeatures.length > 0
+                        const empFeatures: AppFeature[] = Array.isArray(emp.allowedFeatures)
                           ? emp.allowedFeatures
-                          : AVAILABLE_FEATURES.map(f => f.id);
+                          : ['dashboard', 'pdv', 'venda_direta', 'crm'];
                         const isAllowed = empFeatures.includes(feat.id);
                         return (
                           <button

@@ -60,15 +60,30 @@ export const StoreView: React.FC<Props> = ({
     updateProduct,
     openComandas,
     currentUser,
+    isFeatureAllowed,
+    hasStorePermission,
+    validateStoreAccess,
     showToast,
   } = useBakery();
 
+  const isCollaboratorLogged = isAuthenticated && role !== 'customer';
+  const canCollaboratorAccessStore = !isCollaboratorLogged || validateStoreAccess(currentUser);
+
+  useEffect(() => {
+    if (isCollaboratorLogged && !canCollaboratorAccessStore) {
+      if (onNavigateAdmin) {
+        onNavigateAdmin('dashboard');
+      } else if (onNavigateAccount) {
+        onNavigateAccount();
+      }
+    }
+  }, [isCollaboratorLogged, canCollaboratorAccessStore, onNavigateAdmin, onNavigateAccount]);
+
   const isAdminOrManager =
     role === 'admin' ||
-    role === 'manager' ||
     currentUser?.role === 'admin' ||
-    currentUser?.role === 'gerente' ||
-    currentUser?.id === 'emp-admin-ax';
+    currentUser?.id === 'emp-admin-ax' ||
+    (isCollaboratorLogged && canCollaboratorAccessStore);
 
   // Search & Categories
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,7 +355,7 @@ export const StoreView: React.FC<Props> = ({
           ],
           undefined,
           customerName.trim() || profile?.fullName || 'Cliente Loja Online',
-          undefined,
+          comandaNumber,
           0,
           cartSubtotal,
           user?.id
@@ -349,7 +364,7 @@ export const StoreView: React.FC<Props> = ({
         console.warn('[StoreView] Aviso ao registrar venda local:', saleErr);
       }
 
-      // 1.5. Gerar Comanda Confirmada para o Setor Responsável e Administração
+      // 1.5. Gerar Comanda Confirmada para o Setor Responsável e Administração (sem duplicar saldo devedor pois a venda já foi registrada acima)
       try {
         saveComanda(
           comandaNumber,
@@ -365,6 +380,7 @@ export const StoreView: React.FC<Props> = ({
             setorResponsavel: sectorInfo.primary,
             confirmedByCustomer: true,
             source: 'loja_online',
+            updateDebtorBalance: false,
           }
         );
       } catch (cmdErr) {
@@ -463,6 +479,11 @@ export const StoreView: React.FC<Props> = ({
       setIsSubmittingOrder(false);
     }
   };
+
+  // Block rendering of the store interface if the logged-in collaborator does not have explicit 'loja' permission
+  if (isCollaboratorLogged && !canCollaboratorAccessStore) {
+    return null;
+  }
 
   return (
     <div
@@ -605,7 +626,7 @@ export const StoreView: React.FC<Props> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {isAdminOrManager && onNavigateAdmin && (
+            {isFeatureAllowed('afiliados') && onNavigateAdmin && (
               <button
                 type="button"
                 onClick={() => onNavigateAdmin('afiliados')}
@@ -616,7 +637,7 @@ export const StoreView: React.FC<Props> = ({
               </button>
             )}
 
-            {onNavigateAdmin && (
+            {isFeatureAllowed('estoque') && onNavigateAdmin && (
               <button
                 type="button"
                 onClick={() => onNavigateAdmin('estoque')}

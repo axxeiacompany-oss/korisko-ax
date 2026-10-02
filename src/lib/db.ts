@@ -338,15 +338,25 @@ export function userToRow(u: Employee) {
 }
 
 export function rowToUser(r: any): Employee {
+  const roleVal = ((r.role || r.cargo) as UserRole) || 'caixa';
+  const isMasterOrAdmin =
+    String(r.id) === 'emp-admin-ax' ||
+    String(r.email || '').toLowerCase() === 'axxeiacompany@gmail.com' ||
+    roleVal === 'admin';
+  const hasExplicitFeatures = Array.isArray(r.allowed_features);
   return {
     id: String(r.id),
-    name: r.name || '',
+    name: r.name || r.nome || '',
     email: r.email || '',
-    role: (r.role as UserRole) || 'caixa',
-    password: r.password || '',
+    role: roleVal,
+    password: r.password || r.pin || '',
     pin: r.pin || r.password || '',
     avatarColor: r.avatar_color || 'bg-indigo-600',
-    allowedFeatures: Array.isArray(r.allowed_features) ? (r.allowed_features as AppFeature[]) : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+    allowedFeatures: hasExplicitFeatures
+      ? (r.allowed_features as AppFeature[])
+      : isMasterOrAdmin
+      ? ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm']
+      : ['dashboard', 'pdv', 'venda_direta', 'crm'],
     createdAt: r.created_at || new Date().toISOString(),
   };
 }
@@ -571,8 +581,81 @@ export async function upsertCaixaSessao(s: CashRegisterSession): Promise<CashReg
 // ==========================================
 
 export async function listUsuarios(): Promise<Employee[]> {
-  const rows = await fetchAllRowsPaged<any>('usuarios');
-  return rows.map(rowToUser);
+  let dbRows: any[] = [];
+  try {
+    dbRows = await fetchAllRowsPaged<any>('usuarios');
+  } catch {}
+
+  let stateDoc: any = null;
+  try {
+    stateDoc = await fetchSystemStateDoc();
+  } catch {}
+
+  let localEmployees: Employee[] = [];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('KORISKO_STATE_V2');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed?.employees)) {
+          localEmployees = parsed.employees;
+        }
+      }
+    }
+  } catch {}
+
+  const extraEmployees: Employee[] = Array.isArray(stateDoc?.employees) ? stateDoc.employees : [];
+  const mergedMap = new Map<string, Employee>();
+
+  // 1. Seed with local employees
+  localEmployees.forEach(emp => {
+    if (emp && emp.id) mergedMap.set(emp.id, emp);
+  });
+
+  // 2. Overlay korisko_system_state employees (authoritative cloud JSON with full allowedFeatures & password)
+  extraEmployees.forEach(emp => {
+    if (emp && emp.id) {
+      const prev = mergedMap.get(emp.id);
+      const isMasterOrAdmin =
+        emp.id === 'emp-admin-ax' ||
+        (emp.email || '').toLowerCase() === 'axxeiacompany@gmail.com' ||
+        emp.role === 'admin';
+      mergedMap.set(emp.id, {
+        ...prev,
+        ...emp,
+        password: emp.password || prev?.password || emp.pin || '',
+        pin: emp.pin || prev?.pin || emp.password || '',
+        allowedFeatures: Array.isArray(emp.allowedFeatures)
+          ? emp.allowedFeatures
+          : Array.isArray(prev?.allowedFeatures)
+          ? prev!.allowedFeatures
+          : isMasterOrAdmin
+          ? ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm']
+          : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+      });
+    }
+  });
+
+  // 3. Merge usuarios table rows while preserving allowedFeatures & password from stateDoc/local if usuarios table lacks them
+  dbRows.forEach(r => {
+    const mapped = rowToUser(r);
+    const prev = mergedMap.get(mapped.id);
+    const hasExplicitRowFeatures = Array.isArray(r.allowed_features);
+    mergedMap.set(mapped.id, {
+      ...prev,
+      ...mapped,
+      email: mapped.email || prev?.email || '',
+      password: mapped.password || prev?.password || mapped.pin || '',
+      pin: mapped.pin || prev?.pin || mapped.password || '',
+      allowedFeatures: hasExplicitRowFeatures
+        ? (r.allowed_features as AppFeature[])
+        : Array.isArray(prev?.allowedFeatures)
+        ? prev!.allowedFeatures
+        : mapped.allowedFeatures,
+    });
+  });
+
+  return Array.from(mergedMap.values());
 }
 
 export async function upsertUsuario(u: Employee): Promise<Employee> {
@@ -584,9 +667,41 @@ export async function upsertUsuario(u: Employee): Promise<Employee> {
     .single();
 
   if (error) {
-    throw new Error(`[Erro ao salvar usuário]: ${error.message}`);
+    // Fallback if usuarios table uses legacy columns without allowed_features or password
+    const legacyRow: any = {
+      id: u.id,
+      name: u.name,
+      email: u.email || null,
+      role: u.role || 'caixa',
+      pin: u.pin || u.password || '',
+      avatar_color: u.avatarColor || 'bg-indigo-600',
+      active: true,
+    };
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('usuarios')
+      .upsert(legacyRow, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (fallbackError) {
+      throw new Error(`[Erro ao salvar usuário]: ${fallbackError.message}`);
+    }
+    return {
+      ...rowToUser(fallbackData),
+      ...u,
+      allowedFeatures: Array.isArray(u.allowedFeatures)
+        ? u.allowedFeatures
+        : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+    };
   }
-  return rowToUser(data);
+
+  return {
+    ...rowToUser(data),
+    ...u,
+    allowedFeatures: Array.isArray(u.allowedFeatures)
+      ? u.allowedFeatures
+      : rowToUser(data).allowedFeatures,
+  };
 }
 
 export async function deleteUsuario(id: string): Promise<void> {
@@ -706,10 +821,17 @@ export async function saveSystemStateDoc(extraState: any): Promise<void> {
 
 export function comandaToRow(c: Comanda) {
   const sectorInfo = resolveSetoresFromItems(c.items || []);
-  const totalBrl = (c.items || []).reduce(
-    (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
-    0
-  );
+  const computedTotalBrl = Math.round(
+    (c.items || []).reduce((sum, item) => {
+      const unitPrice = Number(item.unitPriceBrl ?? item.product?.priceBrl ?? 0);
+      const qty = Number(item.quantity) || 0;
+      const sub = item.subtotalBrl !== undefined && Number(item.subtotalBrl) > 0
+        ? Number(item.subtotalBrl)
+        : unitPrice * qty;
+      return sum + sub;
+    }, 0) * 100
+  ) / 100;
+  const finalTotalBrl = c.totalBrl !== undefined && Number(c.totalBrl) > 0 ? Number(c.totalBrl) : computedTotalBrl;
   return {
     id: c.id,
     number: c.number,
@@ -726,7 +848,7 @@ export function comandaToRow(c: Comanda) {
     opened_by: c.openedBy || 'Balcão',
     opened_at: c.openedAt || new Date().toISOString(),
     updated_at: c.updatedAt || new Date().toISOString(),
-    total_brl: c.totalBrl ?? totalBrl,
+    total_brl: finalTotalBrl,
     debt_applied_brl: c.debtAppliedBrl ?? 0,
     previous_debt_brl: c.previousDebtBrl ?? 0,
     resulting_debt_brl: c.resultingDebtBrl ?? 0,
@@ -735,12 +857,25 @@ export function comandaToRow(c: Comanda) {
 }
 
 export function rowToComanda(r: any): Comanda {
-  const items: CartItem[] = Array.isArray(r.items) ? r.items : [];
+  const rawItems: CartItem[] = Array.isArray(r.items) ? r.items : [];
+  const items: CartItem[] = rawItems.map(item => {
+    const unitPrice = Number(item.unitPriceBrl ?? item.product?.priceBrl ?? 0);
+    const qty = Number(item.quantity) || 0;
+    const subtotalBrl = item.subtotalBrl !== undefined && Number(item.subtotalBrl) > 0
+      ? Number(item.subtotalBrl)
+      : Math.round(unitPrice * qty * 100) / 100;
+    return {
+      ...item,
+      quantity: qty,
+      unitPriceBrl: unitPrice,
+      subtotalBrl,
+    };
+  });
   const sectorInfo = resolveSetoresFromItems(items);
-  const computedTotal = Number(r.total_brl) || items.reduce(
-    (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
-    0
-  );
+  const itemsSum = Math.round(
+    items.reduce((sum, item) => sum + (Number(item.subtotalBrl) || 0), 0) * 100
+  ) / 100;
+  const computedTotal = itemsSum > 0 ? itemsSum : (Number(r.total_brl) || 0);
   return {
     id: String(r.id),
     number: String(r.number || ''),

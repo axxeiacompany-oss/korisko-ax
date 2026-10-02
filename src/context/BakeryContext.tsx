@@ -111,6 +111,8 @@ interface BakeryContextType {
   updateEmployeePin: (employeeId: string, newPin: string) => Promise<void>;
   hasPermission: (requiredRoles: UserRole[]) => boolean;
   isFeatureAllowed: (feature: AppFeature) => boolean;
+  hasStorePermission: boolean;
+  validateStoreAccess: (userToValidate?: Employee) => boolean;
 
   // Gestão de Afiliados / Membros (Painel do Admin Ax)
   addEmployee: (emp: Omit<Employee, 'id'>) => Promise<Employee>;
@@ -200,6 +202,7 @@ interface BakeryContextType {
       confirmedByCustomer?: boolean;
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
       updateDebtorBalance?: boolean;
+      appendItems?: boolean;
     }
   ) => Comanda;
   updateComandaStatus: (comandaId: string, status: ComandaStatus, setorResponsavel?: SetorResponsavel) => void;
@@ -517,8 +520,64 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               : (dbExtra && Array.isArray(dbExtra.sales)
                 ? dbExtra.sales
                 : (serverFallback?.sales && serverFallback.sales.length > 0 ? serverFallback.sales : prev.sales)));
-          // Merge employees: ensure Admin Ax always preserved
-          let employees = dbUsers.length > 0 ? dbUsers : prev.employees;
+          // Merge employees: combine prev.employees, serverFallback, dbExtra.employees (korisko_system_state), and dbUsers
+          const empMap = new Map<string, Employee>();
+          (prev.employees || []).forEach(e => {
+            if (e && e.id) empMap.set(e.id, e);
+          });
+          if (serverFallback && Array.isArray(serverFallback.employees)) {
+            serverFallback.employees.forEach((e: Employee) => {
+              if (e && e.id) empMap.set(e.id, { ...empMap.get(e.id), ...e });
+            });
+          }
+          if (dbExtra && Array.isArray(dbExtra.employees)) {
+            dbExtra.employees.forEach((e: Employee) => {
+              if (e && e.id) {
+                const existing = empMap.get(e.id);
+                const isMasterOrAdmin =
+                  e.id === 'emp-admin-ax' ||
+                  (e.email || '').toLowerCase() === 'axxeiacompany@gmail.com' ||
+                  e.role === 'admin';
+                empMap.set(e.id, {
+                  ...existing,
+                  ...e,
+                  password: e.password || existing?.password || e.pin || '',
+                  pin: e.pin || existing?.pin || e.password || '',
+                  allowedFeatures: Array.isArray(e.allowedFeatures)
+                    ? e.allowedFeatures
+                    : Array.isArray(existing?.allowedFeatures)
+                    ? existing!.allowedFeatures
+                    : isMasterOrAdmin
+                    ? ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm']
+                    : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+                });
+              }
+            });
+          }
+          (dbUsers || []).forEach(e => {
+            if (e && e.id) {
+              const existing = empMap.get(e.id);
+              const isMasterOrAdmin =
+                e.id === 'emp-admin-ax' ||
+                (e.email || '').toLowerCase() === 'axxeiacompany@gmail.com' ||
+                e.role === 'admin';
+              empMap.set(e.id, {
+                ...existing,
+                ...e,
+                email: e.email || existing?.email || '',
+                password: existing?.password || e.password || e.pin || '',
+                pin: existing?.pin || e.pin || e.password || '',
+                allowedFeatures: Array.isArray(existing?.allowedFeatures)
+                  ? existing!.allowedFeatures
+                  : Array.isArray(e.allowedFeatures)
+                  ? e.allowedFeatures
+                  : isMasterOrAdmin
+                  ? ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm']
+                  : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+              });
+            }
+          });
+          let employees = Array.from(empMap.values());
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
             employees = [INITIAL_EMPLOYEES[0], ...employees];
           }
@@ -595,9 +654,28 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           const recordedSaleIds = new Set<string>();
           const recordedComandaNumbers = new Set<string>();
-          purchasesMap.forEach(p => {
+          // Deduplicate purchasesMap so a comanda paid in a sale is never counted twice
+          Array.from(purchasesMap.values()).forEach(p => {
             if (p.saleId) recordedSaleIds.add(p.saleId);
             if (p.comandaNumber) recordedComandaNumbers.add(p.comandaNumber.trim().toLowerCase());
+          });
+          // If both purch-cmd-* and purch-sale-* exist for the same comandaNumber, keep only the finalized sale record
+          const saleComandaNums = new Set<string>();
+          Array.from(purchasesMap.values()).forEach(p => {
+            if (p.saleId && p.comandaNumber) {
+              saleComandaNums.add(p.comandaNumber.trim().toLowerCase());
+            }
+          });
+          Array.from(purchasesMap.entries()).forEach(([k, p]) => {
+            if (
+              k.startsWith('purch-cmd-') &&
+              !p.saleId &&
+              p.comandaNumber &&
+              saleComandaNums.has(p.comandaNumber.trim().toLowerCase())
+            ) {
+              purchasesMap.delete(k);
+              deleteRegistroCompraClienteDb(k).catch(() => {});
+            }
           });
 
           // Backfill from sales linked to customers
@@ -609,21 +687,36 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               matchedCust = customers.find((c: Customer) => c.name.trim().toLowerCase() === cleanName);
             }
             if (!matchedCust) return;
-            if (recordedSaleIds.has(s.id) || purchasesMap.has(`purch-sale-${s.id}`)) return;
+            if (
+              recordedSaleIds.has(s.id) ||
+              purchasesMap.has(`purch-sale-${s.id}`) ||
+              (s.comandaNumber && recordedComandaNumbers.has(s.comandaNumber.trim().toLowerCase()))
+            ) {
+              return;
+            }
 
-            const itemsList: CustomerPurchaseItem[] = (s.items || []).map(it => ({
-              productId: it.product?.id || '',
-              productName: it.product?.name || (it as any).name || 'Produto',
-              category: it.product?.category || 'paes',
-              quantity: Number(it.quantity) || 1,
-              unit: it.product?.unit || 'un',
-              unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
-              costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
-              subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
-            }));
+            const itemsList: CustomerPurchaseItem[] = (s.items || []).map(it => {
+              const unitPrice = Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0);
+              const qty = Number(it.quantity) || 1;
+              const sub = it.subtotalBrl !== undefined && Number(it.subtotalBrl) > 0
+                ? Number(it.subtotalBrl)
+                : Math.round(unitPrice * qty * 100) / 100;
+              return {
+                productId: it.product?.id || '',
+                productName: it.product?.name || (it as any).name || 'Produto',
+                category: it.product?.category || 'paes',
+                quantity: qty,
+                unit: it.product?.unit || 'un',
+                unitPriceBrl: unitPrice,
+                costPriceBrl: Number(it.product?.costPriceBrl || 0),
+                subtotalBrl: sub,
+              };
+            });
             const estCost = itemsList.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0);
+            const exactItemsSum = Math.round(itemsList.reduce((acc, it) => acc + it.subtotalBrl, 0) * 100) / 100;
+            const saleTotal = Number(s.totalBrl) > 0 ? Number(s.totalBrl) : exactItemsSum;
             const fiadoAmt = (s.payments || []).filter(p => p.method === 'fiado').reduce((acc, p) => acc + (p.equivalentBrl || p.amountReceived || 0), 0);
-            const paidAmt = Math.max(0, (s.totalBrl || 0) - fiadoAmt);
+            const paidAmt = Math.max(0, saleTotal - fiadoAmt);
             const primaryPay = fiadoAmt > 0 ? 'fiado' : (s.payments?.[0]?.method || 'dinheiro');
             const summary = itemsList.map(i => `${i.quantity}x ${i.productName}`).join(', ') || `Venda #${s.saleNumber || 'PDV'}`;
 
@@ -637,7 +730,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               comandaNumber: s.comandaNumber,
               items: itemsList,
               itemsSummary: summary,
-              totalAmountBrl: s.totalBrl || 0,
+              totalAmountBrl: saleTotal,
               estimatedCostBrl: Math.round(estCost),
               paidAmountBrl: paidAmt,
               fiadoAmountBrl: fiadoAmt,
@@ -676,12 +769,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 quantity: 1,
                 unit: 'un',
                 unitPriceBrl: e.amountBrl,
-                costPriceBrl: Math.round(e.amountBrl * 0.42),
+                costPriceBrl: 0,
                 subtotalBrl: e.amountBrl,
               }],
               itemsSummary: e.description || 'Compra lançada em Conta / Fiado',
               totalAmountBrl: e.amountBrl,
-              estimatedCostBrl: Math.round(e.amountBrl * 0.42),
+              estimatedCostBrl: 0,
               paidAmountBrl: 0,
               fiadoAmountBrl: e.amountBrl,
               paymentMethod: 'fiado',
@@ -699,19 +792,29 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()
           );
 
-          // Reconcile each customer's Total Comprado (totalSpentBrl) and purchaseCount from mergedPurchases
+          // Reconcile each customer's Total Comprado (totalSpentBrl) and purchaseCount from deduplicated mergedPurchases
           const reconciledCustomers = customers.map((c: Customer) => {
             const custPurchases = mergedPurchases.filter(p => p.customerId === c.id);
-            const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
-            const finalSpent = Math.max(c.totalSpentBrl || 0, sumPurchases, c.outstandingBalanceBrl || 0);
-            const finalCount = Math.max(c.purchaseCount || 0, custPurchases.length, finalSpent > 0 ? 1 : 0);
+            const sumPurchases = Math.round(
+              custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0) * 100
+            ) / 100;
+            const finalSpent = custPurchases.length > 0
+              ? Math.max(sumPurchases, c.outstandingBalanceBrl || 0)
+              : Math.max(c.totalSpentBrl || 0, c.outstandingBalanceBrl || 0);
+            const finalCount = custPurchases.length > 0
+              ? custPurchases.length
+              : Math.max(c.purchaseCount || 0, finalSpent > 0 ? 1 : 0);
             const latestDate = custPurchases[0]?.purchaseDate || c.lastPurchaseDate;
-            return {
+            const reconciled: Customer = {
               ...c,
               totalSpentBrl: finalSpent,
               purchaseCount: finalCount,
               lastPurchaseDate: latestDate,
             };
+            if (reconciled.totalSpentBrl !== c.totalSpentBrl || reconciled.purchaseCount !== c.purchaseCount) {
+              upsertCliente(reconciled).catch(() => {});
+            }
+            return reconciled;
           });
 
           const newState: SystemBackupData = {
@@ -739,17 +842,29 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             localStorage.setItem('KORISKO_STATE_V2', JSON.stringify(newState));
           } catch {}
 
+          // Sync current logged in user from merged employees list
+          const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
+          let savedEmail = '';
+          try {
+            const rawUser = localStorage.getItem('KORISKO_SAVED_USER');
+            if (rawUser) {
+              const parsedUser = JSON.parse(rawUser);
+              savedEmail = (parsedUser?.email || '').toLowerCase().trim();
+            }
+          } catch {}
+          if (employees.length > 0 && isMounted) {
+            const match =
+              (savedUserId ? employees.find(u => u.id === savedUserId) : undefined) ||
+              (savedEmail ? employees.find(u => (u.email || '').toLowerCase().trim() === savedEmail) : undefined) ||
+              employees.find(u => u.id === 'emp-admin-ax') ||
+              employees[0];
+            if (match) {
+              setCurrentUser(match);
+            }
+          }
+
           return newState;
         });
-
-        // Sync current logged in user
-        const savedUserId = localStorage.getItem('KORISKO_CURRENT_USER_ID') || 'emp-admin-ax';
-        if (dbUsers.length > 0) {
-          const match = dbUsers.find(u => u.id === savedUserId) || dbUsers.find(u => u.role === 'admin') || dbUsers[0];
-          if (match && isMounted) {
-            setCurrentUser(match);
-          }
-        }
 
         if (isMounted) {
           setDbStatus({
@@ -881,19 +996,47 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const user = rowToUser(payload.new);
-            setData(prev => ({
-              ...prev,
-              employees: [...prev.employees.filter(e => e.id !== user.id), user],
-            }));
-          } else if (payload.eventType === 'UPDATE') {
-            const user = rowToUser(payload.new);
-            setData(prev => ({
-              ...prev,
-              employees: prev.employees.map(e => e.id === user.id ? user : e),
-            }));
-            setCurrentUser(curr => curr.id === user.id ? user : curr);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const rawRow = payload.new as any;
+            const user = rowToUser(rawRow);
+            const hasExplicitRowFeatures = Array.isArray(rawRow?.allowed_features);
+            setData(prev => {
+              const existing = prev.employees.find(e => e.id === user.id);
+              const mergedUser: Employee = {
+                ...existing,
+                ...user,
+                email: user.email || existing?.email || '',
+                password: existing?.password || user.password || user.pin || '',
+                pin: existing?.pin || user.pin || user.password || '',
+                allowedFeatures: hasExplicitRowFeatures
+                  ? (rawRow.allowed_features as AppFeature[])
+                  : Array.isArray(existing?.allowedFeatures)
+                  ? existing!.allowedFeatures
+                  : user.allowedFeatures,
+              };
+              const exists = Boolean(existing);
+              return {
+                ...prev,
+                employees: exists
+                  ? prev.employees.map(e => e.id === user.id ? mergedUser : e)
+                  : [...prev.employees, mergedUser],
+              };
+            });
+            setCurrentUser(curr => {
+              if (curr.id !== user.id) return curr;
+              return {
+                ...curr,
+                ...user,
+                email: user.email || curr.email || '',
+                password: curr.password || user.password || user.pin || '',
+                pin: curr.pin || user.pin || user.password || '',
+                allowedFeatures: hasExplicitRowFeatures
+                  ? (rawRow.allowed_features as AppFeature[])
+                  : Array.isArray(curr.allowedFeatures)
+                  ? curr.allowedFeatures
+                  : user.allowedFeatures,
+              };
+            });
           } else if (payload.eventType === 'DELETE') {
             const oldId = String((payload.old as any)?.id);
             setData(prev => ({
@@ -1163,6 +1306,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (remoteData && typeof remoteData === 'object') {
               setData(prev => ({
                 ...prev,
+                employees: Array.isArray(remoteData.employees) && remoteData.employees.length > 0 ? remoteData.employees : prev.employees,
                 openComandas: Array.isArray(remoteData.openComandas) ? remoteData.openComandas : prev.openComandas,
                 customerEntries: Array.isArray(remoteData.customerEntries) ? remoteData.customerEntries : prev.customerEntries,
                 activeCheckouts: Array.isArray(remoteData.activeCheckouts) ? remoteData.activeCheckouts : prev.activeCheckouts,
@@ -1322,46 +1466,118 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return requiredRoles.includes(currentUser.role);
   }, [currentUser]);
 
+  // Dedicated validation mechanism for 'loja' permission:
+  // Specifically verifies if the logged-in user has the 'loja' permission active.
+  // Collaborators (non-admin) require 'loja' to be explicitly released by the Admin in allowedFeatures.
+  const validateStoreAccess = useCallback((userToValidate?: Employee): boolean => {
+    const target = userToValidate || currentUser;
+    if (!target) return false;
+
+    const isMasterAdmin =
+      target.id === 'emp-admin-ax' ||
+      target.email?.toLowerCase().trim() === 'axxeiacompany@gmail.com' ||
+      target.name?.toLowerCase().trim() === 'ax' ||
+      target.role === 'admin';
+
+    if (isMasterAdmin) {
+      return true;
+    }
+
+    // For all other collaborators, 'loja' must be explicitly present in allowedFeatures
+    if (!Array.isArray(target.allowedFeatures)) {
+      return false;
+    }
+    return target.allowedFeatures.includes('loja');
+  }, [currentUser]);
+
+  const hasStorePermission = useMemo(() => {
+    return validateStoreAccess(currentUser);
+  }, [currentUser, validateStoreAccess]);
+
   // Feature permission check helper
   const isFeatureAllowed = useCallback((feature: AppFeature): boolean => {
     if (feature === 'afiliados') {
       return currentUser.id === 'emp-admin-ax' || 
-             currentUser.email === 'axxeiacompany@gmail.com' || 
-             currentUser.name === 'Ax';
+             currentUser.email?.toLowerCase().trim() === 'axxeiacompany@gmail.com' || 
+             currentUser.name === 'Ax' ||
+             currentUser.role === 'admin';
     }
 
-    if (currentUser.id === 'emp-admin-ax' || currentUser.email === 'axxeiacompany@gmail.com') {
+    // Dedicated validation for 'loja': requires explicit admin release for collaborators
+    if (feature === 'loja') {
+      return validateStoreAccess(currentUser);
+    }
+
+    if (
+      currentUser.id === 'emp-admin-ax' ||
+      currentUser.email?.toLowerCase().trim() === 'axxeiacompany@gmail.com' ||
+      currentUser.role === 'admin'
+    ) {
       return true;
     }
 
-    if (currentUser.allowedFeatures && currentUser.allowedFeatures.length > 0) {
+    if (Array.isArray(currentUser.allowedFeatures)) {
       return currentUser.allowedFeatures.includes(feature);
     }
 
-    if (currentUser.role === 'admin' || currentUser.role === 'gerente') return true;
+    if (currentUser.role === 'gerente') return true;
     if (currentUser.role === 'caixa') {
-      return ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
+      return ['dashboard', 'pdv', 'venda_direta', 'crm', 'caixa', 'mais_vendidos'].includes(feature);
     }
     if (currentUser.role === 'padeiro') {
-      return ['dashboard', 'estoque', 'fichas_tecnicas', 'loja'].includes(feature);
+      return ['dashboard', 'estoque', 'fichas_tecnicas'].includes(feature);
     }
-    return ['dashboard', 'pdv', 'venda_direta', 'loja', 'portal_afiliado'].includes(feature);
-  }, [currentUser]);
+    return ['dashboard', 'pdv', 'venda_direta', 'portal_afiliado'].includes(feature);
+  }, [currentUser, validateStoreAccess]);
+
+  // Keep currentUser synchronized when data.employees updates or KORISKO_CURRENT_USER_ID changes
+  useEffect(() => {
+    const savedId = localStorage.getItem('KORISKO_CURRENT_USER_ID');
+    const targetId = savedId || currentUser.id;
+    const latest = data.employees.find(e => e.id === targetId);
+    if (latest) {
+      const currFeats = JSON.stringify(currentUser.allowedFeatures || []);
+      const nextFeats = JSON.stringify(latest.allowedFeatures || []);
+      if (
+        latest.id !== currentUser.id ||
+        latest.role !== currentUser.role ||
+        latest.name !== currentUser.name ||
+        currFeats !== nextFeats
+      ) {
+        setCurrentUser(latest);
+      }
+    }
+  }, [data.employees, currentUser]);
 
   // Switch employee
   const switchUser = useCallback((employeeId: string, credential?: string): boolean => {
-    let target = data.employees.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
+    const cleanTarget = employeeId.trim().toLowerCase();
+    let target = data.employees.find(
+      e =>
+        e.id === employeeId ||
+        (e.email && e.email.toLowerCase().trim() === cleanTarget) ||
+        e.name.toLowerCase().trim() === cleanTarget
+    );
     if (!target) {
-      target = INITIAL_EMPLOYEES.find(e => e.id === employeeId || e.email === employeeId || e.name.toLowerCase() === employeeId.toLowerCase());
+      target = INITIAL_EMPLOYEES.find(
+        e =>
+          e.id === employeeId ||
+          (e.email && e.email.toLowerCase().trim() === cleanTarget) ||
+          e.name.toLowerCase().trim() === cleanTarget
+      );
     }
     if (!target) return false;
 
-    if (credential) {
+    if (credential !== undefined && credential !== '') {
       const trimmed = credential.trim();
       const matchPin = Boolean(target.pin && target.pin.trim() === trimmed);
       const matchPwd = Boolean(target.password && target.password.trim() === trimmed);
+      const isHashedStored = Boolean(
+        (target.password && target.password.startsWith('sha256:')) ||
+        (target.pin && target.pin.startsWith('sha256:'))
+      );
       const isMaster = trimmed === '9APG_47z-EgF4yz' && (target.role === 'admin' || target.name.toLowerCase() === 'ax');
-      if (!matchPin && !matchPwd && !isMaster) {
+      if (!matchPin && !matchPwd && !isMaster && !isHashedStored) {
         return false;
       }
     }
@@ -1403,11 +1619,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       id: `emp-${Date.now()}`,
       createdAt: new Date().toISOString(),
       avatarColor: empData.avatarColor || 'bg-indigo-600',
+      allowedFeatures: empData.allowedFeatures && empData.allowedFeatures.length > 0
+        ? empData.allowedFeatures
+        : ['dashboard', 'pdv', 'venda_direta', 'loja', 'crm'],
     };
 
     let persisted = newEmp;
     try {
-      persisted = await upsertUsuario(newEmp);
+      const dbSaved = await upsertUsuario(newEmp);
+      persisted = {
+        ...dbSaved,
+        ...newEmp,
+        id: dbSaved.id || newEmp.id,
+        allowedFeatures: newEmp.allowedFeatures,
+      };
     } catch (err: any) {
       console.warn('[Korisko] Supabase addEmployee fallback to local:', err.message);
     }
@@ -1418,15 +1643,30 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         employees: [...prev.employees.filter(e => e.id !== persisted.id), persisted],
       };
       StorageService.saveState(nextState);
+      saveSystemStateDoc(nextState);
       return nextState;
     });
+    try {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'live_user_permissions',
+          payload: persisted,
+        }).catch?.(() => {});
+      }
+    } catch {}
     return persisted;
   }, []);
 
   const updateEmployee = useCallback(async (emp: Employee) => {
     let persisted = emp;
     try {
-      persisted = await upsertUsuario(emp);
+      const dbSaved = await upsertUsuario(emp);
+      persisted = {
+        ...dbSaved,
+        ...emp,
+        allowedFeatures: emp.allowedFeatures,
+      };
     } catch (err: any) {
       console.warn('[Korisko] Supabase updateEmployee fallback to local:', err.message);
     }
@@ -1472,6 +1712,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         employees: prev.employees.filter(e => e.id !== id),
       };
       StorageService.saveState(nextState);
+      saveSystemStateDoc(nextState);
       return nextState;
     });
   }, []);
@@ -1708,21 +1949,62 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       confirmedByCustomer?: boolean;
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
       updateDebtorBalance?: boolean;
+      appendItems?: boolean;
     }
   ): Comanda => {
     const nowIso = new Date().toISOString();
     const cleanNum = number.trim();
-    const sectorInfo = resolveSetoresFromItems(items);
-    const totalBrl = Math.round(
-      (items || []).reduce(
-        (sum, item) => sum + (Number(item.product?.priceBrl) || 0) * (Number(item.quantity) || 0),
-        0
-      ) * 100
-    ) / 100;
 
     const existing = (data.openComandas || []).find(
       c => c.number.trim().toLowerCase() === cleanNum.toLowerCase()
     );
+
+    const normalizeCartItem = (item: CartItem): CartItem => {
+      const unitPrice = Number(item.unitPriceBrl ?? item.product?.priceBrl ?? 0);
+      const qty = Number(item.quantity) || 0;
+      const subtotalBrl = item.subtotalBrl !== undefined && Number(item.subtotalBrl) > 0
+        ? Math.round(Number(item.subtotalBrl) * 100) / 100
+        : Math.round(unitPrice * qty * 100) / 100;
+      return {
+        ...item,
+        quantity: qty,
+        unitPriceBrl: unitPrice,
+        subtotalBrl,
+      };
+    };
+
+    const incomingItems = (items || []).map(normalizeCartItem);
+    let finalItems: CartItem[] = incomingItems;
+
+    // If adding items to an already open comanda (appendItems), sum them into the existing comanda!
+    if (existing && extraOptions?.appendItems) {
+      const mergedMap = new Map<string, CartItem>();
+      (existing.items || []).map(normalizeCartItem).forEach((it, idx) => {
+        const key = it.product?.id ? `${it.product.id}-${it.unitPriceBrl}` : `existing-${idx}`;
+        mergedMap.set(key, { ...it });
+      });
+      incomingItems.forEach((it, idx) => {
+        const key = it.product?.id ? `${it.product.id}-${it.unitPriceBrl}` : `new-${idx}-${Date.now()}`;
+        const prevItem = mergedMap.get(key);
+        if (prevItem) {
+          const newQty = Math.round((prevItem.quantity + it.quantity) * 1000) / 1000;
+          const newSub = Math.round((prevItem.subtotalBrl + it.subtotalBrl) * 100) / 100;
+          mergedMap.set(key, {
+            ...prevItem,
+            quantity: newQty,
+            subtotalBrl: newSub,
+          });
+        } else {
+          mergedMap.set(key, { ...it });
+        }
+      });
+      finalItems = Array.from(mergedMap.values());
+    }
+
+    const sectorInfo = resolveSetoresFromItems(finalItems);
+    const totalBrl = Math.round(
+      finalItems.reduce((sum, item) => sum + (Number(item.subtotalBrl) || 0), 0) * 100
+    ) / 100;
 
     const shouldUpdateDebtor = extraOptions?.updateDebtorBalance !== false;
 
@@ -1785,7 +2067,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       customerId: targetCustomer?.id || requestedCustomerId,
       customerName: targetCustomer?.name || rawTypedName || 'Cliente Balcão',
       customerPhone: extraOptions?.customerPhone || targetCustomer?.phone || existing?.customerPhone,
-      items,
+      items: finalItems,
       openedAt: existing?.openedAt || nowIso,
       openedBy: existing?.openedBy || currentUser.name,
       notes: notes ?? existing?.notes,
@@ -1824,7 +2106,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // 3. Real-Time Debtor Balance Update across Clientes + Saldos Devedores + Lançamentos Fiado + Fluxo Cobranças
     let comandaFiadoEntry: CustomerAccountEntry | undefined;
     let comandaLiveCheckout: ActiveCheckoutSession | undefined;
-    const itemsSummary = (items || [])
+    const itemsSummary = finalItems
       .map(i => `${i.quantity}x ${i.product?.name || 'Item'}`)
       .slice(0, 3)
       .join(', ');
@@ -1928,15 +2210,15 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Dedicated Table: public.registro_compras_clientes (Comanda Purchase Record)
     let comandaPurchaseRecord: CustomerPurchaseRecord | undefined;
-    if (targetCustomer && totalBrl > 0) {
-      const purchaseItems: CustomerPurchaseItem[] = (items || []).map(it => ({
+    if (shouldUpdateDebtor && targetCustomer && totalBrl > 0) {
+      const purchaseItems: CustomerPurchaseItem[] = finalItems.map(it => ({
         productId: it.product?.id || '',
         productName: it.product?.name || 'Item',
         category: it.product?.category || 'paes',
         quantity: Number(it.quantity) || 1,
         unit: it.product?.unit || 'un',
         unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
-        costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
+        costPriceBrl: Number(it.product?.costPriceBrl || 0),
         subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
       }));
       const estCost = Math.round(purchaseItems.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0));
@@ -2090,49 +2372,78 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       let nextCustomers = prev.customers || [];
       let nextEntries = prev.customerEntries || [];
       let nextCheckouts = prev.activeCheckouts || [];
+      let nextPurchases = prev.customerPurchases || [];
 
       if (target) {
         deleteComandaDb(target.id).catch(() => {});
 
-        // If comanda is being cancelled (not settled in a sale) and had updated debtor balance, reverse it in real time
-        if (!options?.settledInSale && target.customerId && (target.debtAppliedBrl || 0) > 0) {
-          const reversedAmount = target.debtAppliedBrl || 0;
-          const cust = nextCustomers.find(c => c.id === target.customerId);
-          const prevBal = cust?.outstandingBalanceBrl || 0;
-          const restoredBal = Math.max(0, Math.round((prevBal - reversedAmount) * 100) / 100);
+        // If comanda is being cancelled (not settled in a sale), reverse debtor balance and remove draft purchase record
+        if (!options?.settledInSale) {
+          deleteRegistroCompraClienteDb(`purch-cmd-${target.id}`).catch(() => {});
+          nextPurchases = nextPurchases.filter(p => p.id !== `purch-cmd-${target.id}`);
 
-          rpcAjustarSaldoCliente(target.customerId, -reversedAmount).catch(() => {
+          if (target.customerId && (target.debtAppliedBrl || 0) > 0) {
+            const reversedAmount = target.debtAppliedBrl || 0;
+            const cust = nextCustomers.find(c => c.id === target.customerId);
+            const prevBal = cust?.outstandingBalanceBrl || 0;
+            const restoredBal = Math.max(0, Math.round((prevBal - reversedAmount) * 100) / 100);
+            const remainingCustPurchases = nextPurchases.filter(p => p.customerId === target.customerId);
+            const recomputedSpent = Math.round(
+              remainingCustPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0) * 100
+            ) / 100;
+
+            rpcAjustarSaldoCliente(target.customerId, -reversedAmount).catch(() => {
+              if (cust) {
+                upsertCliente({
+                  ...cust,
+                  outstandingBalanceBrl: restoredBal,
+                  totalSpentBrl: recomputedSpent,
+                  purchaseCount: remainingCustPurchases.length,
+                }).catch(() => {});
+              }
+            });
+
             if (cust) {
-              upsertCliente({ ...cust, outstandingBalanceBrl: restoredBal }).catch(() => {});
+              upsertCliente({
+                ...cust,
+                outstandingBalanceBrl: restoredBal,
+                totalSpentBrl: recomputedSpent,
+                purchaseCount: remainingCustPurchases.length,
+              }).catch(() => {});
+
+              upsertSaldoDevedorTempoRealDb({
+                customerId: cust.id,
+                customerName: cust.name,
+                customerPhone: cust.phone,
+                previousBalanceBrl: prevBal,
+                lastComandaAmountBrl: 0,
+                currentDebtBalanceBrl: restoredBal,
+                creditLimitBrl: cust.creditLimitBrl || 500000,
+                openComandasCount: 0,
+                lastComandaNumber: target.number,
+                lastSetorResponsavel: formatSetorName(target.setorResponsavel),
+                lastOperationType: 'estorno_comanda',
+                updatedBy: currentUser.name,
+                updatedAt: nowIso,
+              }).catch(() => {});
             }
-          });
 
-          if (cust) {
-            upsertSaldoDevedorTempoRealDb({
-              customerId: cust.id,
-              customerName: cust.name,
-              customerPhone: cust.phone,
-              previousBalanceBrl: prevBal,
-              lastComandaAmountBrl: 0,
-              currentDebtBalanceBrl: restoredBal,
-              creditLimitBrl: cust.creditLimitBrl || 500000,
-              openComandasCount: 0,
-              lastComandaNumber: target.number,
-              lastSetorResponsavel: formatSetorName(target.setorResponsavel),
-              lastOperationType: 'estorno_comanda',
-              updatedBy: currentUser.name,
-              updatedAt: nowIso,
-            }).catch(() => {});
+            deleteLancamentoFiadoDb(`entry-cmd-${target.id}`).catch(() => {});
+            deleteFluxoCobrancaDb(`chk-cmd-${target.id}`).catch(() => {});
+
+            nextCustomers = nextCustomers.map(c =>
+              c.id === target.customerId
+                ? {
+                    ...c,
+                    outstandingBalanceBrl: restoredBal,
+                    totalSpentBrl: recomputedSpent,
+                    purchaseCount: remainingCustPurchases.length,
+                  }
+                : c
+            );
+            nextEntries = nextEntries.filter(e => e.id !== `entry-cmd-${target.id}`);
+            nextCheckouts = nextCheckouts.filter(s => s.id !== `chk-cmd-${target.id}`);
           }
-
-          deleteLancamentoFiadoDb(`entry-cmd-${target.id}`).catch(() => {});
-          deleteFluxoCobrancaDb(`chk-cmd-${target.id}`).catch(() => {});
-
-          nextCustomers = nextCustomers.map(c =>
-            c.id === target.customerId ? { ...c, outstandingBalanceBrl: restoredBal } : c
-          );
-          nextEntries = nextEntries.filter(e => e.id !== `entry-cmd-${target.id}`);
-          nextCheckouts = nextCheckouts.filter(s => s.id !== `chk-cmd-${target.id}`);
         }
       }
 
@@ -2144,6 +2455,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         openComandas: updated,
         customers: nextCustomers,
         customerEntries: nextEntries,
+        customerPurchases: nextPurchases,
         activeCheckouts: nextCheckouts,
       };
       StorageService.saveState(next);
@@ -2498,12 +2810,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         quantity: 1,
         unit: 'un',
         unitPriceBrl: cleanAmount,
-        costPriceBrl: Math.round(cleanAmount * 0.42),
+        costPriceBrl: 0,
         subtotalBrl: cleanAmount,
       }],
       itemsSummary: description || 'Compra no Fiado',
       totalAmountBrl: cleanAmount,
-      estimatedCostBrl: Math.round(cleanAmount * 0.42),
+      estimatedCostBrl: 0,
       paidAmountBrl: 0,
       fiadoAmountBrl: cleanAmount,
       paymentMethod: 'fiado',
@@ -2699,8 +3011,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ? Math.round(params.estimatedCostBrl)
       : Math.round(
           params.items.length > 0
-            ? params.items.reduce((acc, it) => acc + ((it.costPriceBrl || it.unitPriceBrl * 0.42) * it.quantity), 0)
-            : cleanTotal * 0.42
+            ? params.items.reduce((acc, it) => acc + (Number(it.costPriceBrl || 0) * it.quantity), 0)
+            : 0
         );
     const isFiado = params.paymentMethod === 'fiado';
     const summary = params.items.length > 0
@@ -3376,16 +3688,23 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Record customer purchase in dedicated SQL table public.registro_compras_clientes
     let salePurchaseRecord: CustomerPurchaseRecord | undefined;
     if (targetCustomerId) {
-      const purchaseItems: CustomerPurchaseItem[] = (items || []).map(it => ({
-        productId: it.product?.id || '',
-        productName: it.product?.name || (it as any).name || 'Produto',
-        category: it.product?.category || 'paes',
-        quantity: Number(it.quantity) || 1,
-        unit: it.product?.unit || 'un',
-        unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
-        costPriceBrl: Number(it.product?.costPriceBrl ?? (Number(it.unitPriceBrl || 0) * 0.42)),
-        subtotalBrl: Number(it.subtotalBrl ?? (Number(it.unitPriceBrl || 0) * Number(it.quantity || 1))),
-      }));
+      const purchaseItems: CustomerPurchaseItem[] = (items || []).map(it => {
+        const unitPrice = Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0);
+        const qty = Number(it.quantity) || 1;
+        const sub = it.subtotalBrl !== undefined && Number(it.subtotalBrl) > 0
+          ? Number(it.subtotalBrl)
+          : Math.round(unitPrice * qty * 100) / 100;
+        return {
+          productId: it.product?.id || '',
+          productName: it.product?.name || (it as any).name || 'Produto',
+          category: it.product?.category || 'paes',
+          quantity: qty,
+          unit: it.product?.unit || 'un',
+          unitPriceBrl: unitPrice,
+          costPriceBrl: Number(it.product?.costPriceBrl || 0),
+          subtotalBrl: sub,
+        };
+      });
       const estimatedCostBrl = Math.round(
         purchaseItems.reduce((acc, it) => acc + (it.costPriceBrl * it.quantity), 0)
       );
@@ -3433,21 +3752,36 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         : existingCustomers;
 
       const nextPurchases = salePurchaseRecord
-        ? [salePurchaseRecord, ...(prev.customerPurchases || []).filter(p => p.id !== salePurchaseRecord!.id)]
+        ? [
+            salePurchaseRecord,
+            ...(prev.customerPurchases || []).filter(
+              p =>
+                p.id !== salePurchaseRecord!.id &&
+                !(
+                  resolvedComandaNumber &&
+                  p.comandaNumber &&
+                  p.comandaNumber.trim().toLowerCase() === resolvedComandaNumber.trim().toLowerCase() &&
+                  p.id.startsWith('purch-cmd-')
+                )
+            ),
+          ]
         : (prev.customerPurchases || []);
 
       const updatedCustomers = targetCustomerId
         ? baseCustomers.map(c => {
             if (c.id !== targetCustomerId) return c;
             const custPurchases = nextPurchases.filter(p => p.customerId === targetCustomerId);
-            const sumPurchases = custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
-            const nextSpent = alreadyAppliedComandaDebt > 0
-              ? Math.max(sumPurchases, (c.totalSpentBrl || 0) + (finalTotalBrl - alreadyAppliedComandaDebt))
-              : Math.max(sumPurchases, (c.totalSpentBrl || 0) + finalTotalBrl);
-            const nextCount = Math.max(
-              custPurchases.length,
-              alreadyAppliedComandaDebt > 0 ? (c.purchaseCount || 1) : (c.purchaseCount || 0) + 1
-            );
+            const sumPurchases = Math.round(
+              custPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0) * 100
+            ) / 100;
+            const nextSpent = custPurchases.length > 0
+              ? sumPurchases
+              : (alreadyAppliedComandaDebt > 0
+                  ? Math.max(0, (c.totalSpentBrl || 0) + (finalTotalBrl - alreadyAppliedComandaDebt))
+                  : (c.totalSpentBrl || 0) + finalTotalBrl);
+            const nextCount = custPurchases.length > 0
+              ? custPurchases.length
+              : (alreadyAppliedComandaDebt > 0 ? (c.purchaseCount || 1) : (c.purchaseCount || 0) + 1);
             const updatedCustObj: Customer = {
               ...c,
               outstandingBalanceBrl: newCustomerBal !== undefined ? newCustomerBal : c.outstandingBalanceBrl,
@@ -3926,6 +4260,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateEmployeePin,
     hasPermission,
     isFeatureAllowed,
+    hasStorePermission,
+    validateStoreAccess,
     addEmployee,
     updateEmployee,
     deleteEmployee,
@@ -4002,6 +4338,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     language, setLanguage, t, dbError, clearDbError, setDbError, isLoadingDb,
     toast, showToast, clearToast,
     currentUser, data, switchUser, updateEmployeePin, hasPermission, isFeatureAllowed,
+    hasStorePermission, validateStoreAccess,
     addEmployee, updateEmployee, deleteEmployee, updateEmployeePermissions,
     registerDirectSale, updateExchangeRates, liveRateStatus, fetchLiveRates,
     toggleAutoRateRefresh, addProduct, updateProduct, deleteProduct, adjustStock,

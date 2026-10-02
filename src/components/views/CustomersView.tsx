@@ -154,28 +154,52 @@ export const CustomersView: React.FC = () => {
   // Current Month for Birthday matching
   const currentMonthNum = (new Date().getMonth() + 1).toString().padStart(2, '0');
 
-  // Map of live Total Comprado and purchase count per customer (combining SQL registro_compras_clientes + sales + fiado entries)
+  // Map of live Total Comprado and purchase count per customer (combining SQL registro_compras_clientes + sales, deduplicating comandas)
   const customerPurchasesStatsMap = useMemo(() => {
     const map = new Map<string, { totalSpent: number; count: number }>();
     customers.forEach(c => {
-      const purchList = (customerPurchases || []).filter(p => p.customerId === c.id);
+      const rawPurchList = (customerPurchases || []).filter(p => p.customerId === c.id);
+      const finalizedCmds = new Set<string>();
+      rawPurchList.forEach(p => {
+        if (p.saleId && p.comandaNumber) {
+          finalizedCmds.add(p.comandaNumber.trim().toLowerCase());
+        }
+      });
+      const purchList = rawPurchList.filter(
+        p =>
+          !(
+            p.id.startsWith('purch-cmd-') &&
+            !p.saleId &&
+            p.comandaNumber &&
+            finalizedCmds.has(p.comandaNumber.trim().toLowerCase())
+          )
+      );
       const sumPurch = purchList.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
       const recordedSaleIds = new Set(purchList.filter(p => p.saleId).map(p => p.saleId));
-
-      const extraSalesSum = (sales || [])
-        .filter(s => s && (s.customerId === c.id || (s.customerName && s.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) && !recordedSaleIds.has(s.id))
-        .reduce((acc, s) => acc + (Number(s.totalBrl) || 0), 0);
-
-      const finalTotalSpent = Math.max(
-        c.totalSpentBrl || 0,
-        sumPurch + extraSalesSum,
-        c.outstandingBalanceBrl || 0
+      const recordedCmdNums = new Set(
+        purchList
+          .map(p => p.comandaNumber?.trim().toLowerCase())
+          .filter((cmd): cmd is string => Boolean(cmd))
       );
-      const finalCount = Math.max(
-        c.purchaseCount || 0,
-        purchList.length,
-        finalTotalSpent > 0 ? 1 : 0
+
+      const extraSales = (sales || []).filter(
+        s =>
+          s &&
+          (s.customerId === c.id ||
+            (s.customerName && s.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) &&
+          !recordedSaleIds.has(s.id) &&
+          !(s.comandaNumber && recordedCmdNums.has(s.comandaNumber.trim().toLowerCase()))
       );
+      const extraSalesSum = extraSales.reduce((acc, s) => acc + (Number(s.totalBrl) || 0), 0);
+
+      const exactCalculatedTotal = Math.round((sumPurch + extraSalesSum) * 100) / 100;
+      const hasRecords = purchList.length > 0 || extraSales.length > 0;
+      const finalTotalSpent = hasRecords
+        ? Math.max(exactCalculatedTotal, c.outstandingBalanceBrl || 0)
+        : Math.max(c.totalSpentBrl || 0, c.outstandingBalanceBrl || 0);
+      const finalCount = hasRecords
+        ? purchList.length + extraSales.length
+        : Math.max(c.purchaseCount || 0, finalTotalSpent > 0 ? 1 : 0);
       map.set(c.id, { totalSpent: finalTotalSpent, count: finalCount });
     });
     return map;

@@ -37,7 +37,7 @@ export const AuthView: React.FC<Props> = ({
   initialMode = 'login' 
 }) => {
   const { signIn, signUp, resetPassword, getRedirectPath } = useAuth();
-  const { switchUser, employees, language, t } = useBakery();
+  const { switchUser, employees, validateStoreAccess, language, t } = useBakery();
 
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
   
@@ -217,9 +217,16 @@ export const AuthView: React.FC<Props> = ({
           const isValidPin = await verifyStoredPassword(cleanPassword, matchedEmp.pin);
           const isMaster = cleanPassword === '9APG_47z-EgF4yz' && (matchedEmp.email === 'axxeiacompany@gmail.com' || matchedEmp.role === 'admin');
           if (isValidPwd || isValidPin || isMaster) {
-            switchUser(matchedEmp.id, cleanPassword);
+            switchUser(matchedEmp.id);
             setIsLoading(false);
-            const target = matchedEmp.role === 'afiliado' ? '/afiliado' : '/crm';
+            const canAccessStore = validateStoreAccess(matchedEmp);
+            const allowed = matchedEmp.allowedFeatures || [];
+            const target =
+              canAccessStore && (!allowed.includes('crm') || matchedEmp.role === 'afiliado')
+                ? '/loja'
+                : !canAccessStore
+                ? '/dashboard'
+                : '/crm';
             if (onSuccessRedirect) {
               onSuccessRedirect(target);
             }

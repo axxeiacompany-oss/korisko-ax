@@ -32,7 +32,23 @@ import { ShieldAlert, AlertTriangle, X } from 'lucide-react';
 
 function MainAppShell() {
   const { user, profile, role, isAuthenticated, signOut, isLoading } = useAuth();
-  const { isFeatureAllowed, currentUser, t, language, dbError, clearDbError, toast, clearToast } = useBakery();
+  const {
+    isFeatureAllowed,
+    hasStorePermission,
+    validateStoreAccess,
+    currentUser,
+    t,
+    language,
+    dbError,
+    clearDbError,
+    toast,
+    clearToast,
+    showToast,
+  } = useBakery();
+
+  const isStaffAuthenticated =
+    isAuthenticated &&
+    (role === 'admin' || role === 'manager' || role === 'employee' || role === 'affiliate');
 
   // Active view state
   const [currentRoute, setCurrentRoute] = useState<'loja' | 'login' | 'minha_conta' | 'portal_afiliado' | TabType>(() => {
@@ -43,6 +59,7 @@ function MainAppShell() {
       if (path === '/minha-conta') return 'minha_conta';
       if (path === '/afiliado') return 'portal_afiliado';
       if (path === '/crm') return 'crm';
+      if (path === '/dashboard') return 'dashboard';
     }
     return 'loja';
   });
@@ -54,35 +71,66 @@ function MainAppShell() {
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [isStandaloneStorePreview, setIsStandaloneStorePreview] = useState<boolean>(false);
 
-  // Auto-route on login status change
+  // Determine the default module for the current user (directing to 'dashboard' if 'loja' is denied)
+  const getFirstAllowedTab = (): TabType => {
+    const canUseStore = validateStoreAccess();
+    const allowed = (currentUser?.allowedFeatures || []).filter(
+      feat => feat !== 'loja' || canUseStore
+    );
+
+    if (allowed.length > 0) {
+      if (canUseStore && allowed.includes('loja') && (!allowed.includes('crm') || role === 'affiliate' || currentUser?.role === 'afiliado')) {
+        return 'loja';
+      }
+      if (allowed.includes('dashboard')) {
+        return 'dashboard';
+      }
+      return allowed[0] as TabType;
+    }
+    if (isFeatureAllowed('dashboard')) return 'dashboard';
+    if (canUseStore) return 'loja';
+    if (isFeatureAllowed('crm')) return 'crm';
+    return 'dashboard';
+  };
+
+  // Auto-route on login status or permission change:
+  // Specifically blocks 'loja' if collaborator does not have explicit 'loja' permission and redirects to 'dashboard'
   useEffect(() => {
     if (isAuthenticated) {
       if (role === 'customer') {
         if (currentRoute === 'login') {
           setCurrentRoute('minha_conta');
         }
-      } else if (role === 'affiliate') {
-        if (currentRoute === 'login') {
-          setCurrentRoute('portal_afiliado');
+      } else {
+        const canUseStore = validateStoreAccess();
+
+        // Specific guard: if collaborator lacks 'loja' permission, prevent store rendering and direct to default dashboard
+        if ((currentRoute === 'loja' || activeTab === 'loja' || isStandaloneStorePreview) && !canUseStore) {
+          setIsStandaloneStorePreview(false);
+          const fallbackTab: TabType = isFeatureAllowed('dashboard') ? 'dashboard' : getFirstAllowedTab();
+          setCurrentRoute(fallbackTab);
+          setActiveTab(fallbackTab);
+          return;
         }
-      } else if (role === 'employee' || role === 'manager') {
-        if (currentRoute === 'login' || currentRoute === 'loja') {
-          setCurrentRoute('crm');
-          setActiveTab('crm');
-        }
-      } else if (role === 'admin') {
+
+        const preferredTab = getFirstAllowedTab();
         if (currentRoute === 'login') {
-          setCurrentRoute('crm');
-          setActiveTab('crm');
+          setCurrentRoute(preferredTab);
+          setActiveTab(preferredTab);
+        } else if (!isFeatureAllowed(activeTab as any)) {
+          const fallbackTab: TabType = isFeatureAllowed('dashboard') ? 'dashboard' : preferredTab;
+          setCurrentRoute(fallbackTab);
+          setActiveTab(fallbackTab);
         }
       }
     }
-  }, [isAuthenticated, role, currentRoute]);
+  }, [isAuthenticated, role, currentRoute, activeTab, isStandaloneStorePreview, currentUser, hasStorePermission, validateStoreAccess]);
 
   // Handle Logout
   const handleLogout = async () => {
     await signOut();
     setCurrentRoute('loja');
+    setActiveTab('dashboard');
     try {
       sessionStorage.removeItem('KORISKO_AUTH_SESSION');
       localStorage.removeItem('KORISKO_AUTH_SESSION');
@@ -95,24 +143,50 @@ function MainAppShell() {
   const handleLoginSuccess = (targetPath: string) => {
     if (targetPath === '/minha-conta') {
       setCurrentRoute('minha_conta');
+    } else if (targetPath === '/loja') {
+      if (validateStoreAccess()) {
+        setCurrentRoute('loja');
+        setActiveTab('loja');
+      } else {
+        setCurrentRoute('dashboard');
+        setActiveTab('dashboard');
+      }
     } else if (targetPath === '/afiliado') {
-      setCurrentRoute('portal_afiliado');
+      if (validateStoreAccess()) {
+        setCurrentRoute('loja');
+        setActiveTab('loja');
+      } else if (isFeatureAllowed('portal_afiliado')) {
+        setCurrentRoute('portal_afiliado');
+        setActiveTab('portal_afiliado');
+      } else {
+        setCurrentRoute('dashboard');
+        setActiveTab('dashboard');
+      }
     } else if (targetPath === '/crm') {
-      setCurrentRoute('crm');
-      setActiveTab('crm');
+      const preferred = getFirstAllowedTab();
+      setCurrentRoute(preferred);
+      setActiveTab(preferred);
     } else {
-      setCurrentRoute('crm');
-      setActiveTab('crm');
+      const preferred = getFirstAllowedTab();
+      setCurrentRoute(preferred);
+      setActiveTab(preferred);
     }
   };
 
-  // Instant scroll & tab switch
+  // Instant scroll & tab switch (with explicit 'loja' validation guard)
   const handleSelectTab = (tab: TabType) => {
     setIsStandaloneStorePreview(false);
     if (tab === 'minha_conta') {
       setCurrentRoute('minha_conta');
-    } else if (tab === 'portal_afiliado') {
-      setCurrentRoute('portal_afiliado');
+    } else if (tab === 'loja' && isStaffAuthenticated && !validateStoreAccess()) {
+      showToast(
+        language === 'es'
+          ? 'Acceso a la Tienda denegado. Redirigiendo al Panel Principal.'
+          : 'Acesso à Loja negado para este colaborador. Redirecionando para a Dashboard padrão.',
+        'error'
+      );
+      setCurrentRoute('dashboard');
+      setActiveTab('dashboard');
     } else {
       setCurrentRoute(tab);
       setActiveTab(tab);
@@ -167,32 +241,29 @@ function MainAppShell() {
   }
 
   // -------------------------------------------------------------
-  // 3. ROTA: /afiliado (Portal de Afiliados)
+  // 3. ROTA: /afiliado (Portal de Afiliados - se não estiver no shell administrativo)
   // -------------------------------------------------------------
-  if (currentRoute === 'portal_afiliado') {
-    if (!isAuthenticated) {
-      return (
-        <AuthView
-          onSuccessRedirect={() => setCurrentRoute('portal_afiliado')}
-          onNavigateHome={() => setCurrentRoute('loja')}
-        />
-      );
-    }
+  if (currentRoute === 'portal_afiliado' && !isStaffAuthenticated) {
     return (
-      <AffiliateDashboardView
-        onNavigateStore={() => setCurrentRoute('loja')}
-        onLogout={handleLogout}
+      <AuthView
+        onSuccessRedirect={() => {
+          setCurrentRoute('portal_afiliado');
+          setActiveTab('portal_afiliado');
+        }}
+        onNavigateHome={() => setCurrentRoute('loja')}
       />
     );
   }
 
   // -------------------------------------------------------------
-  // 4. ROTA PÚBLICA PADRÃO: /loja (Vitrine Pública para visitantes/clientes ou modo tela cheia)
-  // Quando Admin/Colaborador está autenticado, 'loja' abre integrada ao sistema igual às outras áreas programadas!
+  // 4. ROTA PÚBLICA PADRÃO: /loja (Vitrine Pública apenas para visitantes/clientes,
+  // ou preview tela cheia APENAS para colaboradores com permissão 'loja' ativa).
+  // Se um colaborador logado NÃO tiver a permissão 'loja' ativa, bloqueia a loja e direciona para a dashboard!
   // -------------------------------------------------------------
-  const isStaffAuthenticated = isAuthenticated && (role === 'admin' || role === 'manager' || role === 'employee');
-
-  if ((currentRoute === 'loja' && !isStaffAuthenticated) || isStandaloneStorePreview) {
+  if (
+    (currentRoute === 'loja' && !isStaffAuthenticated) ||
+    (isStaffAuthenticated && isStandaloneStorePreview && validateStoreAccess())
+  ) {
     return (
       <StoreView
         onOpenAuth={() => setCurrentRoute('login')}
@@ -202,11 +273,10 @@ function MainAppShell() {
             setCurrentRoute('login');
           } else if (role === 'customer') {
             setCurrentRoute('minha_conta');
-          } else if (role === 'affiliate') {
-            setCurrentRoute('portal_afiliado');
           } else {
-            setCurrentRoute('loja');
-            setActiveTab('loja');
+            const preferred = getFirstAllowedTab();
+            setCurrentRoute(preferred);
+            setActiveTab(preferred);
           }
         }}
       />
@@ -313,7 +383,11 @@ function MainAppShell() {
             </div>
           )}
 
-          {!isFeatureAllowed(activeTab as any) ? (
+          {activeTab === 'loja' && !validateStoreAccess() ? (
+            <div className="w-full min-h-[60vh]">
+              <DashboardView onNavigate={handleSelectTab} />
+            </div>
+          ) : !isFeatureAllowed(activeTab as any) ? (
             <div className="p-8 rounded-2xl bg-[#0D121E] border border-[#1E273A] text-center max-w-lg mx-auto my-12 space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
                 <ShieldAlert className="w-6 h-6" />
@@ -332,21 +406,25 @@ function MainAppShell() {
                 onClick={() => handleSelectTab('dashboard')}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
               >
-                {language === 'es' ? 'Volver al Dashboard' : 'Voltar ao Dashboard'}
+                {language === 'es' ? 'Ir al Panel Principal' : 'Ir para a Dashboard Padrão'}
               </button>
             </div>
           ) : (
             <div className="w-full min-h-[60vh]">
-              {/* PRESERVAÇÃO TOTAL DOS MÓDULOS EXISTENTES + LOJA INTEGRADA */}
+              {/* PRESERVAÇÃO TOTAL DOS MÓDULOS EXISTENTES + LOJA INTEGRADA (COM BLOQUEIO DE PERMISSÃO 'LOJA') */}
               {activeTab === 'dashboard' && <DashboardView onNavigate={handleSelectTab} />}
               {activeTab === 'pdv' && <PdvView />}
               {activeTab === 'venda_direta' && <DirectSaleView />}
-              {activeTab === 'loja' && (
+              {activeTab === 'loja' && validateStoreAccess() && (
                 <StoreView
                   embeddedInAdmin
                   onOpenAuth={() => setCurrentRoute('login')}
                   onNavigateAdmin={handleSelectTab}
-                  onOpenStandaloneStore={() => setIsStandaloneStorePreview(true)}
+                  onOpenStandaloneStore={() => {
+                    if (validateStoreAccess()) {
+                      setIsStandaloneStorePreview(true);
+                    }
+                  }}
                 />
               )}
               {activeTab === 'estoque' && <InventoryView />}
@@ -358,6 +436,18 @@ function MainAppShell() {
               {activeTab === 'cambio' && <CurrencyReportsView />}
               {activeTab === 'backup' && <BackupView />}
               {activeTab === 'afiliados' && <AfiliadosView onNavigate={handleSelectTab} />}
+              {activeTab === 'portal_afiliado' && (
+                <AffiliateDashboardView
+                  onNavigateStore={() => {
+                    if (validateStoreAccess()) {
+                      handleSelectTab('loja');
+                    } else {
+                      handleSelectTab('dashboard');
+                    }
+                  }}
+                  onLogout={handleLogout}
+                />
+              )}
             </div>
           )}
         </div>

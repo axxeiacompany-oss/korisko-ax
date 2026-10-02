@@ -71,8 +71,13 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
+  const canViewCostControl =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'gerente' ||
+    currentUser?.role === 'padeiro' ||
+    currentUser?.role === 'estoquista';
 
-  // Build complete list of purchases for this customer (merging SQL table registro_compras_clientes + sales + fiado entries)
+  // Build complete list of purchases for this customer (merging SQL table registro_compras_clientes + sales + fiado entries, deduplicating comandas)
   const allCustomerPurchases = useMemo<CustomerPurchaseRecord[]>(() => {
     if (!customer) return [];
 
@@ -80,13 +85,28 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
     const recordedSaleIds = new Set<string>();
     const recordedComandas = new Set<string>();
 
-    (customerPurchases || [])
-      .filter(p => p.customerId === customer.id)
-      .forEach(p => {
-        map.set(p.id, p);
-        if (p.saleId) recordedSaleIds.add(p.saleId);
-        if (p.comandaNumber) recordedComandas.add(p.comandaNumber.trim().toLowerCase());
-      });
+    const custRawPurchases = (customerPurchases || []).filter(p => p.customerId === customer.id);
+    const finalizedComandaNums = new Set<string>();
+    custRawPurchases.forEach(p => {
+      if (p.saleId && p.comandaNumber) {
+        finalizedComandaNums.add(p.comandaNumber.trim().toLowerCase());
+      }
+    });
+
+    custRawPurchases.forEach(p => {
+      // Skip draft comanda record if a finalized sale record already exists for the same comandaNumber
+      if (
+        p.id.startsWith('purch-cmd-') &&
+        !p.saleId &&
+        p.comandaNumber &&
+        finalizedComandaNums.has(p.comandaNumber.trim().toLowerCase())
+      ) {
+        return;
+      }
+      map.set(p.id, p);
+      if (p.saleId) recordedSaleIds.add(p.saleId);
+      if (p.comandaNumber) recordedComandas.add(p.comandaNumber.trim().toLowerCase());
+    });
 
     // Also include any sales for this customer not yet in map
     (sales || [])
@@ -97,22 +117,37 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
             (s.customerName && s.customerName.trim().toLowerCase() === customer.name.trim().toLowerCase()))
       )
       .forEach(s => {
-        if (recordedSaleIds.has(s.id) || map.has(`purch-sale-${s.id}`)) return;
-        const itemsList: CustomerPurchaseItem[] = (s.items || []).map(it => ({
-          productId: it.product?.id || '',
-          productName: it.product?.name || (it as any).name || 'Produto',
-          category: it.product?.category || 'paes',
-          quantity: Number(it.quantity) || 1,
-          unit: it.product?.unit || 'un',
-          unitPriceBrl: Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0),
-          costPriceBrl: Number(it.product?.costPriceBrl ?? Number(it.unitPriceBrl || 0) * 0.42),
-          subtotalBrl: Number(it.subtotalBrl ?? Number(it.unitPriceBrl || 0) * Number(it.quantity || 1)),
-        }));
+        if (
+          recordedSaleIds.has(s.id) ||
+          map.has(`purch-sale-${s.id}`) ||
+          (s.comandaNumber && recordedComandas.has(s.comandaNumber.trim().toLowerCase()))
+        ) {
+          return;
+        }
+        const itemsList: CustomerPurchaseItem[] = (s.items || []).map(it => {
+          const unitPrice = Number(it.unitPriceBrl ?? it.product?.priceBrl ?? 0);
+          const qty = Number(it.quantity) || 1;
+          const sub = it.subtotalBrl !== undefined && Number(it.subtotalBrl) > 0
+            ? Number(it.subtotalBrl)
+            : Math.round(unitPrice * qty * 100) / 100;
+          return {
+            productId: it.product?.id || '',
+            productName: it.product?.name || (it as any).name || 'Produto',
+            category: it.product?.category || 'paes',
+            quantity: qty,
+            unit: it.product?.unit || 'un',
+            unitPriceBrl: unitPrice,
+            costPriceBrl: Number(it.product?.costPriceBrl || 0),
+            subtotalBrl: sub,
+          };
+        });
         const estCost = Math.round(itemsList.reduce((acc, it) => acc + it.costPriceBrl * it.quantity, 0));
+        const exactItemsSum = Math.round(itemsList.reduce((acc, it) => acc + it.subtotalBrl, 0) * 100) / 100;
+        const saleTotal = Number(s.totalBrl) > 0 ? Number(s.totalBrl) : exactItemsSum;
         const fiadoAmt = (s.payments || [])
           .filter(p => p.method === 'fiado')
           .reduce((acc, p) => acc + (p.equivalentBrl || p.amountReceived || 0), 0);
-        const paidAmt = Math.max(0, (s.totalBrl || 0) - fiadoAmt);
+        const paidAmt = Math.max(0, saleTotal - fiadoAmt);
         const primaryPay = fiadoAmt > 0 ? 'fiado' : (s.payments?.[0]?.method || 'dinheiro');
 
         map.set(`purch-sale-${s.id}`, {
@@ -125,7 +160,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
           comandaNumber: s.comandaNumber,
           items: itemsList,
           itemsSummary: itemsList.map(i => `${i.quantity}x ${i.productName}`).join(', ') || `Venda #${s.saleNumber}`,
-          totalAmountBrl: s.totalBrl || 0,
+          totalAmountBrl: saleTotal,
           estimatedCostBrl: estCost,
           paidAmountBrl: paidAmt,
           fiadoAmountBrl: fiadoAmt,
@@ -136,6 +171,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
           purchaseDate: s.timestamp || new Date().toISOString(),
         });
         recordedSaleIds.add(s.id);
+        if (s.comandaNumber) recordedComandas.add(s.comandaNumber.trim().toLowerCase());
       });
 
     // Also include any fiado debit entries not yet in map
@@ -162,13 +198,13 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
               quantity: 1,
               unit: 'un',
               unitPriceBrl: e.amountBrl,
-              costPriceBrl: Math.round(e.amountBrl * 0.42),
+              costPriceBrl: 0,
               subtotalBrl: e.amountBrl,
             },
           ],
           itemsSummary: e.description || 'Compra no Fiado',
           totalAmountBrl: e.amountBrl,
-          estimatedCostBrl: Math.round(e.amountBrl * 0.42),
+          estimatedCostBrl: 0,
           paidAmountBrl: 0,
           fiadoAmountBrl: e.amountBrl,
           paymentMethod: 'fiado',
@@ -177,6 +213,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
           recordedBy: e.recordedBy || 'Caixa',
           purchaseDate: e.date || new Date().toISOString(),
         });
+        if (e.comandaNumber) recordedComandas.add(e.comandaNumber.trim().toLowerCase());
       });
 
     return Array.from(map.values()).sort(
@@ -192,7 +229,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
       .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
   }, [customer, customerEntries]);
 
-  // Financial Metrics for this Customer
+  // Financial Metrics for this Customer (Comanda sum never altered by internal CMV)
   const metrics = useMemo(() => {
     if (!customer) {
       return {
@@ -206,18 +243,41 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
       };
     }
 
-    const sumPurchases = allCustomerPurchases.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
-    const totalPurchased = Math.max(customer.totalSpentBrl || 0, sumPurchases, customer.outstandingBalanceBrl || 0);
-    const purchaseCount = Math.max(allCustomerPurchases.length, customer.purchaseCount || 0, totalPurchased > 0 ? 1 : 0);
+    const sumPurchases = Math.round(
+      allCustomerPurchases.reduce((acc, p) => {
+        const itemsSum = Array.isArray(p.items) && p.items.length > 0
+          ? p.items.reduce((s, it) => s + (Number(it.subtotalBrl) || Number(it.unitPriceBrl || 0) * Number(it.quantity || 1)), 0)
+          : 0;
+        const effectiveTotal = Number(p.totalAmountBrl) > 0 ? Number(p.totalAmountBrl) : itemsSum;
+        return acc + effectiveTotal;
+      }, 0) * 100
+    ) / 100;
+
+    const totalPurchased = allCustomerPurchases.length > 0
+      ? Math.max(sumPurchases, customer.outstandingBalanceBrl || 0)
+      : Math.max(customer.totalSpentBrl || 0, customer.outstandingBalanceBrl || 0);
+    const purchaseCount = allCustomerPurchases.length > 0
+      ? allCustomerPurchases.length
+      : Math.max(customer.purchaseCount || 0, totalPurchased > 0 ? 1 : 0);
 
     const paidAtCheckout = allCustomerPurchases.reduce((acc, p) => acc + (Number(p.paidAmountBrl) || 0), 0);
     const totalEnteredCash = Math.min(
       totalPurchased,
-      paidAtCheckout + customerAmortizationsTotal + Math.max(0, totalPurchased - sumPurchases)
+      Math.max(paidAtCheckout + customerAmortizationsTotal, Math.max(0, totalPurchased - (customer.outstandingBalanceBrl || 0)))
     );
 
-    const rawCost = allCustomerPurchases.reduce((acc, p) => acc + (Number(p.estimatedCostBrl) || 0), 0);
-    const totalEstimatedCost = rawCost > 0 ? rawCost : Math.round(totalPurchased * 0.42);
+    // Preço de Custo / CMV é um controle exclusivo do Admin e Setores Responsáveis (calculado apenas sobre produtos com custo cadastrado)
+    const rawCost = allCustomerPurchases.reduce((acc, p) => {
+      const itemsCost = Array.isArray(p.items) && p.items.length > 0
+        ? p.items.reduce((s, it) => {
+            const prod = products.find(pr => pr.id === it.productId);
+            const registeredCost = Number(prod?.costPriceBrl ?? it.costPriceBrl ?? 0);
+            return s + registeredCost * (Number(it.quantity) || 1);
+          }, 0)
+        : 0;
+      return acc + itemsCost;
+    }, 0);
+    const totalEstimatedCost = Math.round(rawCost);
     const estimatedNetProfit = Math.max(0, totalPurchased - totalEstimatedCost);
     const ticketMedio = purchaseCount > 0 ? Math.round(totalPurchased / purchaseCount) : 0;
 
@@ -230,7 +290,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
       estimatedNetProfit,
       ticketMedio,
     };
-  }, [customer, allCustomerPurchases, customerAmortizationsTotal]);
+  }, [customer, allCustomerPurchases, customerAmortizationsTotal, products]);
 
   // Filtered purchases list
   const filteredPurchases = useMemo(() => {
@@ -266,7 +326,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
         quantity: qty,
         unit: prod.unit,
         unitPriceBrl: prod.priceBrl,
-        costPriceBrl: prod.costPriceBrl || Math.round(prod.priceBrl * 0.42),
+        costPriceBrl: Number(prod.costPriceBrl || 0),
         subtotalBrl: Math.round(prod.priceBrl * qty),
       };
       setDraftItems(prev => [...prev, newItem]);
@@ -285,7 +345,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
         quantity: qty,
         unit: 'un',
         unitPriceBrl: price,
-        costPriceBrl: Math.round(price * 0.42),
+        costPriceBrl: 0,
         subtotalBrl: Math.round(price * qty),
       };
       setDraftItems(prev => [...prev, newItem]);
@@ -314,7 +374,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
             quantity: qty,
             unit: prod.unit,
             unitPriceBrl: prod.priceBrl,
-            costPriceBrl: prod.costPriceBrl || Math.round(prod.priceBrl * 0.42),
+            costPriceBrl: Number(prod.costPriceBrl || 0),
             subtotalBrl: Math.round(prod.priceBrl * qty),
           });
         }
@@ -328,7 +388,7 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
             quantity: qty,
             unit: 'un',
             unitPriceBrl: price,
-            costPriceBrl: Math.round(price * 0.42),
+            costPriceBrl: 0,
             subtotalBrl: Math.round(price * qty),
           });
         }
@@ -509,22 +569,9 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#111827] border border-rose-500/30">
-              <div className="flex items-center justify-between text-[11px] text-rose-300 font-semibold">
-                <span>Saída / Custo Estimado (CMV)</span>
-                <ArrowDownRight className="w-4 h-4 text-rose-400" />
-              </div>
-              <div className="text-lg sm:text-xl font-black text-rose-400 font-mono-nums mt-1">
-                {formatCurrency(metrics.totalEstimatedCost, 'PYG')}
-              </div>
-              <div className="text-[10px] text-emerald-400 mt-0.5 font-mono-nums">
-                Margem Bruta: +{formatCurrency(metrics.estimatedNetProfit, 'PYG')}
-              </div>
-            </div>
-
             <div className="p-3.5 rounded-2xl bg-[#111827] border border-[#1E293B]">
               <div className="flex items-center justify-between text-[11px] text-neutral-300 font-semibold">
-                <span>Pendente no Fiado</span>
+                <span>Pendente na Comanda / Fiado</span>
                 <Clock className="w-4 h-4 text-amber-400" />
               </div>
               <div className={`text-lg sm:text-xl font-black font-mono-nums mt-1 ${customer.outstandingBalanceBrl > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -534,17 +581,45 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                 Limite: {formatCurrency(customer.creditLimitBrl, 'PYG')}
               </div>
             </div>
+
+            {canViewCostControl ? (
+              <div className="p-3.5 rounded-2xl bg-[#111827] border border-indigo-500/30">
+                <div className="flex items-center justify-between text-[11px] text-indigo-300 font-semibold">
+                  <span>CMV (Controle Admin / Setor)</span>
+                  <Database className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div className="text-lg sm:text-xl font-black text-indigo-300 font-mono-nums mt-1">
+                  {formatCurrency(metrics.totalEstimatedCost, 'PYG')}
+                </div>
+                <div className="text-[10px] text-neutral-400 mt-0.5 font-mono-nums">
+                  Uso interno • Não altera soma da comanda
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-[#111827] border border-sky-500/30">
+                <div className="flex items-center justify-between text-[11px] text-sky-300 font-semibold">
+                  <span>Ticket Médio da Comanda</span>
+                  <Receipt className="w-4 h-4 text-sky-400" />
+                </div>
+                <div className="text-lg sm:text-xl font-black text-sky-400 font-mono-nums mt-1">
+                  {formatCurrency(metrics.ticketMedio, 'PYG')}
+                </div>
+                <div className="text-[10px] text-neutral-400 mt-0.5 font-mono-nums">
+                  Soma limpa dos itens consumidos
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Individual Customer Financial Flow Chart (Entrada vs Saída/Custo vs Fiado) */}
+          {/* Individual Customer Comanda & Payment Summary Bar (Soma Limpa da Comanda sem interferência de CMV) */}
           <div className="p-4 rounded-2xl bg-[#0F1626] border border-[#1E293B] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>Gráfico Financeiro do Cliente: Entrada (Recebido) vs Saída (Custo CMV) & Fiado</span>
+                <span>Resumo da Conta & Comanda do Cliente: Soma de Produtos vs Pago & Fiado</span>
               </h3>
-              <span className="text-[11px] font-mono-nums text-emerald-400 font-bold">
-                Resultado Líquido do Cliente: +{formatCurrency(Math.max(0, metrics.totalEnteredCash - metrics.totalEstimatedCost), 'PYG')}
+              <span className="text-[11px] font-mono-nums text-amber-300 font-bold">
+                Soma Total da Comanda/Compras: {formatCurrency(metrics.totalPurchased, 'PYG')}
               </span>
             </div>
 
@@ -562,37 +637,18 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                 </div>
                 <div className="w-full h-2.5 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
                   <div
-                    style={{ width: `${Math.max(4, entryPct)}%` }}
+                    style={{ width: `${metrics.totalEnteredCash > 0 ? Math.max(4, entryPct) : 0}%` }}
                     className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
                   />
                 </div>
               </div>
 
-              {/* Bar 2: Saída / Custo de Produção */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-rose-300 font-semibold flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />
-                    Saída Operacional / Custo dos Produtos Vendidos (CMV)
-                  </span>
-                  <span className="font-mono-nums font-bold text-rose-400">
-                    -{formatCurrency(metrics.totalEstimatedCost, 'PYG')} ({costPct}%)
-                  </span>
-                </div>
-                <div className="w-full h-2.5 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
-                  <div
-                    style={{ width: `${Math.max(4, costPct)}%` }}
-                    className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-500"
-                  />
-                </div>
-              </div>
-
-              {/* Bar 3: Saldo em Fiado */}
+              {/* Bar 2: Saldo em Fiado / Comanda em Aberto */}
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-amber-300 font-semibold flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
-                    Em Aberto no Fiado (A Receber)
+                    Em Aberto na Comanda / Fiado (A Receber do Cliente)
                   </span>
                   <span className="font-mono-nums font-bold text-amber-400">
                     {formatCurrency(customer.outstandingBalanceBrl, 'PYG')} ({fiadoPct}%)
@@ -605,6 +661,21 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Controle Exclusivo do Admin e Setores Responsáveis: Preço de Custo / CMV */}
+              {canViewCostControl && (
+                <div className="pt-2 mt-2 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-indigo-300 font-semibold flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-[10px] font-bold uppercase">
+                      Controle Admin & Setores Responsáveis
+                    </span>
+                    <span>Custo dos Produtos Vendidos (CMV Cadastrado):</span>
+                  </span>
+                  <span className="font-mono-nums text-indigo-300 font-bold">
+                    {formatCurrency(metrics.totalEstimatedCost, 'PYG')} (Controle interno • Não interfere na comanda do cliente)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -980,12 +1051,14 @@ export const CustomerPurchasesModal: React.FC<CustomerPurchasesModalProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3 font-mono-nums">
-                        <span className="text-rose-400">
-                          Custo/Saída Est.: -{formatCurrency(purch.estimatedCostBrl, 'PYG')}
+                        <span className="text-amber-300 font-bold">
+                          Soma da Comanda: {formatCurrency(purch.totalAmountBrl, 'PYG')}
                         </span>
-                        <span className="text-emerald-400 font-semibold">
-                          Margem: +{formatCurrency(profit, 'PYG')}
-                        </span>
+                        {canViewCostControl && purch.estimatedCostBrl > 0 && (
+                          <span className="text-indigo-400" title="Controle exclusivo do Admin e Setores Responsáveis">
+                            CMV (Admin/Setor): {formatCurrency(purch.estimatedCostBrl, 'PYG')}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

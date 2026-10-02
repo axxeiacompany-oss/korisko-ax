@@ -37,12 +37,20 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
     customerPurchases,
     customerEntries,
     sales,
+    products,
+    currentUser,
     currentSession,
     sessionHistory,
   } = useBakery();
 
   const [period, setPeriod] = useState<PeriodFilter>('15d');
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  const canViewCostControl =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'gerente' ||
+    currentUser?.role === 'padeiro' ||
+    currentUser?.role === 'estoquista';
 
   // Consolidate all cash register transactions (current session + history)
   const allCashTransactions = useMemo(() => {
@@ -92,22 +100,39 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
       vendasFiadoLancadas += fiadoPart;
 
       const saleCost = (s.items || []).reduce((acc, it) => {
-        const unitCost = it.product?.costPriceBrl || Math.round((it.unitPriceBrl || 0) * 0.42);
-        return acc + unitCost * (it.quantity || 1);
+        const prod = products.find(pr => pr.id === it.product?.id);
+        const unitCost = Number(prod?.costPriceBrl ?? it.product?.costPriceBrl ?? 0);
+        return acc + unitCost * (Number(it.quantity) || 1);
       }, 0);
-      custoMercadoriaVendida += saleCost > 0 ? saleCost : Math.round((s.totalBrl || 0) * 0.42);
+      custoMercadoriaVendida += saleCost;
     });
 
-    // 2. Compras registradas manualmente ou via comanda em registro_compras_clientes (que não duplicam vendas)
+    // 2. Compras registradas manualmente ou via comanda em registro_compras_clientes (sem duplicar vendas ou comandas pagas)
     const saleIdsInPeriod = new Set(periodSales.map(s => s.id));
+    const saleComandasInPeriod = new Set(
+      periodSales
+        .map(s => s.comandaNumber?.trim().toLowerCase())
+        .filter((c): c is string => Boolean(c))
+    );
     const extraCustomerPurchases = (customerPurchases || []).filter(
-      p => p && (!p.saleId || !saleIdsInPeriod.has(p.saleId)) && isDateInPeriod(p.purchaseDate, period)
+      p =>
+        p &&
+        (!p.saleId || !saleIdsInPeriod.has(p.saleId)) &&
+        !(p.comandaNumber && saleComandasInPeriod.has(p.comandaNumber.trim().toLowerCase())) &&
+        isDateInPeriod(p.purchaseDate, period)
     );
 
     extraCustomerPurchases.forEach(p => {
       entradasVendasAvista += Number(p.paidAmountBrl) || 0;
       vendasFiadoLancadas += Number(p.fiadoAmountBrl) || 0;
-      custoMercadoriaVendida += Number(p.estimatedCostBrl) || Math.round((Number(p.totalAmountBrl) || 0) * 0.42);
+      const itemsCost = Array.isArray(p.items)
+        ? p.items.reduce((acc, it) => {
+            const prod = products.find(pr => pr.id === it.productId);
+            const unitCost = Number(prod?.costPriceBrl ?? it.costPriceBrl ?? 0);
+            return acc + unitCost * (Number(it.quantity) || 1);
+          }, 0)
+        : 0;
+      custoMercadoriaVendida += itemsCost;
     });
 
     // 3. Amortizações de Fiado recebidas no período (Entradas no Caixa)
@@ -136,7 +161,8 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
     const totalEntradas = Math.round(
       entradasVendasAvista + entradasAmortizacoesFiado + entradasCaixaSuprimentos
     );
-    const totalSaidas = Math.round(saidasCaixaDespesas + custoMercadoriaVendida);
+    // Saídas de caixa operacionais separadas do Preço de Custo (CMV é controle interno do Admin e Setores Responsáveis)
+    const totalSaidas = Math.round(saidasCaixaDespesas);
     const saldoLiquido = totalEntradas - totalSaidas;
     const margemLiquidaPct =
       totalEntradas > 0 ? Math.round((saldoLiquido / totalEntradas) * 100) : 0;
@@ -176,14 +202,9 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
         .filter(p => p.method === 'fiado')
         .reduce((acc, p) => acc + (p.equivalentBrl || p.amountReceived || 0), 0);
       const paidPart = Math.max(0, (s.totalBrl || 0) - fiadoPart);
-      const saleCost = (s.items || []).reduce((acc, it) => {
-        const unitCost = it.product?.costPriceBrl || Math.round((it.unitPriceBrl || 0) * 0.42);
-        return acc + unitCost * (it.quantity || 1);
-      }, 0);
 
       bucket.entradas += paidPart;
       bucket.fiado += fiadoPart;
-      bucket.saidas += saleCost > 0 ? saleCost : Math.round((s.totalBrl || 0) * 0.42);
     });
 
     extraCustomerPurchases.forEach(p => {
@@ -192,7 +213,6 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
       if (!bucket) return;
       bucket.entradas += Number(p.paidAmountBrl) || 0;
       bucket.fiado += Number(p.fiadoAmountBrl) || 0;
-      bucket.saidas += Number(p.estimatedCostBrl) || Math.round((Number(p.totalAmountBrl) || 0) * 0.42);
     });
 
     periodAmortizations.forEach(e => {
@@ -234,15 +254,36 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
       dailySeries,
       maxDailyVal,
     };
-  }, [sales, customerPurchases, customerEntries, allCashTransactions, period]);
+  }, [sales, customerPurchases, customerEntries, allCashTransactions, products, period]);
 
-  // Compute Customer Ranking by Total Comprado (merging customer.totalSpentBrl + customerPurchases)
+  // Compute Customer Ranking by Total Comprado (deduplicating open comandas vs finalized sales)
   const customerRanking = useMemo(() => {
     const list = (customers || []).map(c => {
-      const purchasesForCust = (customerPurchases || []).filter(p => p.customerId === c.id);
-      const sumPurchases = purchasesForCust.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0);
-      const totalSpent = Math.max(c.totalSpentBrl || 0, sumPurchases, c.outstandingBalanceBrl || 0);
-      const count = Math.max(c.purchaseCount || 0, purchasesForCust.length, totalSpent > 0 ? 1 : 0);
+      const rawCustPurchases = (customerPurchases || []).filter(p => p.customerId === c.id);
+      const finalizedCmds = new Set<string>();
+      rawCustPurchases.forEach(p => {
+        if (p.saleId && p.comandaNumber) {
+          finalizedCmds.add(p.comandaNumber.trim().toLowerCase());
+        }
+      });
+      const purchasesForCust = rawCustPurchases.filter(
+        p =>
+          !(
+            p.id.startsWith('purch-cmd-') &&
+            !p.saleId &&
+            p.comandaNumber &&
+            finalizedCmds.has(p.comandaNumber.trim().toLowerCase())
+          )
+      );
+      const sumPurchases = Math.round(
+        purchasesForCust.reduce((acc, p) => acc + (Number(p.totalAmountBrl) || 0), 0) * 100
+      ) / 100;
+      const totalSpent = purchasesForCust.length > 0
+        ? Math.max(sumPurchases, c.outstandingBalanceBrl || 0)
+        : Math.max(c.totalSpentBrl || 0, c.outstandingBalanceBrl || 0);
+      const count = purchasesForCust.length > 0
+        ? purchasesForCust.length
+        : Math.max(c.purchaseCount || 0, totalSpent > 0 ? 1 : 0);
       const paidTotal = Math.max(0, totalSpent - (c.outstandingBalanceBrl || 0));
 
       return {
@@ -350,17 +391,19 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
               </div>
             </div>
 
-            {/* Card 2: Total Saídas & Custos */}
+            {/* Card 2: Saídas de Caixa & Controle de Custo (Admin / Setor) */}
             <div className="p-3.5 rounded-2xl bg-[#080B12] border border-rose-500/30 space-y-1">
               <div className="flex items-center justify-between text-xs text-rose-300 font-semibold">
-                <span>🔴 Total Saídas & Custos</span>
+                <span>🔴 Saídas de Caixa</span>
                 <ArrowDownRight className="w-4 h-4 text-rose-400" />
               </div>
               <div className="text-lg sm:text-2xl font-black text-rose-400 font-mono-nums">
                 -{formatCurrency(financialAnalytics.totalSaidas, 'PYG')}
               </div>
               <div className="text-[10px] text-neutral-400 font-mono-nums truncate">
-                CMV: {formatCurrency(financialAnalytics.custoMercadoriaVendida, 'PYG')} | Caixa: {formatCurrency(financialAnalytics.saidasCaixaDespesas, 'PYG')}
+                {canViewCostControl
+                  ? `CMV (Admin/Setor): ${formatCurrency(financialAnalytics.custoMercadoriaVendida, 'PYG')}`
+                  : `Sangrias / Despesas de Caixa`}
               </div>
             </div>
 
@@ -522,19 +565,21 @@ export const FinancialPurchasesAnalytics: React.FC<FinancialPurchasesAnalyticsPr
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-rose-950/15 border border-rose-500/20 space-y-1">
-                  <div className="text-[11px] font-bold text-rose-300">Composição das Saídas & Custos</div>
-                  <div className="flex justify-between text-[11px] text-neutral-400 font-mono-nums">
-                    <span>Custo Mercadoria Vendida (CMV):</span>
-                    <strong className="text-rose-300">-{formatCurrency(financialAnalytics.custoMercadoriaVendida, 'PYG')}</strong>
-                  </div>
+                  <div className="text-[11px] font-bold text-rose-300">Saídas Operacionais & Controle de Setor</div>
                   <div className="flex justify-between text-[11px] text-neutral-400 font-mono-nums">
                     <span>Saídas / Sangrias de Caixa:</span>
                     <strong className="text-rose-300">-{formatCurrency(financialAnalytics.saidasCaixaDespesas, 'PYG')}</strong>
                   </div>
                   <div className="flex justify-between text-[11px] text-neutral-400 font-mono-nums">
-                    <span>Consumo Lançado em Fiado:</span>
+                    <span>Comandas / Consumo em Fiado:</span>
                     <strong className="text-amber-300">{formatCurrency(financialAnalytics.vendasFiadoLancadas, 'PYG')}</strong>
                   </div>
+                  {canViewCostControl && (
+                    <div className="flex justify-between text-[11px] text-indigo-300 font-mono-nums pt-0.5 border-t border-rose-500/20">
+                      <span>Preço de Custo / CMV (Controle Admin/Setor):</span>
+                      <strong className="text-indigo-300">{formatCurrency(financialAnalytics.custoMercadoriaVendida, 'PYG')}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
