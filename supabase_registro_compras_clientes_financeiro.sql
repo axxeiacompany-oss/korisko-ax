@@ -144,7 +144,8 @@ BEGIN
 END $$;
 
 -- 5. VIEW SQL DE ANÁLISE FINANCEIRA DIÁRIA: SOMA LIMPA DE COMANDAS/COMPRAS E CONTROLE INTERNO DE CMV (ADMIN & SETORES)
-CREATE OR REPLACE VIEW public.vw_analise_financeira_entradas_saidas AS
+CREATE OR REPLACE VIEW public.vw_analise_financeira_entradas_saidas
+WITH (security_invoker = true) AS
 SELECT
   DATE_TRUNC('day', purchase_date::TIMESTAMPTZ)::DATE AS data_movimento,
   COUNT(*) AS total_compras_registradas,
@@ -157,6 +158,7 @@ FROM public.registro_compras_clientes
 GROUP BY DATE_TRUNC('day', purchase_date::TIMESTAMPTZ)::DATE
 ORDER BY data_movimento DESC;
 
+ALTER VIEW public.vw_analise_financeira_entradas_saidas SET (security_invoker = true);
 GRANT SELECT ON public.vw_analise_financeira_entradas_saidas TO anon, authenticated, service_role;
 
 -- 6. LIMPEZA DE DUPLICIDADES E RECÁLCULO AUTOMÁTICO DA SOMA DE COMANDAS DOS CLIENTES
