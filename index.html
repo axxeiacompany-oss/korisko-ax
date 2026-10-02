@@ -56,6 +56,10 @@
             var dummy = {
               url: urlStr,
               readyState: 1, // WebSocket.OPEN
+              OPEN: 1,
+              CONNECTING: 0,
+              CLOSING: 2,
+              CLOSED: 3,
               send: function() {},
               close: function() {},
               addEventListener: function(type, fn) {
@@ -64,7 +68,7 @@
                 if (type === 'open') {
                   setTimeout(function() {
                     try { fn({ type: 'open' }); } catch(e) {}
-                  }, 10);
+                  }, 0);
                 }
               },
               removeEventListener: function(type, fn) {
@@ -83,7 +87,7 @@
               try {
                 if (typeof dummy.onopen === 'function') dummy.onopen({ type: 'open' });
               } catch(e) {}
-            }, 10);
+            }, 0);
 
             return dummy;
           };

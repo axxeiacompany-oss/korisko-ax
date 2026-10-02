@@ -705,8 +705,8 @@ export const PdvView: React.FC = () => {
         onClose={() => setIsComandasOpen(false)}
         currentCart={cart}
         currentCartItems={cart}
-        activeComandaNumber={activeComandaNumber}
-        activeCustomerName={activeCustomerName}
+        activeComandaNumber={activeComandaNumber ?? undefined}
+        activeCustomerName={activeCustomerName ?? undefined}
         onLoadComanda={handleLoadComanda}
         onClearCart={handleClearCart}
       />

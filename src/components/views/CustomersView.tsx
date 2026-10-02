@@ -40,7 +40,13 @@ import {
   ShieldCheck,
   Radio,
   BookOpen,
-  ShoppingBag
+  ShoppingBag,
+  LayoutGrid,
+  List,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  MoreVertical
 } from 'lucide-react';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { ReceiptModal } from '../modals/ReceiptModal';
@@ -76,6 +82,12 @@ export const CustomersView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
   const [onlyDebtors, setOnlyDebtors] = useState(false);
+  const [activeViewTab, setActiveViewTab] = useState<'all' | 'debtors' | 'birthdays' | 'history'>('all');
+  const [displayMode, setDisplayMode] = useState<'cards' | 'table'>('cards');
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showLiveStreamBanner, setShowLiveStreamBanner] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<'all' | 'debito' | 'amortizacao'>('all');
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -230,11 +242,31 @@ export const CustomersView: React.FC = () => {
         (c.documentCpf && c.documentCpf.includes(search));
       
       const matchCat = categoryFilter === 'todas' || c.category === categoryFilter;
-      const matchDebtor = !onlyDebtors || c.outstandingBalanceBrl > 0;
 
-      return matchSearch && matchCat && matchDebtor;
+      let matchTab = true;
+      if (activeViewTab === 'debtors') {
+        matchTab = c.outstandingBalanceBrl > 0;
+      } else if (activeViewTab === 'birthdays') {
+        matchTab = Boolean(c.birthday && c.birthday.includes(`/${currentMonthNum}`));
+      } else if (onlyDebtors) {
+        matchTab = c.outstandingBalanceBrl > 0;
+      }
+
+      return matchSearch && matchCat && matchTab;
     });
-  }, [customers, search, categoryFilter, onlyDebtors]);
+  }, [customers, search, categoryFilter, activeViewTab, onlyDebtors, currentMonthNum]);
+
+  // Birthday customers count for current month
+  const birthdayCount = useMemo(() => {
+    return customers.filter(c => c.birthday && c.birthday.includes(`/${currentMonthNum}`)).length;
+  }, [customers, currentMonthNum]);
+
+  const getCustomerInitials = (name: string) => {
+    if (!name) return 'CL';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   // KPIs
   const stats = useMemo(() => {
@@ -712,10 +744,33 @@ export const CustomersView: React.FC = () => {
     };
   }, [statementCustomer, customerEntries, sales, statementPeriodFilter, statementTypeFilter, statementSearch]);
 
+  // Filtered entries for the clean Histórico de Fiado tab
+  const filteredHistoryEntries = useMemo(() => {
+    let list = [...(customerEntries || [])];
+    if (historyTypeFilter === 'debito') {
+      list = list.filter(e => e.type === 'debito_compra');
+    } else if (historyTypeFilter === 'amortizacao') {
+      list = list.filter(e => e.type === 'pagamento_amortizacao');
+    }
+    if (historySearch.trim()) {
+      const term = historySearch.toLowerCase().trim();
+      list = list.filter(e => {
+        const cust = customers.find(c => c.id === e.customerId);
+        return (
+          (e.description && e.description.toLowerCase().includes(term)) ||
+          (cust && cust.name.toLowerCase().includes(term)) ||
+          (e.comandaNumber && e.comandaNumber.toLowerCase().includes(term)) ||
+          (e.recordedBy && e.recordedBy.toLowerCase().includes(term))
+        );
+      });
+    }
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [customerEntries, historyTypeFilter, historySearch, customers]);
+
   return (
     <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden pb-24 lg:pb-0">
       
-      {/* Top Banner */}
+      {/* Top Banner - Limpo e Objetivo */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-[#0D121E] border border-[#1E273A] shadow-xl">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
@@ -724,552 +779,844 @@ export const CustomersView: React.FC = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
-                {language === 'es' ? 'Gestión de Clientes & Fiado en Tiempo Real' : 'CRM, Fiado & Extrato em Tempo Real'}
+                {language === 'es' ? 'Gestión de Clientes & Fiado' : 'CRM & Gestão de Clientes'}
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Radio className="w-2.5 h-2.5 animate-pulse" />
-                Tempo Real Anti-Perda
+                <Radio className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
+                Tempo Real
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-0.5 truncate">
-              Korizko • Panificação confeitaria artesanal — Todo Fiado ou pagamento aparece na hora no Extrato
+              Korizko • Panificação confeitaria artesanal — Controle simplificado de clientes, fiado e pagamentos
             </p>
           </div>
         </div>
 
         {canManage && (
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Toggle Gráficos Financeiros */}
+            <button
+              type="button"
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                showAnalytics 
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                  : 'bg-[#080B12] border-[#1C2538] text-neutral-300 hover:text-white hover:bg-neutral-800'
+              }`}
+              title="Exibir ou ocultar painel de gráficos e ranking de compras"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>{showAnalytics ? 'Ocultar Gráficos' : 'Gráficos & Análise'}</span>
+            </button>
+
             {currentUser?.role === 'admin' && (
               <button
                 type="button"
                 onClick={() => zeroAllNumbersForRealTest()}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
-                title="Zerar todos os números financeiros, comandas, vendas e fiado para iniciar teste real (Exclusivo Admin)"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer active:scale-95"
+                title="Zerar todos os números para iniciar teste real (Exclusivo Admin)"
               >
-                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Zerar Todos os Números (Teste Real)</span>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Zerar Teste</span>
               </button>
             )}
+
             <button
               onClick={handleOpenCreate}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-neutral-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>{language === 'es' ? 'Nuevo Cliente' : 'Novo Cliente'}</span>
+              <span>{language === 'es' ? '+ Nuevo Cliente' : '+ Novo Cliente'}</span>
             </button>
           </div>
         )}
       </div>
 
-      {/* Live Checkout & Fiado Real-Time Feed ("apareca na hr principalmente se for em fiado para nao ter percas") */}
-      {((activeCheckouts && activeCheckouts.length > 0) || (customerEntries && customerEntries.length > 0)) && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#111728] via-[#0D121E] to-[#161224] border border-rose-500/30 space-y-3 shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* KPI Cards - Fáceis de ler e com atalho para filtrar */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('all')}
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+            activeViewTab === 'all'
+              ? 'bg-[#121829] border-amber-500/40 shadow-md shadow-amber-500/10'
+              : 'bg-[#0D121E] border-[#1E273A] hover:border-neutral-700'
+          }`}
+        >
+          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
+            <span className="truncate">Total de Clientes</span>
+            <Users className="w-4 h-4 text-amber-400 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-white font-mono-nums">
+            {stats.total}
+          </div>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">Clique para ver todos</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('debtors')}
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+            activeViewTab === 'debtors'
+              ? 'bg-rose-950/30 border-rose-500/50 shadow-md shadow-rose-950/20'
+              : 'bg-[#0D121E] border-[#1E273A] hover:border-rose-900/50'
+          }`}
+        >
+          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
+            <span className="truncate">Total Fiado (A Receber)</span>
+            <DollarSign className="w-4 h-4 text-rose-400 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-rose-400 font-mono-nums truncate">
+            {formatCurrency(stats.totalDebtBrl, 'PYG')}
+          </div>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">
+            Moeda oficial: Guaraní (₲)
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('debtors')}
+          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+            activeViewTab === 'debtors'
+              ? 'bg-amber-950/30 border-amber-500/50 shadow-md shadow-amber-950/20'
+              : 'bg-[#0D121E] border-[#1E273A] hover:border-amber-900/50'
+          }`}
+        >
+          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
+            <span className="truncate">Clientes com Fiado</span>
+            <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-amber-400 font-mono-nums">
+            {stats.debtorsCount}
+          </div>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">Clique para filtrar devedores</p>
+        </button>
+
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
+          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
+            <span className="truncate">Total Comprado (Geral)</span>
+            <ShoppingBag className="w-4 h-4 text-emerald-400 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono-nums truncate">
+            {formatCurrency(stats.totalPurchasedAllBrl, 'PYG')}
+          </div>
+          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">Histórico consolidado</p>
+        </div>
+
+      </div>
+
+      {/* Painel de Gráficos e Análise Financeira (Colapsável para não poluir a tela) */}
+      {showAnalytics && (
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#0D121E] border border-amber-500/30 shadow-xl space-y-4 animate-in fade-in zoom-in-95">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wide flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-rose-400" />
-                <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
-              </h2>
+              <BarChart3 className="w-5 h-5 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">Análise Gráfica & Ranking de Compras</h3>
             </div>
-            <div className="flex items-center gap-2">
-              {currentUser?.role === 'admin' && customerEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAnalytics(false)}
+              className="text-xs text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-neutral-800 cursor-pointer"
+            >
+              Fechar Análise ✕
+            </button>
+          </div>
+          <FinancialPurchasesAnalytics
+            onSelectCustomer={c => setPurchasesCustomer(c)}
+            defaultExpanded={true}
+          />
+        </div>
+      )}
+
+      {/* Abas Principais de Navegação - Super Simples e Fáceis */}
+      <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-[#0D121E] border border-[#1E273A] overflow-x-auto scrollbar-none">
+        
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('all')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            activeViewTab === 'all'
+              ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Todos os Clientes</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${activeViewTab === 'all' ? 'bg-black/20 text-neutral-950 font-bold' : 'bg-neutral-800 text-neutral-300'}`}>
+            {stats.total}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('debtors')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            activeViewTab === 'debtors'
+              ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20'
+              : 'text-neutral-400 hover:text-rose-300 hover:bg-rose-950/20'
+          }`}
+        >
+          <AlertCircle className="w-4 h-4 text-rose-400" />
+          <span>Contas a Receber (Fiado)</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${activeViewTab === 'debtors' ? 'bg-white/20 text-white font-bold' : 'bg-rose-950/40 text-rose-300'}`}>
+            {stats.debtorsCount}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('birthdays')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            activeViewTab === 'birthdays'
+              ? 'bg-pink-600 text-white shadow-md shadow-pink-600/20'
+              : 'text-neutral-400 hover:text-pink-300 hover:bg-pink-950/20'
+          }`}
+        >
+          <span>🎂 Aniversariantes</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${activeViewTab === 'birthdays' ? 'bg-white/20 text-white font-bold' : 'bg-pink-950/40 text-pink-300'}`}>
+            {birthdayCount}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveViewTab('history')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            activeViewTab === 'history'
+              ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+              : 'text-neutral-400 hover:text-sky-300 hover:bg-sky-950/20'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Histórico & Movimentações</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${activeViewTab === 'history' ? 'bg-white/20 text-white font-bold' : 'bg-sky-950/40 text-sky-300'}`}>
+            {customerEntries?.length || 0}
+          </span>
+        </button>
+
+      </div>
+
+      {/* VISÃO 1: LISTA OU TABELA DE CLIENTES */}
+      {activeViewTab !== 'history' && (
+        <div className="space-y-4">
+          
+          {/* Barra de Busca, Categoria e Alternância de Visualização */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
+            
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+              <input
+                id="crm-search-input"
+                name="crmSearch"
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={language === 'es' ? 'Buscar por nombre, WhatsApp o documento...' : 'Buscar cliente por nome, WhatsApp ou CPF...'}
+                className="w-full pl-9 pr-8 py-2 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+              />
+              {search && (
                 <button
                   type="button"
-                  onClick={() => clearAllCustomerEntries()}
-                  className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                  title="Apagar todos os registros da tabela de Fiado & Conta Corrente e zerar saldos (Exclusivo Admin)"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5"
                 >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Apagar Todos ({customerEntries.length})</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
-              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-                Sincronizado em Tempo Real
-              </span>
             </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
+              {/* Category filter */}
+              <select
+                id="crm-category-filter"
+                name="categoryFilter"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-neutral-300 focus:outline-none focus:border-amber-500 shrink-0 cursor-pointer"
+              >
+                <option value="todas">Todas as Categorias</option>
+                <option value="varejo">Varejo (Balcão)</option>
+                <option value="mensalista">Mensalista (Fiado)</option>
+                <option value="empresa">Empresa / PJ</option>
+                <option value="confeitaria">Confeitaria</option>
+              </select>
+
+              {/* Modo de exibição: Cartões vs Tabela */}
+              <div className="flex items-center rounded-xl bg-[#080B12] border border-[#1C2538] p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('cards')}
+                  className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                    displayMode === 'cards' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'
+                  }`}
+                  title="Exibir em Cartões Visuais"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('table')}
+                  className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                    displayMode === 'table' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'
+                  }`}
+                  title="Exibir em Tabela Compacta"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
           </div>
 
-          {activeCheckouts && activeCheckouts.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {activeCheckouts.slice(0, 3).map(chk => {
-                const isFiado = chk.paymentMethod === 'fiado';
-                const isChargingNow = chk.status === 'em_cobranca';
-                const isComandaLancada = chk.status === 'comanda_lancada';
-                const linkedCust = customers.find(c => c.id === chk.customerId || c.name.toLowerCase() === chk.customerName.toLowerCase());
+          {/* MODO CARDS (Visual, limpo e direto) */}
+          {displayMode === 'cards' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+              {filteredCustomers.map(cust => {
+                const hasDebt = cust.outstandingBalanceBrl > 0;
+                const isOverLimit = cust.creditLimitBrl > 0 && cust.outstandingBalanceBrl > cust.creditLimitBrl;
+                const isBirthdayMonth = cust.birthday && cust.birthday.includes(`/${currentMonthNum}`);
+                const pStats = customerPurchasesStatsMap.get(cust.id) || {
+                  totalSpent: cust.totalSpentBrl || 0,
+                  count: cust.purchaseCount || 0,
+                };
+                const initials = getCustomerInitials(cust.name);
+
                 return (
-                  <div
-                    key={chk.id}
-                    className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
-                      isChargingNow || isComandaLancada
-                        ? isFiado
-                          ? 'bg-rose-950/40 border-rose-500/60 shadow-md shadow-rose-950/30'
-                          : 'bg-amber-950/30 border-amber-500/50'
-                        : isFiado
-                          ? 'bg-rose-950/20 border-rose-500/30'
-                          : 'bg-[#090D16] border-[#1E273A]'
+                  <div 
+                    key={cust.id}
+                    className={`p-4 sm:p-5 rounded-2xl bg-[#0D121E] border transition-all flex flex-col justify-between ${
+                      isOverLimit 
+                        ? 'border-rose-500/50 shadow-lg shadow-rose-950/20' 
+                        : hasDebt 
+                        ? 'border-amber-500/40 hover:border-amber-500/60' 
+                        : 'border-[#1E273A] hover:border-neutral-700'
                     }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          isChargingNow
-                            ? 'bg-amber-500 text-neutral-950 animate-pulse'
-                            : isComandaLancada
-                              ? 'bg-rose-500 text-white animate-pulse'
-                              : isFiado
-                                ? 'bg-rose-500/25 text-rose-200 border border-rose-500/40'
-                                : 'bg-emerald-500/20 text-emerald-300'
+                    <div>
+                      {/* Top: Avatar, Name, Phone & WhatsApp */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                            hasDebt 
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          }`}>
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="font-bold text-white text-sm tracking-tight truncate">
+                                {cust.name}
+                              </h3>
+                              {isBirthdayMonth && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-bold shrink-0">
+                                  🎂 Aniversário
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-neutral-400 mt-0.5">
+                              <span className="font-mono">{cust.phone || 'Sem telefone'}</span>
+                              {cust.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsAppNotice(cust)}
+                                  className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer p-0.5"
+                                  title="Enviar Extrato no WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 border ${
+                          cust.category === 'mensalista' 
+                            ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                            : cust.category === 'empresa'
+                            ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700'
                         }`}>
-                          {isChargingNow
-                            ? `COBRANDO AGORA: ${chk.paymentMethod.toUpperCase()}`
-                            : isComandaLancada
-                              ? `COMANDA LANÇADA ${chk.comandaNumber ? `#${chk.comandaNumber}` : ''} • SALDO ATUALIZADO`
-                              : isFiado
-                                ? 'FIADO CONFIRMADO'
-                                : `PAGO (${chk.paymentMethod.toUpperCase()})`}
+                          {cust.category}
                         </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono-nums font-black text-sm text-amber-400">
-                            {formatCurrency(chk.amountBrl, 'PYG')}
-                          </span>
-                          {currentUser?.role === 'admin' && (
+                      </div>
+
+                      {/* Financial Status Box - O Mais Importante */}
+                      <div className={`p-3.5 rounded-xl mb-3 ${
+                        hasDebt 
+                          ? 'bg-rose-950/25 border border-rose-500/30' 
+                          : 'bg-[#080B12] border border-[#1C2538]'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] text-neutral-400 block font-medium">
+                              {hasDebt ? 'Saldo a Receber (Fiado)' : 'Situação da Conta'}
+                            </span>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                              <span className={`text-lg sm:text-xl font-black font-mono-nums ${hasDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                {hasDebt ? formatCurrency(cust.outstandingBalanceBrl, 'PYG') : '✅ Em Dia (R$ 0)'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {hasDebt && (
                             <button
                               type="button"
-                              onClick={() => clearCheckoutSession(chk.id)}
-                              className="p-1 rounded-lg bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
-                              title="Apagar esta cobrança em tempo real (Exclusivo Admin)"
+                              onClick={() => handleSendWhatsAppNotice(cust)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Enviar aviso de cobrança via WhatsApp"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>Cobrar</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Credit limit info */}
+                        <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-neutral-400">
+                          <span>Limite: <strong>{formatCurrency(cust.creditLimitBrl, 'PYG')}</strong></span>
+                          <span className={isOverLimit ? 'text-rose-400 font-bold' : 'text-neutral-500'}>
+                            {isOverLimit 
+                              ? 'Limite Excedido!' 
+                              : hasDebt ? `${Math.round((cust.outstandingBalanceBrl / (cust.creditLimitBrl || 1)) * 100)}% usado` : '100% liberado'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mini Resumo: Total Comprado & Fidelidade */}
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setPurchasesCustomer(cust)}
+                          className="p-2 rounded-xl bg-[#080B12] hover:bg-neutral-800/80 border border-[#1C2538] transition-all text-left cursor-pointer group"
+                          title="Clique para ver o histórico detalhado de compras deste cliente"
+                        >
+                          <span className="text-[10px] text-neutral-400 flex items-center gap-1">
+                            <ShoppingBag className="w-3 h-3 text-amber-400" />
+                            <span>Total Comprado</span>
+                          </span>
+                          <span className="font-bold text-white group-hover:text-amber-300 font-mono-nums block mt-0.5">
+                            {formatCurrency(pStats.totalSpent, 'PYG')}
+                          </span>
+                          <span className="text-[9px] text-neutral-500 block">
+                            {pStats.count} {pStats.count === 1 ? 'compra' : 'compras'} →
+                          </span>
+                        </button>
+
+                        <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538] flex flex-col justify-center">
+                          <span className="text-[10px] text-neutral-400 flex items-center gap-1">
+                            <Award className="w-3 h-3 text-amber-400" />
+                            <span>Fidelidade</span>
+                          </span>
+                          <span className="font-bold text-amber-400 font-mono-nums block mt-0.5">
+                            {cust.loyaltyPoints} pontos
+                          </span>
+                          {cust.loyaltyPoints >= 50 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLoyalty(cust)}
+                              className="text-[9px] text-amber-300 hover:underline text-left cursor-pointer"
+                            >
+                              Resgatar desconto →
                             </button>
                           )}
                         </div>
                       </div>
 
-                      <div className="font-bold text-white truncate">
-                        Cliente: {chk.customerName}
+                    </div>
+
+                    {/* AÇÕES PRINCIPAIS - 3 BOTÕES CLAROS E ÓBVIOS */}
+                    <div className="pt-3 border-t border-[#1C2538] space-y-2">
+                      <div className="grid grid-cols-3 gap-1.5">
+                        
+                        {/* 1. Receber Pagamento */}
+                        <button
+                          type="button"
+                          disabled={!hasDebt}
+                          onClick={() => handleOpenPayment(cust)}
+                          className={`py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            hasDebt 
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 active:scale-95' 
+                              : 'bg-neutral-800/40 text-neutral-500 cursor-not-allowed'
+                          }`}
+                          title={hasDebt ? 'Receber pagamento ou amortização' : 'Cliente sem débitos pendentes'}
+                        >
+                          <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Receber</span>
+                        </button>
+
+                        {/* 2. Lançar Fiado */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDebt(cust)}
+                          className="py-2 px-1 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95"
+                          title="Lançar nova compra no fiado para este cliente"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>+ Fiado</span>
+                        </button>
+
+                        {/* 3. Extrato */}
+                        <button
+                          type="button"
+                          onClick={() => setStatementCustomer(cust)}
+                          className="py-2 px-1 rounded-xl bg-[#080B12] hover:bg-neutral-800 border border-[#1C2538] text-neutral-200 text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                          title="Ver extrato completo e comprovante térmico"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>Extrato</span>
+                        </button>
+
                       </div>
 
-                      {isFiado && (
-                        <div className="text-[11px] text-rose-200 font-mono-nums">
-                          Anterior: {formatCurrency(chk.previousDebtBrl || 0, 'PYG')} → Novo Saldo: <strong>{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong>
+                      {/* Ações Secundárias (Editar / Excluir) */}
+                      {canManage && (
+                        <div className="flex items-center justify-end gap-2 text-xs pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(cust)}
+                            className="text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Editar</span>
+                          </button>
+                          <span className="text-neutral-600">•</span>
+                          <button
+                            type="button"
+                            onClick={() => setCustomerToDelete(cust)}
+                            className="text-rose-400/80 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Excluir</span>
+                          </button>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[10px] text-neutral-400">
-                      <span>Op: {chk.operatorName} {chk.comandaNumber ? `• #${chk.comandaNumber}` : ''}</span>
-                      {linkedCust && (
-                        <button
-                          type="button"
-                          onClick={() => setStatementCustomer(linkedCust)}
-                          className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
-                        >
-                          Abrir Extrato
-                        </button>
-                      )}
-                    </div>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {customerEntries && customerEntries.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-              {customerEntries.slice(0, 9).map(entry => {
-                const cust = customers.find(c => c.id === entry.customerId);
-                const isDebit = entry.type === 'debito_compra';
-                return (
-                  <div
-                    key={entry.id}
-                    className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2.5 transition-all ${
-                      isDebit
-                        ? 'bg-rose-950/20 border-rose-500/30 hover:border-rose-500/50'
-                        : 'bg-emerald-950/20 border-emerald-500/30 hover:border-emerald-500/50'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                          isDebit ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
-                        }`}>
-                          {isDebit ? 'FIADO / DÉBITO' : 'AMORTIZAÇÃO'}
-                        </span>
-                        {entry.comandaNumber && (
-                          <span className="text-[10px] font-mono font-bold text-amber-300">
-                            #{entry.comandaNumber}
-                          </span>
-                        )}
-                        <span className="text-[11px] font-bold text-white truncate">
-                          {cust?.name || 'Cliente'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-neutral-300 truncate mt-1">
-                        {entry.description}
-                      </p>
-                      <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                        {new Date(entry.date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        {entry.recordedBy ? ` • Op: ${entry.recordedBy}` : ''}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="text-right">
-                        <span className={`text-xs font-mono font-black block ${
-                          isDebit ? 'text-rose-400' : 'text-emerald-400'
-                        }`}>
-                          {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
-                        </span>
-                        <span className="text-[10px] font-mono text-neutral-400 block">
-                          {formatCurrency(entry.amountBrl, 'BRL')}
-                        </span>
-                      </div>
-                      {currentUser?.role === 'admin' && (
-                        <button
-                          type="button"
-                          onClick={() => deleteCustomerEntry(entry.id)}
-                          className="px-2 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                          title="Apagar este registro de Fiado / Conta Corrente (Exclusivo Admin)"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>Apagar</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* MODO TABELA (Rápido, compacto para caixas e balcão) */}
+          {displayMode === 'table' && (
+            <div className="bg-[#0D121E] border border-[#1E273A] rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#080B12] border-b border-[#1E273A] text-neutral-400 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3.5 font-semibold">Cliente</th>
+                      <th className="p-3.5 font-semibold">Contato / WhatsApp</th>
+                      <th className="p-3.5 font-semibold">Categoria</th>
+                      <th className="p-3.5 font-semibold text-right">Saldo Devedor (Fiado)</th>
+                      <th className="p-3.5 font-semibold text-right">Total Comprado</th>
+                      <th className="p-3.5 font-semibold text-center">Ações Rápidas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1C2538]">
+                    {filteredCustomers.map(cust => {
+                      const hasDebt = cust.outstandingBalanceBrl > 0;
+                      const pStats = customerPurchasesStatsMap.get(cust.id) || {
+                        totalSpent: cust.totalSpentBrl || 0,
+                        count: cust.purchaseCount || 0,
+                      };
+                      return (
+                        <tr key={cust.id} className="hover:bg-neutral-800/30 transition-colors">
+                          <td className="p-3.5 font-bold text-white">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[10px] ${
+                                hasDebt ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {getCustomerInitials(cust.name)}
+                              </span>
+                              <span className="truncate max-w-[180px]">{cust.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-3.5 font-mono text-neutral-300">
+                            <div className="flex items-center gap-1.5">
+                              <span>{cust.phone || '—'}</span>
+                              {cust.phone && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsAppNotice(cust)}
+                                  className="text-emerald-400 hover:text-emerald-300"
+                                  title="Enviar no WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <span className="px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 text-[10px] font-semibold uppercase">
+                              {cust.category}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right font-mono font-bold">
+                            <span className={hasDebt ? 'text-rose-400 text-sm' : 'text-emerald-400'}>
+                              {hasDebt ? formatCurrency(cust.outstandingBalanceBrl, 'PYG') : 'R$ 0 (Em dia)'}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-right font-mono text-neutral-300">
+                            <button
+                              type="button"
+                              onClick={() => setPurchasesCustomer(cust)}
+                              className="text-amber-400 hover:underline cursor-pointer"
+                            >
+                              {formatCurrency(pStats.totalSpent, 'PYG')}
+                            </button>
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {hasDebt && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayment(cust)}
+                                  className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer"
+                                  title="Receber Pagamento"
+                                >
+                                  Receber
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDebt(cust)}
+                                className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white font-bold text-[11px] cursor-pointer"
+                                title="Lançar Fiado"
+                              >
+                                + Fiado
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setStatementCustomer(cust)}
+                                className="px-2 py-1 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white font-medium text-[11px] cursor-pointer"
+                                title="Abrir Extrato"
+                              >
+                                Extrato
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(cust)}
+                                className="p-1 rounded-lg text-neutral-400 hover:text-white"
+                                title="Editar Cliente"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
+
+          {/* Estado Vazio de Busca */}
+          {filteredCustomers.length === 0 && (
+            <div className="text-center py-12 bg-[#0D121E]/60 border border-dashed border-[#1E273A] rounded-2xl">
+              <Users className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
+              <h3 className="text-sm font-semibold text-neutral-300">
+                Nenhum cliente encontrado
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+                {search ? 'Tente verificar a ortografia ou limpar os filtros de busca.' : 'Cadastre seus clientes para gerenciar contas de fiado e fidelidade com facilidade.'}
+              </p>
+              {canManage && !search && (
+                <button
+                  onClick={handleOpenCreate}
+                  className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Cadastrar Primeiro Cliente</span>
+                </button>
+              )}
+            </div>
+          )}
+
         </div>
       )}
 
-      {/* KPI Cards - 2 cols on mobile */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        
-        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
-          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Total Clientes' : 'Total Clientes'}</span>
-            <Users className="w-4 h-4 text-amber-400 shrink-0" />
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-white font-mono-nums">
-            {stats.total}
-          </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'En el sistema' : 'Cadastrados no Korizko'}</p>
-        </div>
+      {/* VISÃO 2: ABA DE HISTÓRICO & MOVIMENTAÇÕES (TUDO ORGANIZADO AQUI SEM POLUIR A TELA PRINCIPAL) */}
+      {activeViewTab === 'history' && (
+        <div className="space-y-4">
+          
+          {/* Header e Filtros do Histórico */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3.5 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+              <input
+                id="crm-history-search"
+                name="historySearch"
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Buscar por cliente, comanda ou operador..."
+                className="w-full pl-9 pr-4 py-2 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+              />
+            </div>
 
-        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
-          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Total Fiado (A Cobrar)' : 'Total Fiado (A Receber)'}</span>
-            <DollarSign className="w-4 h-4 text-rose-400 shrink-0" />
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-rose-400 font-mono-nums">
-            {formatCurrency(stats.totalDebtBrl, 'PYG')}
-          </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">
-            Moeda oficial Guaraní (₲ PYG)
-          </p>
-        </div>
-
-        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
-          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Con Deuda' : 'Com Débito'}</span>
-            <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-amber-400 font-mono-nums">
-            {stats.debtorsCount}
-          </div>
-          <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{language === 'es' ? 'Cuentas abiertas' : 'Contas em aberto'}</p>
-        </div>
-
-        <div className="p-3 sm:p-4 rounded-2xl bg-[#0D121E] border border-[#C89B6E]/25">
-          <div className="flex items-center justify-between text-neutral-400 text-xs mb-1">
-            <span className="truncate">{language === 'es' ? 'Total Comprado Geral' : 'Total Comprado (Clientes)'}</span>
-            <ShoppingBag className="w-4 h-4 text-[#C89B6E] shrink-0" />
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-[#F2D6B8] font-mono-nums">
-            {formatCurrency(stats.totalPurchasedAllBrl, 'PYG')}
-          </div>
-          <p className="text-[10px] text-[#C89B6E]/80 mt-0.5 truncate">Histórico consolidado de compras</p>
-        </div>
-
-      </div>
-
-      {/* Painel & Gráfico Financeiro de Análise de Entradas e Saídas + Ranking de Compras por Cliente */}
-      <FinancialPurchasesAnalytics
-        onSelectCustomer={c => setPurchasesCustomer(c)}
-        defaultExpanded={true}
-      />
-
-      {/* Toolbar / Search & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-[#0D121E] border border-[#1E273A]">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-          <input
-            id="crm-search-input"
-            name="crmSearch"
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={language === 'es' ? 'Buscar cliente por nombre, WhatsApp o documento...' : 'Buscar por nome, telefone WhatsApp ou CPF...'}
-            className="w-full pl-9 pr-4 py-2 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
-          {/* Debt toggle filter */}
-          <button
-            type="button"
-            onClick={() => setOnlyDebtors(!onlyDebtors)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer ${
-              onlyDebtors 
-                ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 font-semibold' 
-                : 'bg-[#080B12] border-[#1C2538] text-neutral-400 hover:text-white'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>{language === 'es' ? 'Solo con Deuda' : 'Apenas com Fiado'}</span>
-          </button>
-
-          {/* Category filter */}
-          <select
-            id="crm-category-filter"
-            name="categoryFilter"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-neutral-300 focus:outline-none focus:border-amber-500 shrink-0 cursor-pointer"
-          >
-            <option value="todas">{language === 'es' ? 'Todas las Categorías' : 'Todas as Categorias'}</option>
-            <option value="varejo">{language === 'es' ? 'Venta Mostrador' : 'Varejo (Balcão)'}</option>
-            <option value="mensalista">{language === 'es' ? 'Mensualista (Fiado)' : 'Mensalista (Fiado)'}</option>
-            <option value="empresa">{language === 'es' ? 'Empresa / B2B' : 'Empresa / PJ'}</option>
-            <option value="confeitaria">{language === 'es' ? 'Pastelería' : 'Confeitaria'}</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Customer Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-        {filteredCustomers.map(cust => {
-          const hasDebt = cust.outstandingBalanceBrl > 0;
-          const isOverLimit = cust.creditLimitBrl > 0 && cust.outstandingBalanceBrl > cust.creditLimitBrl;
-          const isBirthdayMonth = cust.birthday && cust.birthday.includes(`/${currentMonthNum}`);
-
-          return (
-            <div 
-              key={cust.id}
-              className={`p-4 sm:p-5 rounded-2xl bg-[#0D121E] border transition-all flex flex-col justify-between ${
-                isOverLimit 
-                  ? 'border-rose-500/40 shadow-lg shadow-rose-950/20' 
-                  : hasDebt 
-                  ? 'border-amber-500/30' 
-                  : 'border-[#1E273A] hover:border-neutral-700'
-              }`}
-            >
-              <div>
-                
-                {/* Header: Name, Badge, Birthday */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="font-bold text-white text-sm tracking-tight truncate">
-                        {cust.name}
-                      </h3>
-                      {isBirthdayMonth && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-bold shrink-0 flex items-center gap-1">
-                          🎂 Aniversário
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-neutral-400 mt-1">
-                      <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
-                      <span className="font-mono">{cust.phone}</span>
-                    </div>
-                  </div>
-
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
-                    cust.category === 'mensalista' 
-                      ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
-                      : cust.category === 'empresa'
-                      ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
-                      : 'bg-neutral-800 text-neutral-300'
-                  }`}>
-                    {cust.category}
-                  </span>
-                </div>
-
-                {/* Financial Balance Card */}
-                <div className={`p-3 rounded-xl mb-3 ${
-                  hasDebt ? 'bg-rose-950/20 border border-rose-900/30' : 'bg-[#080B12] border border-[#1C2538]'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-neutral-400 block font-medium">
-                        {language === 'es' ? 'Saldo Deudor (Fiado)' : 'Saldo Devedor (Fiado)'}
-                      </span>
-                      <div className="flex items-baseline gap-1.5 mt-0.5">
-                        <span className={`text-base sm:text-lg font-black font-mono-nums ${hasDebt ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {formatCurrency(cust.outstandingBalanceBrl, 'PYG')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {hasDebt && (
-                      <button
-                        type="button"
-                        onClick={() => handleSendWhatsAppNotice(cust)}
-                        className="p-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 transition-colors cursor-pointer"
-                        title={language === 'es' ? 'Enviar cobro por WhatsApp' : 'Enviar aviso de cobrança via WhatsApp'}
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Credit limit progress */}
-                  <div className="mt-2 pt-2 border-t border-neutral-800/60 flex items-center justify-between text-[11px] text-neutral-400">
-                    <span>{language === 'es' ? 'Límite de Crédito:' : 'Limite de Crédito:'} <strong>{formatCurrency(cust.creditLimitBrl, 'PYG')}</strong></span>
-                    <span className={isOverLimit ? 'text-rose-400 font-bold' : 'text-neutral-500'}>
-                      {isOverLimit 
-                        ? (language === 'es' ? '¡Límite Excedido!' : 'Limite Excedido!') 
-                        : `${Math.round((cust.outstandingBalanceBrl / (cust.creditLimitBrl || 1)) * 100)}% usado`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Loyalty & Total Spent Stats (Clickable Total Comprado to open Purchase History) */}
-                {(() => {
-                  const pStats = customerPurchasesStatsMap.get(cust.id) || {
-                    totalSpent: cust.totalSpentBrl || 0,
-                    count: cust.purchaseCount || 0,
-                  };
-                  return (
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                      <div className="p-2 rounded-xl bg-[#080B12] border border-[#1C2538] flex flex-col justify-center">
-                        <span className="text-[10px] text-neutral-500 block">{language === 'es' ? 'Fidelidad' : 'Fidelidade'}</span>
-                        <span className="font-bold text-amber-400 font-mono-nums flex items-center justify-center gap-1 mt-0.5">
-                          <Award className="w-3 h-3" />
-                          {cust.loyaltyPoints} pts
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPurchasesCustomer(cust)}
-                        className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all text-center cursor-pointer group"
-                        title="Clique para abrir o Registro de Compras feitas por este cliente"
-                      >
-                        <span className="text-[10px] text-amber-300 font-semibold flex items-center justify-center gap-1">
-                          <ShoppingBag className="w-3 h-3 text-amber-400" />
-                          <span>{language === 'es' ? 'Total Comprado' : 'Total Comprado'}</span>
-                        </span>
-                        <span className="font-black text-white group-hover:text-amber-300 font-mono-nums mt-0.5 block">
-                          {formatCurrency(pStats.totalSpent, 'PYG')}
-                        </span>
-                        <span className="text-[9px] text-amber-400/90 font-semibold block">
-                          {pStats.count} {pStats.count === 1 ? 'compra' : 'compras'} • Ver Registro →
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })()}
-
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+              <div className="flex items-center bg-[#080B12] border border-[#1C2538] rounded-xl p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTypeFilter('all')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    historyTypeFilter === 'all' ? 'bg-amber-500 text-neutral-950 font-bold' : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Todos ({customerEntries?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTypeFilter('debito')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    historyTypeFilter === 'debito' ? 'bg-rose-500 text-white font-bold' : 'text-neutral-400 hover:text-rose-300'
+                  }`}
+                >
+                  Débitos (+ Fiado)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTypeFilter('amortizacao')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    historyTypeFilter === 'amortizacao' ? 'bg-emerald-600 text-white font-bold' : 'text-neutral-400 hover:text-emerald-300'
+                  }`}
+                >
+                  Pagamentos (- Amortizações)
+                </button>
               </div>
 
-              {/* Action Buttons - Designed to never overflow on mobile */}
-              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-3 mt-3 border-t border-[#1C2538]">
-                
-                {/* Left actions */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setPurchasesCustomer(cust)}
-                    className="px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                    title="Ver Registro de Compras do Cliente"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>{language === 'es' ? 'Compras' : 'Compras'}</span>
-                  </button>
+              {currentUser?.role === 'admin' && customerEntries && customerEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => clearAllCustomerEntries()}
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 shrink-0"
+                  title="Limpar todos os registros de fiado (Exclusivo Admin)"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar Histórico</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setStatementCustomer(cust)}
-                    className="px-2.5 py-1.5 rounded-lg border border-[#1C2538] bg-[#080B12] text-neutral-300 hover:text-white hover:bg-neutral-800 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    <span>{language === 'es' ? 'Extracto' : 'Extrato'}</span>
-                  </button>
+          {/* Feed de Checkouts Ativos em tempo real (se houver) */}
+          {activeCheckouts && activeCheckouts.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/20 via-[#0D121E] to-[#121829] border border-amber-500/30 space-y-2">
+              <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
+                <span>Cobranças sendo processadas agora no balcão:</span>
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {activeCheckouts.map(chk => (
+                  <div key={chk.id} className="p-2.5 rounded-xl bg-[#080B12] border border-[#1C2538] flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-white block">{chk.customerName}</span>
+                      <span className="text-[10px] text-neutral-400 block">Op: {chk.operatorName} • {chk.paymentMethod.toUpperCase()}</span>
+                    </div>
+                    <span className="font-mono font-bold text-amber-400">{formatCurrency(chk.amountBrl, 'PYG')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDebt(cust)}
-                    className="px-2.5 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                    title={language === 'es' ? 'Agregar deuda/crédito' : 'Lançar Débito / Fiado (Escolher Moeda)'}
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>{language === 'es' ? '+ Deuda' : '+ Fiado'}</span>
-                  </button>
-                </div>
+          {/* Lista de Registros do Histórico */}
+          <div className="space-y-2">
+            {filteredHistoryEntries.map(entry => {
+              const isDebit = entry.type === 'debito_compra';
+              const cust = customers.find(c => c.id === entry.customerId);
+              return (
+                <div
+                  key={entry.id}
+                  className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between gap-3 transition-all ${
+                    isDebit
+                      ? 'bg-[#0D121E] border-rose-500/30 hover:border-rose-500/50'
+                      : 'bg-[#0D121E] border-emerald-500/30 hover:border-emerald-500/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                      isDebit ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'
+                    }`}>
+                      {isDebit ? <Plus className="w-4 h-4 stroke-[3]" /> : <Check className="w-4 h-4 stroke-[3]" />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                          isDebit ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          {isDebit ? 'FIADO / DÉBITO' : 'PAGAMENTO / AMORTIZAÇÃO'}
+                        </span>
+                        <span className="font-bold text-white text-xs truncate">
+                          {cust?.name || (entry as any).customerName || 'Cliente'}
+                        </span>
+                        {entry.comandaNumber && (
+                          <span className="font-mono text-[10px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                            #{entry.comandaNumber}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-neutral-300 mt-1 truncate">
+                        {entry.description}
+                      </p>
+                      <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                        {new Date(entry.date).toLocaleString('pt-BR')} {entry.recordedBy ? `• Operador: ${entry.recordedBy}` : ''}
+                      </p>
+                    </div>
+                  </div>
 
-                {/* Right actions */}
-                <div className="flex items-center gap-1.5">
-                  {canManage && (
-                    <>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <span className={`text-sm font-mono font-black block ${
+                        isDebit ? 'text-rose-400' : 'text-emerald-400'
+                      }`}>
+                        {isDebit ? '+' : '-'}{formatCurrency(entry.amountBrl, 'PYG')}
+                      </span>
+                      {cust && (
+                        <button
+                          type="button"
+                          onClick={() => setStatementCustomer(cust)}
+                          className="text-[10px] text-amber-400 hover:underline block cursor-pointer"
+                        >
+                          Ver Extrato
+                        </button>
+                      )}
+                    </div>
+
+                    {currentUser?.role === 'admin' && (
                       <button
                         type="button"
-                        onClick={() => handleOpenEdit(cust)}
-                        className="p-1.5 rounded-lg border border-[#1C2538] text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition-colors cursor-pointer"
-                        title={language === 'es' ? 'Editar Cliente' : 'Editar Cliente'}
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerToDelete(cust)}
-                        className="p-1.5 rounded-lg border border-[#1C2538] text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors cursor-pointer"
-                        title={language === 'es' ? 'Eliminar Cliente' : 'Excluir Cliente'}
+                        onClick={() => deleteCustomerEntry(entry.id)}
+                        className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
+                        title="Apagar este lançamento (Exclusivo Admin)"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                    </>
-                  )}
-
-                  {hasDebt && (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenPayment(cust)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-95"
-                    >
-                      <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>{language === 'es' ? 'Amortizar' : 'Amortizar'}</span>
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
+              );
+            })}
+
+            {filteredHistoryEntries.length === 0 && (
+              <div className="text-center py-12 bg-[#0D121E]/60 border border-dashed border-[#1E273A] rounded-2xl">
+                <BookOpen className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
+                <h3 className="text-sm font-semibold text-neutral-300">
+                  Nenhum lançamento encontrado
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Movimentações de fiado e pagamentos aparecerão automaticamente aqui.
+                </p>
               </div>
+            )}
+          </div>
 
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredCustomers.length === 0 && (
-        <div className="text-center py-12 bg-[#0D121E]/60 border border-dashed border-[#1E273A] rounded-2xl">
-          <Users className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-neutral-300">
-            {language === 'es' ? 'Ningún cliente encontrado' : 'Nenhum cliente encontrado'}
-          </h3>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-            {search ? 'Tente verificar a ortografia ou limpar os filtros.' : 'Cadastre seus clientes para gerenciar contas de fiado e fidelidade.'}
-          </p>
-          {canManage && !search && (
-            <button
-              onClick={handleOpenCreate}
-              className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs inline-flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{language === 'es' ? 'Registrar Primer Cliente' : 'Cadastrar Primeiro Cliente'}</span>
-            </button>
-          )}
         </div>
       )}
 
