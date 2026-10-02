@@ -853,15 +853,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
-                {language === 'es' ? 'Gestión de Clientes & Fiado' : 'CRM & Gestão de Clientes'}
-              </h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Radio className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
-                Tempo Real
-              </span>
-            </div>
+            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+              {language === 'es' ? 'Gestión de Clientes & Fiado' : 'CRM & Gestão de Clientes'}
+            </h1>
             <p className="text-xs text-neutral-400 mt-0.5 truncate">
               Korizko • Panificação confeitaria artesanal — Controle simplificado de clientes, fiado e pagamentos
             </p>
@@ -1032,15 +1026,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
               <BookOpen className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-black text-white tracking-tight uppercase">
-                  Registros de Fiados & Entradas (Tempo Real)
-                </h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                  Ao Vivo na Tela
-                </span>
-              </div>
+              <h2 className="text-sm sm:text-base font-black text-white tracking-tight uppercase">
+                Registros de Fiados & Entradas
+              </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
                 Todas as compras no fiado e pagamentos que entraram no caixa com data, comanda e operador
               </p>
@@ -3085,7 +3073,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
           <div className="text-center pb-4 border-b border-black mb-4">
             <h1 className="text-xl font-extrabold uppercase tracking-wide">KORIZKO</h1>
             <p className="text-sm font-bold">Panificação confeitaria artesanal</p>
-            <p className="text-xs text-neutral-600">Sistema Integrado de Gestão, Comandas em Tempo Real & Contas a Receber</p>
+            <p className="text-xs text-neutral-600">Sistema Integrado de Gestão, Comandas & Contas a Receber</p>
             <h2 className="text-sm font-bold uppercase mt-2 border-t border-b border-black py-1">
               Extrato de Conta Corrente & Fiado
             </h2>

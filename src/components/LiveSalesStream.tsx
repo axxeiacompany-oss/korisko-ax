@@ -410,7 +410,7 @@ export const LiveSalesStream: React.FC<Props> = ({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-rose-400" />
-              <span>Últimos Registros na Tabela de Fiado & Conta Corrente (Tempo Real)</span>
+              <span>Últimos Registros na Tabela de Fiado & Conta Corrente</span>
             </span>
 
             <div className="flex items-center gap-2">

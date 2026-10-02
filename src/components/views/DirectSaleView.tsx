@@ -245,15 +245,9 @@ export const DirectSaleView: React.FC<Props> = ({ onSaleCompleted }) => {
             </div>
           </div>
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base sm:text-xl font-black text-white tracking-tight">
-                {t.directSaleTitle}
-              </h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Radio className="w-2.5 h-2.5 animate-pulse" />
-                Tempo Real
-              </span>
-            </div>
+            <h1 className="text-base sm:text-xl font-black text-white tracking-tight">
+              {t.directSaleTitle}
+            </h1>
             <p className="text-xs text-neutral-400">
               Korizko • Panificação confeitaria artesanal — Cobrança e Fiado sincronizados na hora
             </p>
