@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useBakery } from '../../context/BakeryContext';
-import { Product, ProductCategory, CartItem, Sale, Comanda } from '../../types';
+import { Product, ProductCategory, CartItem, Sale, Comanda, PaymentMethod } from '../../types';
 import { formatCurrency } from '../../utils/currency';
 import { 
   Search, 

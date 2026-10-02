@@ -203,6 +203,8 @@ interface BakeryContextType {
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
       updateDebtorBalance?: boolean;
       appendItems?: boolean;
+      isFiado?: boolean;
+      intendedPaymentMethod?: string;
     }
   ) => Comanda;
   updateComandaStatus: (comandaId: string, status: ComandaStatus, setorResponsavel?: SetorResponsavel) => void;
@@ -2038,6 +2040,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       source?: 'pdv' | 'loja_online' | 'cliente_direto';
       updateDebtorBalance?: boolean;
       appendItems?: boolean;
+      isFiado?: boolean;
+      intendedPaymentMethod?: string;
     }
   ): Comanda => {
     const nowIso = new Date().toISOString();

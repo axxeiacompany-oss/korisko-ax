@@ -308,6 +308,11 @@ export const PaymentModal: React.FC<Props> = ({
     setInputAmount(remainingBrl.toString());
   };
 
+  const handleQuickAddBill = (bill: number) => {
+    const current = parseFloat(inputAmount) || 0;
+    setInputAmount((current + bill).toString());
+  };
+
   const handlePayFullInCurrency = (_cur?: Currency) => {
     if (remainingBrl <= 0) return;
 
