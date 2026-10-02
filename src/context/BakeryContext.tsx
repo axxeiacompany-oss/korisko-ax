@@ -1485,7 +1485,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [liveRateStatus, setLiveRateStatus] = useState<LiveRateStatus>({
     isFetching: false,
     lastFetchedAt: null,
-    provider: 'AwesomeAPI Mercados (Ao Vivo)',
+    provider: 'Câmbio em Tempo Real (Guaraní / Real / Dólar)',
     autoRefresh: true,
     status: 'idle',
   });
