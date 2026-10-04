@@ -850,7 +850,7 @@ export async function rpcAjustarSaldoCliente(p_id: string, p_valor: number): Pro
       throw new Error(`[RPC ajustar_saldo_cliente falhou]: ${error.message}`);
     }
 
-    if (typeof data === 'number') {
+    if (typeof data === 'number' && !isNaN(data)) {
       return data;
     }
     if (data && typeof data.outstanding_balance_brl === 'number') {
@@ -859,7 +859,22 @@ export async function rpcAjustarSaldoCliente(p_id: string, p_valor: number): Pro
     if (data && typeof data.novo_saldo === 'number') {
       return data.novo_saldo;
     }
-    return Number(data) || 0;
+    if (typeof data === 'string' && data.trim() !== '' && !isNaN(Number(data))) {
+      return Number(data);
+    }
+
+    // If the SQL function returns VOID (null) or didn't find the row, read the actual balance from clientes
+    const { data: custRow, error: custErr } = await supabase
+      .from('clientes')
+      .select('outstanding_balance_brl')
+      .eq('id', p_id)
+      .maybeSingle();
+
+    if (!custErr && custRow && custRow.outstanding_balance_brl !== undefined && custRow.outstanding_balance_brl !== null) {
+      return Number(custRow.outstanding_balance_brl);
+    }
+
+    throw new Error('[RPC ajustar_saldo_cliente]: Cliente não encontrado ou retorno vazio.');
   })();
 
   return await withDbTimeout(doRpc, 5000, 'Tempo limite no RPC ajustar_saldo_cliente');
@@ -1000,7 +1015,32 @@ export async function upsertComandaDb(c: Comanda): Promise<Comanda | null> {
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error || !data) return null;
+
+    if (error) {
+      const {
+        setores_envolvidos,
+        confirmed_by_customer,
+        confirmed_at,
+        customer_phone,
+        source,
+        ...coreRow
+      } = row;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('comandas')
+        .upsert(coreRow, { onConflict: 'id' })
+        .select()
+        .single();
+      if (fallbackErr || !fallbackData) return null;
+      return rowToComanda({
+        ...fallbackData,
+        ...c,
+        debt_applied_brl: c.debtAppliedBrl ?? (c.customerId ? c.totalBrl : 0),
+        previous_debt_brl: c.previousDebtBrl,
+        resulting_debt_brl: c.resultingDebtBrl,
+      });
+    }
+
+    if (!data) return null;
     return rowToComanda({
       ...data,
       debt_applied_brl: c.debtAppliedBrl ?? (c.customerId ? c.totalBrl : 0),
@@ -1166,9 +1206,33 @@ export async function upsertLancamentoFiadoDb(e: CustomerAccountEntry): Promise<
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error || !data) return null;
+
+    if (error) {
+      const {
+        previous_balance_brl,
+        resulting_balance_brl,
+        setor_responsavel,
+        confirmed_by_customer,
+        comanda_number,
+        customer_name,
+        ...coreRow
+      } = row;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('lancamentos_fiado')
+        .upsert(coreRow, { onConflict: 'id' })
+        .select()
+        .single();
+      if (fallbackErr || !fallbackData) {
+        console.warn('[Supabase lancamentos_fiado fallback error]:', fallbackErr?.message || error.message);
+        return null;
+      }
+      return rowToFiadoEntry({ ...fallbackData, ...row });
+    }
+
+    if (!data) return null;
     return rowToFiadoEntry(data);
-  } catch {
+  } catch (err) {
+    console.warn('[Supabase lancamentos_fiado exception]:', err);
     return null;
   }
 }
@@ -1243,7 +1307,26 @@ export async function upsertFluxoCobrancaDb(s: ActiveCheckoutSession): Promise<A
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error || !data) return null;
+
+    if (error) {
+      const {
+        previous_debt_brl,
+        projected_debt_brl,
+        setor_responsavel,
+        items_summary,
+        sale_id,
+        ...coreRow
+      } = row;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('fluxo_cobrancas_tempo_real')
+        .upsert(coreRow, { onConflict: 'id' })
+        .select()
+        .single();
+      if (fallbackErr || !fallbackData) return null;
+      return rowToCheckoutSession({ ...fallbackData, ...row });
+    }
+
+    if (!data) return null;
     return rowToCheckoutSession(data);
   } catch {
     return null;
@@ -1369,34 +1452,46 @@ export async function upsertSaldoDevedorTempoRealDb(d: LiveDebtorBalanceRecord):
       .single();
 
     if (error) {
-      // Only fallback to core columns if database explicitly rejects non-existent columns (code 42703)
-      if (error.code === '42703' || (error.message && error.message.toLowerCase().includes('column'))) {
-        const {
-          open_comandas_count,
-          last_entry_description,
-          last_payment_date,
-          last_purchase_date,
-          status_cobranca,
-          last_comanda_id,
-          available_credit_brl,
-          open_comandas_total_brl,
-          last_operation_amount_brl,
-          ...coreRow
-        } = row;
-        const { data: fallbackData, error: fallbackErr } = await supabase
+      const {
+        open_comandas_count,
+        last_entry_description,
+        last_payment_date,
+        last_purchase_date,
+        status_cobranca,
+        last_comanda_id,
+        available_credit_brl,
+        open_comandas_total_brl,
+        last_operation_amount_brl,
+        ...coreRow
+      } = row;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('saldos_devedores_tempo_real')
+        .upsert(coreRow, { onConflict: 'customer_id' })
+        .select()
+        .single();
+      if (fallbackErr) {
+        // Second-level minimal fallback with last_comanda_amount_brl if needed
+        const minimalRow: any = {
+          customer_id: d.customerId,
+          customer_name: d.customerName,
+          customer_phone: d.customerPhone || null,
+          previous_balance_brl: Number(d.previousBalanceBrl) || 0,
+          current_debt_balance_brl: currentDebt,
+          credit_limit_brl: Number(d.creditLimitBrl) || 500000,
+          updated_at: d.updatedAt || new Date().toISOString(),
+        };
+        const { data: minData, error: minErr } = await supabase
           .from('saldos_devedores_tempo_real')
-          .upsert(coreRow, { onConflict: 'customer_id' })
+          .upsert(minimalRow, { onConflict: 'customer_id' })
           .select()
           .single();
-        if (fallbackErr) {
+        if (minErr || !minData) {
           console.warn('[Supabase saldos_devedores fallback error]:', fallbackErr.message);
           return null;
         }
-        return rowToLiveDebtorBalance({ ...fallbackData, ...d });
+        return rowToLiveDebtorBalance({ ...minData, ...row, ...d });
       }
-
-      console.warn('[Supabase saldos_devedores error]:', error.message);
-      return null;
+      return rowToLiveDebtorBalance({ ...fallbackData, ...row, ...d });
     }
     return rowToLiveDebtorBalance(data);
   } catch (err) {
@@ -1616,7 +1711,28 @@ export async function upsertRegistroCompraClienteDb(p: CustomerPurchaseRecord): 
       .upsert(row, { onConflict: 'id' })
       .select()
       .single();
-    if (error || !data) return null;
+
+    if (error) {
+      const {
+        estimated_cost_brl,
+        flow_type,
+        setor_responsavel,
+        notes,
+        sale_number,
+        comanda_number,
+        customer_phone,
+        ...coreRow
+      } = row;
+      const { data: fallbackData, error: fallbackErr } = await supabase
+        .from('registro_compras_clientes')
+        .upsert(coreRow, { onConflict: 'id' })
+        .select()
+        .single();
+      if (fallbackErr || !fallbackData) return null;
+      return rowToCustomerPurchase({ ...fallbackData, ...row });
+    }
+
+    if (!data) return null;
     return rowToCustomerPurchase(data);
   } catch {
     return null;

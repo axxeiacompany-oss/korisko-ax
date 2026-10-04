@@ -164,6 +164,13 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
       ? autoDetectedSector.primary
       : selectedSetor;
 
+    const hasLinkedDebtor = Boolean(
+      chosenCustomer ||
+      (customerName.trim() && customerName.trim().toLowerCase() !== 'cliente balcão') ||
+      existingOpenComanda?.customerId ||
+      (existingOpenComanda?.customerName && existingOpenComanda.customerName.trim().toLowerCase() !== 'cliente balcão')
+    );
+
     const saved = saveComanda(
       comandaNumber.trim(),
       effectiveCart,
@@ -177,6 +184,7 @@ export const ComandasModal: React.FC<ComandasModalProps> = ({
         confirmedByCustomer: true,
         source: 'pdv',
         appendItems: isAppendingToExisting,
+        updateDebtorBalance: hasLinkedDebtor,
       }
     );
 

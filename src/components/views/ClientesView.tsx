@@ -129,11 +129,11 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
   // Save Customer (Create or Edit)
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formPhone.trim()) {
+    if (!formName.trim()) {
       showToast(
         language === 'es' 
-          ? 'Nombre y Teléfono/WhatsApp son obligatorios.' 
-          : 'Nome e WhatsApp/Telefone são campos obrigatórios.',
+          ? 'El nombre del cliente es obligatorio.' 
+          : 'O nome do cliente é obrigatório.',
         'error'
       );
       return;
