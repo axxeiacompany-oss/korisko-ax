@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useBakery } from '../context/BakeryContext';
 import { Sale } from '../types';
+import { formatSetorName } from '../lib/db';
 import { 
   Zap, 
   Clock, 
@@ -18,7 +19,8 @@ import {
   ShieldCheck,
   UserCheck,
   Landmark,
-  RotateCcw
+  RotateCcw,
+  UtensilsCrossed
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { ReceiptModal } from './modals/ReceiptModal';
@@ -37,13 +39,17 @@ export const LiveSalesStream: React.FC<Props> = ({
 }) => {
   const {
     sales,
+    openComandas,
     activeCheckouts,
     customerEntries,
+    customers,
+    liveDebtorBalances,
     language,
     currentUser,
     deleteCustomerEntry,
     clearAllCustomerEntries,
     clearCheckoutSession,
+    removeComanda,
     zeroAllNumbersForRealTest,
   } = useBakery();
   const isAdmin = currentUser.role === 'admin';
@@ -51,6 +57,7 @@ export const LiveSalesStream: React.FC<Props> = ({
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [confirmZeroAll, setConfirmZeroAll] = useState<boolean>(false);
+  const [confirmClearFiado, setConfirmClearFiado] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [filterPeriod, setFilterPeriod] = useState<'today' | 'all'>('all');
   const [nowTime, setNowTime] = useState<number>(Date.now());
@@ -101,49 +108,111 @@ export const LiveSalesStream: React.FC<Props> = ({
     prevEntriesLengthRef.current = (customerEntries || []).length;
   }, [sales.length, customerEntries]);
 
-  // Today string for filtering
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Helper to check if a timestamp belongs to the current local day
+  const isSameLocalDay = (isoDate?: string) => {
+    if (!isoDate) return false;
+    const d = new Date(isoDate);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date(nowTime);
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
 
   // Active live checkouts and launched comandas happening right now ("na hora de cobrar / lançar comanda")
   const liveInProgressCheckouts = useMemo(() => {
     return (activeCheckouts || []).filter(c => {
       if (c.status !== 'em_cobranca' && c.status !== 'comanda_lancada') return false;
       const ageSec = (nowTime - new Date(c.updatedAt).getTime()) / 1000;
-      return ageSec < 900; // active within last 15 min
+      return ageSec < 1800; // active within last 30 min
     });
   }, [activeCheckouts, nowTime]);
 
-  // Filtered sales stream sorted latest first
+  // Active open comandas sorted latest first
+  const activeComandasList = useMemo(() => {
+    const list = (openComandas || []).filter(
+      c => c.status !== 'pago' && c.status !== 'cancelado'
+    );
+    return list
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt || b.openedAt).getTime() - new Date(a.updatedAt || a.openedAt).getTime());
+  }, [openComandas]);
+
+  // Filtered sales stream sorted latest first (explicit descending timestamp sort, NOT .reverse()!)
   const streamSales = useMemo(() => {
-    let list = sales.filter(s => s.status === 'completed');
+    let list = (sales || []).filter(s => s && s.status === 'completed');
     if (filterPeriod === 'today') {
-      list = list.filter(s => s.timestamp.startsWith(todayStr));
+      list = list.filter(s => isSameLocalDay(s.timestamp));
     }
-    return list.slice().reverse();
-  }, [sales, filterPeriod, todayStr]);
+    return list
+      .slice()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [sales, filterPeriod, nowTime]);
 
-  // Recent Fiado entries today
+  // Recent Fiado entries sorted latest first
   const recentFiadoEntries = useMemo(() => {
-    let list = customerEntries || [];
+    let list = (customerEntries || []).slice();
     if (filterPeriod === 'today') {
-      list = list.filter(e => (e.date || '').startsWith(todayStr));
+      list = list.filter(e => isSameLocalDay(e.date));
     }
-    return list.slice(0, 8);
-  }, [customerEntries, filterPeriod, todayStr]);
+    return list
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 12);
+  }, [customerEntries, filterPeriod, nowTime]);
 
-  // Stream metrics
-  const totalRevenue = useMemo(() => {
-    return streamSales.reduce((acc, s) => acc + s.totalBrl, 0);
+  // Stream metrics (Sales + Open Comandas + Fiado / Debtors)
+  const totalSalesRevenue = useMemo(() => {
+    return streamSales.reduce((acc, s) => acc + (Number(s.totalBrl) || 0), 0);
   }, [streamSales]);
 
-  const totalFiadoToday = useMemo(() => {
-    return streamSales.reduce((acc, s) => {
+  const totalOpenComandasBrl = useMemo(() => {
+    return activeComandasList.reduce((acc, c) => {
+      const cmdSum = c.totalBrl !== undefined && Number(c.totalBrl) > 0
+        ? Number(c.totalBrl)
+        : (c.items || []).reduce((s, it) => s + (Number(it.subtotalBrl) || (Number(it.unitPriceBrl || it.product?.priceBrl || 0) * Number(it.quantity || 1))), 0);
+      return acc + cmdSum;
+    }, 0);
+  }, [activeComandasList]);
+
+  const totalRevenue = totalSalesRevenue;
+
+  const totalFiadoRegistered = useMemo(() => {
+    // Sum from sales in period
+    const fiadoFromSales = streamSales.reduce((acc, s) => {
       const fiadoPart = (s.payments || [])
-        .filter(p => p.method === 'fiado')
-        .reduce((sum, p) => sum + p.equivalentBrl, 0);
+        .filter(p => p && p.method === 'fiado')
+        .reduce((sum, p) => sum + (Number(p.equivalentBrl ?? p.amountReceived) || 0), 0);
       return acc + fiadoPart;
     }, 0);
-  }, [streamSales]);
+
+    // Sum from customerEntries (debito_compra) that are not already counted via saleId
+    const countedSaleIds = new Set(streamSales.map(s => s.id));
+    const entriesList = filterPeriod === 'today'
+      ? (customerEntries || []).filter(e => isSameLocalDay(e.date))
+      : (customerEntries || []);
+
+    const extraFiadoEntries = entriesList
+      .filter(e => e && e.type === 'debito_compra' && (!e.saleId || !countedSaleIds.has(e.saleId)))
+      .reduce((acc, e) => acc + (Number(e.amountBrl) || 0), 0);
+
+    const combinedFiado = fiadoFromSales + extraFiadoEntries;
+
+    if (filterPeriod === 'all') {
+      const totalOutstandingCustomers = (customers || []).reduce(
+        (acc, c) => acc + (Number(c.outstandingBalanceBrl) || 0),
+        0
+      );
+      const totalLiveDebtors = (liveDebtorBalances || []).reduce(
+        (acc, d) => acc + (Number(d.currentDebtBalanceBrl) || 0),
+        0
+      );
+      return Math.max(combinedFiado, totalOutstandingCustomers, totalLiveDebtors);
+    }
+
+    return combinedFiado;
+  }, [streamSales, customerEntries, customers, liveDebtorBalances, filterPeriod, nowTime]);
 
   const salesCount = streamSales.length;
 
@@ -372,7 +441,7 @@ export const LiveSalesStream: React.FC<Props> = ({
         )}
 
         {/* Live Counters Banner */}
-        <div className="grid grid-cols-3 gap-2.5 my-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-3.5">
           <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex flex-col">
             <span className="text-[10px] text-neutral-400 uppercase font-semibold tracking-wider">
               {language === 'es' ? 'Ventas en el Flujo' : 'Vendas no Fluxo'}
@@ -394,16 +463,95 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
           </div>
 
+          <div className="p-3 rounded-xl bg-neutral-950 border border-amber-500/25 flex flex-col">
+            <span className="text-[10px] text-amber-300 uppercase font-bold tracking-wider flex items-center gap-1">
+              <UtensilsCrossed className="w-3 h-3 text-amber-400" />
+              Comandas Abertas ({activeComandasList.length})
+            </span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg font-black text-amber-300 font-mono-nums">{formatCurrency(totalOpenComandasBrl, 'PYG')}</span>
+            </div>
+          </div>
+
           <div className="p-3 rounded-xl bg-neutral-950 border border-rose-500/30 flex flex-col">
             <span className="text-[10px] text-rose-300 uppercase font-bold tracking-wider flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-rose-400" />
-              Fiado Registrado Hoje
+              {filterPeriod === 'today' ? 'Fiado Hoje' : 'Fiado & Caderneta'}
             </span>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg font-black text-rose-400 font-mono-nums">{formatCurrency(totalFiadoToday, 'PYG')}</span>
+              <span className="text-lg font-black text-rose-400 font-mono-nums">{formatCurrency(totalFiadoRegistered, 'PYG')}</span>
             </div>
           </div>
         </div>
+
+        {/* Active Open Comandas in Shift */}
+        {activeComandasList.length > 0 && (
+          <div className="mb-3.5 p-3.5 rounded-xl bg-neutral-950/90 border border-amber-500/30 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
+                <span>Comandas em Andamento no Turno ({activeComandasList.length})</span>
+              </span>
+              {onNavigateToPdv && (
+                <button
+                  type="button"
+                  onClick={onNavigateToPdv}
+                  className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                >
+                  Cobrar no PDV →
+                </button>
+              )}
+            </div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {activeComandasList.map(cmd => {
+                const cmdTotal = cmd.totalBrl !== undefined && Number(cmd.totalBrl) > 0
+                  ? Number(cmd.totalBrl)
+                  : (cmd.items || []).reduce((s, it) => s + (Number(it.subtotalBrl) || (Number(it.unitPriceBrl || it.product?.priceBrl || 0) * Number(it.quantity || 1))), 0);
+                return (
+                  <div
+                    key={cmd.id}
+                    className="p-2.5 rounded-lg bg-[#080B12] border border-amber-500/25 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black font-mono-nums">
+                          Comanda #{cmd.number}
+                        </span>
+                        <span className="font-bold text-white">
+                          {cmd.customerName || 'Cliente Balcão'}
+                        </span>
+                        <span className="text-[10px] text-emerald-400 font-semibold">
+                          Setor: {formatSetorName(cmd.setorResponsavel)}
+                        </span>
+                        <span className="text-[10px] text-neutral-400 font-mono-nums">
+                          {getRelativeTime(cmd.updatedAt || cmd.openedAt)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-neutral-400 truncate">
+                        {(cmd.items || []).map(i => `${i.quantity}x ${i.product?.name || (i as any).name || 'Item'}`).join(', ')}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                      <span className="font-mono-nums font-black text-amber-400">
+                        {formatCurrency(cmdTotal, 'PYG')}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => removeComanda(cmd.id)}
+                          className="p-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 text-[10px] cursor-pointer"
+                          title="Cancelar Comanda"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Recent Real-Time Fiado & Amortization Ledger Entries with Full Delete & Zero Controls */}
         <div className="mb-3.5 p-3.5 rounded-xl bg-neutral-950/90 border border-neutral-800 space-y-2.5">
@@ -419,15 +567,38 @@ export const LiveSalesStream: React.FC<Props> = ({
               </span>
 
               {isAdmin && recentFiadoEntries.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => clearAllCustomerEntries()}
-                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Apagar todos os registros da Tabela de Fiado & Conta Corrente (Exclusivo Admin)"
-                >
-                  <Trash2 className="w-3 h-3 text-rose-400" />
-                  <span>Apagar Todos</span>
-                </button>
+                !confirmClearFiado ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearFiado(true)}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Apagar todos os registros da Tabela de Fiado & Conta Corrente (Exclusivo Admin)"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-400" />
+                    <span>Apagar Todos</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 bg-rose-950/70 border border-rose-500/50 rounded-lg px-2 py-0.5">
+                    <span className="text-[10px] font-bold text-rose-200">Confirmar?</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllCustomerEntries();
+                        setConfirmClearFiado(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                    >
+                      Sim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClearFiado(false)}
+                      className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] cursor-pointer"
+                    >
+                      Não
+                    </button>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -534,14 +705,16 @@ export const LiveSalesStream: React.FC<Props> = ({
             </div>
           ) : (
             streamSales.map((sale, idx) => {
-              const hasFiado = (sale.payments || []).some(p => p.method === 'fiado');
+              const paymentsList = Array.isArray(sale.payments) ? sale.payments : [];
+              const hasFiado = paymentsList.some(p => p && p.method === 'fiado');
               const payment = hasFiado
-                ? sale.payments.find(p => p.method === 'fiado')!
-                : (sale.payments[0] || { method: 'dinheiro', currency: 'PYG', amountReceived: sale.totalBrl });
+                ? paymentsList.find(p => p && p.method === 'fiado')!
+                : (paymentsList[0] || { method: 'dinheiro', currency: 'PYG', amountReceived: sale.totalBrl });
               const badge = getPaymentBadge(payment.method);
               const BadgeIcon = badge.icon;
               const relativeTime = getRelativeTime(sale.timestamp);
               const isRecent = idx === 0;
+              const saleItems = Array.isArray(sale.items) ? sale.items : [];
 
               return (
                 <div
@@ -557,7 +730,7 @@ export const LiveSalesStream: React.FC<Props> = ({
                   {/* Left Column: Number, Seller, Time, Items */}
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0 text-xs font-bold text-neutral-200 font-mono-nums">
-                      #{sale.saleNumber || sale.id.slice(-4)}
+                      #{sale.saleNumber || (sale.id || '').slice(-4)}
                     </div>
 
                     <div className="space-y-1">
@@ -591,13 +764,13 @@ export const LiveSalesStream: React.FC<Props> = ({
 
                       {/* Items Preview */}
                       <div className="flex flex-wrap gap-1.5 text-[11px] text-neutral-400">
-                        {sale.items.map((item, itemIdx) => (
+                        {saleItems.map((item, itemIdx) => (
                           <span 
                             key={itemIdx} 
                             className="inline-flex items-center px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300"
                           >
                             <strong className="text-amber-400 mr-1 font-mono-nums">{item.quantity}x</strong> 
-                            {item.product.name}
+                            {item.product?.name || (item as any).productName || (item as any).name || 'Produto'}
                           </span>
                         ))}
                       </div>

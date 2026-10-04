@@ -56,22 +56,34 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
   const [inspectSale, setInspectSale] = useState<Sale | null>(null);
   const [purchasesCustomer, setPurchasesCustomer] = useState<Customer | null>(null);
 
-  // Filter today's sales
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // Filter today's sales using local timezone day
   const todaySales = useMemo(() => {
-    return sales.filter(s => s.status === 'completed' && s.timestamp.startsWith(todayStr));
-  }, [sales, todayStr]);
+    const now = new Date();
+    return (sales || []).filter(s => {
+      if (!s || s.status !== 'completed' || !s.timestamp) return false;
+      const d = new Date(s.timestamp);
+      if (isNaN(d.getTime())) return false;
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    });
+  }, [sales]);
 
   // Operational stats
   const openComandasTotalBrl = useMemo(() => {
-    return openComandas.reduce((sum, cmd) => {
-      return sum + cmd.items.reduce((acc, it) => acc + it.subtotalBrl, 0);
+    return (openComandas || []).reduce((sum, cmd) => {
+      const cmdTotal = cmd.totalBrl !== undefined && Number(cmd.totalBrl) > 0
+        ? Number(cmd.totalBrl)
+        : (cmd.items || []).reduce((acc, it) => acc + (Number(it.subtotalBrl) || 0), 0);
+      return sum + cmdTotal;
     }, 0);
   }, [openComandas]);
 
   // Financial stats for today
   const todayRevenueBrl = useMemo(() => {
-    return todaySales.reduce((sum, s) => sum + s.totalBrl, 0);
+    return todaySales.reduce((sum, s) => sum + (Number(s.totalBrl) || 0), 0);
   }, [todaySales]);
 
   // Breakdown of today's payments by currency
@@ -81,7 +93,8 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
     let usdTotal = 0;
 
     todaySales.forEach(s => {
-      s.payments.forEach(p => {
+      (s.payments || []).forEach(p => {
+        if (!p) return;
         if (p.currency === 'BRL') brlTotal += p.amountReceived;
         if (p.currency === 'PYG') pygTotal += p.amountReceived;
         if (p.currency === 'USD') usdTotal += p.amountReceived;
@@ -97,8 +110,8 @@ export const DashboardView: React.FC<Props> = ({ onNavigate }) => {
   const todayGrossProfit = useMemo(() => {
     let totalCost = 0;
     todaySales.forEach(s => {
-      s.items.forEach(it => {
-        totalCost += (it.product.costPriceBrl || 0) * it.quantity;
+      (s.items || []).forEach(it => {
+        totalCost += (Number(it.product?.costPriceBrl) || 0) * (Number(it.quantity) || 1);
       });
     });
     return Math.max(0, todayRevenueBrl - totalCost);
