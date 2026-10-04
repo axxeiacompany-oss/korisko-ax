@@ -119,9 +119,10 @@ export const PaymentModal: React.FC<Props> = ({
   const [inputAmount, setInputAmount] = useState<string>('');
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
 
-  // Reset modal state whenever opened
+  // Reset modal state ONLY when modal transitions from closed to open
+  const prevIsOpenRef = useRef<boolean>(false);
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       checkoutSessionIdRef.current = `chk-pdv-${Date.now()}`;
       setPayments([]);
       setInputAmount('');
@@ -141,6 +142,7 @@ export const PaymentModal: React.FC<Props> = ({
       setShowQuickAddCustomer(false);
       setIsFinishing(false);
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen, initialCustomerName, initialPaymentMethod, customers]);
 
   // Preferred currency for change (Guaraní ₲)
@@ -273,15 +275,27 @@ export const PaymentModal: React.FC<Props> = ({
     setLoyaltyDiscountBrl(discount);
   };
 
+  const resolveEffectiveCustomerName = () => {
+    return (
+      selectedCustomer?.name ||
+      customerName.trim() ||
+      quickCustName.trim() ||
+      linkedComanda?.customerName ||
+      ''
+    );
+  };
+
   const handleAddPayment = () => {
-    const val = parseFloat(inputAmount);
+    const parsed = parseFloat(inputAmount);
+    const val = (!parsed || parsed <= 0) ? remainingBrl : parsed;
     if (!val || val <= 0) return;
 
-    if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+    const effName = resolveEffectiveCustomerName();
+    if (selectedMethod === 'fiado' && !selectedCustomerId && !effName) {
       showToast(
         language === 'es'
           ? 'Para registrar en Fiado, seleccione o escriba el nombre del cliente arriba.'
-          : 'Para lançar no Fiado sem perdas, selecione ou digite o nome do cliente acima.',
+          : 'Para lançar no Fiado, selecione ou digite o nome do cliente no campo acima.',
         'error'
       );
       return;
@@ -316,11 +330,12 @@ export const PaymentModal: React.FC<Props> = ({
   const handlePayFullInCurrency = (_cur?: Currency) => {
     if (remainingBrl <= 0) return;
 
-    if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+    const effName = resolveEffectiveCustomerName();
+    if (selectedMethod === 'fiado' && !selectedCustomerId && !effName) {
       showToast(
         language === 'es'
           ? 'Para registrar en Fiado, seleccione o escriba el nombre del cliente arriba.'
-          : 'Para lançar no Fiado sem perdas, selecione ou digite o nome do cliente acima.',
+          : 'Para lançar no Fiado, selecione ou digite o nome do cliente no campo acima.',
         'error'
       );
       return;
@@ -341,23 +356,26 @@ export const PaymentModal: React.FC<Props> = ({
 
   const handleSelectMethod = (m: PaymentMethod) => {
     setSelectedMethod(m);
+    if (m === 'fiado' && (!inputAmount || parseFloat(inputAmount) <= 0) && remainingBrl > 0) {
+      setInputAmount(remainingBrl.toString());
+    }
   };
 
   const handleFinishSale = async () => {
     let finalPayments = [...payments];
+    const effCustomerName = resolveEffectiveCustomerName();
+    const effCustomerId = selectedCustomer?.id || selectedCustomerId || linkedComanda?.customerId || undefined;
 
     // Se nenhum pagamento fracionado foi adicionado manualmente, utiliza o valor total no método selecionado
     if (finalPayments.length === 0 && totalBrl > 0) {
-      if (selectedMethod === 'fiado') {
-        if (!selectedCustomerId && !customerName.trim()) {
-          showToast(
-            language === 'es'
-              ? 'Para registrar venta como Fiado, seleccione o escriba el nombre del cliente.'
-              : 'Para lançar venda como Fiado sem perdas, selecione ou digite o nome do cliente.',
-            'error'
-          );
-          return;
-        }
+      if (selectedMethod === 'fiado' && !effCustomerId && !effCustomerName) {
+        showToast(
+          language === 'es'
+            ? 'Para registrar venta como Fiado, seleccione o escriba el nombre del cliente.'
+            : 'Para lançar venda como Fiado, selecione ou digite o nome do cliente.',
+          'error'
+        );
+        return;
       }
       finalPayments = [{
         id: `pay-${Date.now()}`,
@@ -369,7 +387,7 @@ export const PaymentModal: React.FC<Props> = ({
       }];
     } else if (remainingBrl > 0.05) {
       // Se há um restante não quitado, aloca o restante no método selecionado
-      if (selectedMethod === 'fiado' && !selectedCustomerId && !customerName.trim()) {
+      if (selectedMethod === 'fiado' && !effCustomerId && !effCustomerName) {
         showToast(
           language === 'es'
             ? 'Para registrar saldo restante como Fiado, seleccione o escriba el nombre del cliente.'
@@ -390,7 +408,7 @@ export const PaymentModal: React.FC<Props> = ({
 
     // Validação de fiado caso alguma das parcelas seja fiado
     const hasFiadoPayment = finalPayments.some(p => p.method === 'fiado');
-    if (hasFiadoPayment && !selectedCustomerId && !customerName.trim()) {
+    if (hasFiadoPayment && !effCustomerId && !effCustomerName) {
       showToast(
         language === 'es'
           ? 'Para registrar venta con parte en Fiado, seleccione o escriba el nombre del cliente.'
@@ -416,11 +434,11 @@ export const PaymentModal: React.FC<Props> = ({
         cartItems,
         finalPayments,
         changeData,
-        customerName || selectedCustomer?.name || undefined,
+        effCustomerName || undefined,
         comandaNumber || undefined,
         discountBrl > 0 ? discountBrl : undefined,
         rawSubtotalBrl,
-        selectedCustomer?.id || selectedCustomerId || undefined
+        effCustomerId
       );
       onSaleCompleted(sale);
     } catch (err: any) {
@@ -854,7 +872,7 @@ export const PaymentModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleAddPayment}
-                  disabled={!inputAmount || parseFloat(inputAmount) <= 0}
+                  disabled={(!inputAmount || parseFloat(inputAmount) <= 0) && remainingBrl <= 0}
                   className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[2.5]" />

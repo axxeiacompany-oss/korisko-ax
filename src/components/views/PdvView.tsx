@@ -536,25 +536,43 @@ export const PdvView: React.FC = () => {
           </div>
 
           {/* Checkout & Comanda action buttons */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={cart.length === 0 && openComandas.length === 0}
-              onClick={() => setIsComandasOpen(true)}
-              className="py-3 px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-              title={language === 'es' ? 'Guardar comanda para mesa o salón' : 'Salvar comanda para mesa ou balcão'}
-            >
-              <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
-              <span>{language === 'es' ? 'Comanda' : 'Comanda'}</span>
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={cart.length === 0 && openComandas.length === 0}
+                onClick={() => setIsComandasOpen(true)}
+                className="py-3 px-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                title={language === 'es' ? 'Guardar comanda para mesa o salón' : 'Salvar comanda para mesa ou balcão'}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'es' ? 'Comanda' : 'Comanda'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={cart.length === 0}
+                onClick={() => {
+                  setPaymentMethodForModal('dinheiro');
+                  setIsPaymentOpen(true);
+                }}
+                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4 stroke-[2.5]" />
+                {language === 'es' ? 'Cobrar Venta' : 'Finalizar Venda'}
+              </button>
+            </div>
+
             <button
               type="button"
               disabled={cart.length === 0}
-              onClick={() => setIsPaymentOpen(true)}
-              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/10 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              onClick={() => {
+                setPaymentMethodForModal('fiado');
+                setIsPaymentOpen(true);
+              }}
+              className="w-full py-2.5 px-3.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 disabled:opacity-40 text-rose-200 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <CreditCard className="w-4 h-4 stroke-[2.5]" />
-              {language === 'es' ? 'Cobrar Venta' : 'Finalizar Venda'}
+              <BookOpen className="w-3.5 h-3.5 text-rose-400" />
+              <span>{language === 'es' ? 'Cobrar en Fiado / Caderneta' : 'Cobrar no Fiado / Caderneta'}</span>
             </button>
           </div>
 
@@ -693,6 +711,7 @@ export const PdvView: React.FC = () => {
         onSaleCompleted={handleSaleSuccess}
         comandaNumber={activeComandaNumber || undefined}
         initialCustomerName={activeCustomerName || undefined}
+        initialPaymentMethod={paymentMethodForModal}
       />
 
       {/* Receipt preview modal */}

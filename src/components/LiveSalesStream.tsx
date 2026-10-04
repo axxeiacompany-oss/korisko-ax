@@ -121,15 +121,6 @@ export const LiveSalesStream: React.FC<Props> = ({
     );
   };
 
-  // Active live checkouts and launched comandas happening right now ("na hora de cobrar / lançar comanda")
-  const liveInProgressCheckouts = useMemo(() => {
-    return (activeCheckouts || []).filter(c => {
-      if (c.status !== 'em_cobranca' && c.status !== 'comanda_lancada') return false;
-      const ageSec = (nowTime - new Date(c.updatedAt).getTime()) / 1000;
-      return ageSec < 1800; // active within last 30 min
-    });
-  }, [activeCheckouts, nowTime]);
-
   // Active open comandas sorted latest first
   const activeComandasList = useMemo(() => {
     const list = (openComandas || []).filter(
@@ -362,83 +353,6 @@ export const LiveSalesStream: React.FC<Props> = ({
             )}
           </div>
         </div>
-
-        {/* LIVE CHECKOUTS HAPPENING RIGHT NOW ("NA HORA DE COBRAR E COLOCAR FIADO OU OUTRO MÉTODO") */}
-        {liveInProgressCheckouts.length > 0 && (
-          <div className="mt-3.5 p-3.5 rounded-xl bg-gradient-to-r from-rose-950/50 via-neutral-950 to-amber-950/40 border border-rose-500/40 space-y-2.5 animate-in fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-                <span>Sendo Cobrado Agora no Caixa / Balcão ({liveInProgressCheckouts.length})</span>
-              </span>
-              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
-                Aparece na Hora
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {liveInProgressCheckouts.map(chk => {
-                const badge = getPaymentBadge(chk.paymentMethod);
-                const BadgeIcon = badge.icon;
-                const isFiado = chk.paymentMethod === 'fiado';
-                return (
-                  <div
-                    key={chk.id}
-                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-                      isFiado
-                        ? 'bg-rose-950/40 border-rose-500/50'
-                        : 'bg-neutral-900/90 border-amber-500/30'
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
-                          <BadgeIcon className="w-3 h-3" />
-                          <span>COBRANDO EM: {badge.label}</span>
-                        </span>
-                        <span className="text-xs font-black text-white flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-                          {chk.customerName}
-                        </span>
-                        {chk.comandaNumber && (
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono-nums font-bold">
-                            Comanda #{chk.comandaNumber}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-neutral-400">
-                          Operador: <strong className="text-neutral-200">{chk.operatorName}</strong>
-                        </span>
-                      </div>
-
-                      {chk.itemsSummary && (
-                        <div className="text-[11px] text-neutral-300">
-                          Itens: {chk.itemsSummary} • Setor: <strong className="text-amber-300">{chk.setorResponsavel || 'Balcão'}</strong>
-                        </div>
-                      )}
-
-                      {isFiado && (
-                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-rose-200 font-mono-nums pt-0.5">
-                          <span>Dívida Anterior: <strong>{formatCurrency(chk.previousDebtBrl || 0, 'PYG')}</strong></span>
-                          <span>+ Compra: <strong className="text-rose-400">+{formatCurrency(chk.amountBrl, 'PYG')}</strong></span>
-                          <span>= Novo Saldo Extrato: <strong className="text-amber-300">{formatCurrency(chk.projectedDebtBrl || chk.amountBrl, 'PYG')}</strong></span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="text-base font-black text-amber-400 font-mono-nums">
-                        {formatCurrency(chk.amountBrl, 'PYG')}
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-mono-nums">
-                        {getRelativeTime(chk.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Live Counters Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-3.5">
