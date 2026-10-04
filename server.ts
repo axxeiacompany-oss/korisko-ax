@@ -183,6 +183,31 @@ async function initPostgres() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS saldos_devedores_tempo_real (
+        customer_id TEXT PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT,
+        previous_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        current_debt_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        open_comandas_total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        open_comandas_count INTEGER NOT NULL DEFAULT 0,
+        credit_limit_brl NUMERIC(14, 2) NOT NULL DEFAULT 500000,
+        available_credit_brl NUMERIC(14, 2) NOT NULL DEFAULT 500000,
+        last_comanda_id TEXT,
+        last_comanda_number TEXT,
+        last_operation_type TEXT NOT NULL DEFAULT 'comanda_lancada',
+        last_operation_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+        last_entry_description TEXT,
+        last_payment_date TIMESTAMP WITH TIME ZONE,
+        last_purchase_date TIMESTAMP WITH TIME ZONE,
+        status_cobranca TEXT NOT NULL DEFAULT 'em_dia',
+        setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
+        updated_by TEXT DEFAULT 'Sistema',
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     client.release();
     isPgConnected = true;
   } catch (err) {
@@ -619,6 +644,7 @@ app.post('/api/factory-zero', async (_req, res) => {
       customerEntries: [],
       customerPurchases: [],
       activeCheckouts: [],
+      liveDebtorBalances: [],
     };
 
     safeWriteJsonFile(LOCAL_STATE_FILE, zeroState);
@@ -708,6 +734,7 @@ app.post('/api/zero-numbers', async (_req, res) => {
       customerEntries: [],
       customerPurchases: [],
       activeCheckouts: [],
+      liveDebtorBalances: [],
     };
 
     safeWriteJsonFile(LOCAL_STATE_FILE, zeroedTestState);

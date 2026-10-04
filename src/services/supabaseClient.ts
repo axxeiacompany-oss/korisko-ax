@@ -292,7 +292,31 @@ CREATE TABLE IF NOT EXISTS public.caixa_sessoes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 10. TABELAS DE ESTADO GLOBAL E BACKUP
+-- 10. TABELA DEDICADA DE SALDOS DEVEDORES EM TEMPO REAL (saldos_devedores_tempo_real)
+CREATE TABLE IF NOT EXISTS public.saldos_devedores_tempo_real (
+  customer_id TEXT PRIMARY KEY,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  previous_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  current_debt_balance_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  open_comandas_total_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  open_comandas_count INTEGER NOT NULL DEFAULT 0,
+  credit_limit_brl NUMERIC(14, 2) NOT NULL DEFAULT 500000,
+  available_credit_brl NUMERIC(14, 2) NOT NULL DEFAULT 500000,
+  last_comanda_id TEXT,
+  last_comanda_number TEXT,
+  last_operation_type TEXT NOT NULL DEFAULT 'comanda_lancada',
+  last_operation_amount_brl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  last_entry_description TEXT,
+  last_payment_date TIMESTAMPTZ,
+  last_purchase_date TIMESTAMPTZ,
+  status_cobranca TEXT NOT NULL DEFAULT 'em_dia',
+  setor_responsavel TEXT DEFAULT 'Panificação & Confeitaria Artesanal',
+  updated_by TEXT DEFAULT 'Sistema',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. TABELAS DE ESTADO GLOBAL E BACKUP
 CREATE TABLE IF NOT EXISTS public.korisko_system_state (
   id TEXT PRIMARY KEY,
   data JSONB NOT NULL,
@@ -305,7 +329,7 @@ CREATE TABLE IF NOT EXISTS public.korisko_backup_points (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 11. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
+-- 12. HABILITAR SEGURANÇA EM NÍVEL DE LINHA (RLS)
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
@@ -315,6 +339,7 @@ ALTER TABLE public.comandas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lancamentos_fiado ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auditoria_logins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.caixa_sessoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saldos_devedores_tempo_real ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_system_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.korisko_backup_points ENABLE ROW LEVEL SECURITY;
 
@@ -781,6 +806,97 @@ export async function saveStateToSupabase(stateData: any): Promise<boolean> {
           updated_at: new Date().toISOString()
         }));
         await supabase.from('clientes').upsert(custRows, { onConflict: 'id' });
+      } catch {}
+    }
+
+    // Sync saldos_devedores_tempo_real for all customers with active balances or explicit debtor records
+    if (Array.isArray(stateData.customers) && stateData.customers.length > 0) {
+      try {
+        const activeComandas = Array.isArray(stateData.openComandas) ? stateData.openComandas : [];
+        const customerEntries = Array.isArray(stateData.customerEntries) ? stateData.customerEntries : [];
+        const customerPurchases = Array.isArray(stateData.customerPurchases) ? stateData.customerPurchases : [];
+
+        const debtorRows = stateData.customers
+          .filter((c: any) => {
+            const currentDebt = Number(c.outstandingBalanceBrl) || 0;
+            const hasOpenCmd = activeComandas.some((cmd: any) => 
+              (cmd.customerId === c.id || (cmd.customerName && cmd.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) &&
+              cmd.status !== 'pago' && cmd.status !== 'cancelado'
+            );
+            const hasExtra = Array.isArray(stateData.liveDebtorBalances) && stateData.liveDebtorBalances.some((d: any) => d.customerId === c.id);
+            return currentDebt > 0 || hasOpenCmd || hasExtra;
+          })
+          .map((c: any) => {
+            const extra = (stateData.liveDebtorBalances || []).find((d: any) => d.customerId === c.id);
+            const currentDebt = Number(c.outstandingBalanceBrl) || 0;
+            const creditLimit = Number(c.creditLimitBrl) || 500000;
+
+            const custOpenCmds = activeComandas.filter((cmd: any) => 
+              (cmd.customerId === c.id || (cmd.customerName && cmd.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) &&
+              cmd.status !== 'pago' && cmd.status !== 'cancelado'
+            );
+            const openCount = custOpenCmds.length;
+            const openTotal = Math.round(custOpenCmds.reduce((sum: number, cmd: any) => sum + (Number(cmd.totalBrl) || 0), 0) * 100) / 100;
+
+            const custEntries = customerEntries.filter((e: any) => e.customerId === c.id);
+            const latestEntry = custEntries[0];
+            const latestPayment = custEntries.find((e: any) => e.type === 'pagamento_amortizacao');
+            const latestPurchase = customerPurchases.find((p: any) => p.customerId === c.id);
+
+            const lastPurchaseDate = extra?.lastPurchaseDate || c.lastPurchaseDate || latestPurchase?.purchaseDate || null;
+            const lastPaymentDate = extra?.lastPaymentDate || latestPayment?.date || null;
+
+            let statusCobranca = extra?.statusCobranca || 'em_dia';
+            if (currentDebt > creditLimit) {
+              statusCobranca = 'alerta_limite';
+            } else if (currentDebt > 0 && lastPurchaseDate) {
+              const daysSince = (Date.now() - new Date(lastPurchaseDate).getTime()) / (1000 * 60 * 60 * 24);
+              if (daysSince > 30) statusCobranca = 'atrasado';
+            }
+
+            return {
+              customer_id: c.id,
+              customer_name: c.name,
+              customer_phone: c.phone || null,
+              previous_balance_brl: Number(extra?.previousBalanceBrl ?? latestEntry?.previousBalanceBrl ?? 0),
+              current_debt_balance_brl: currentDebt,
+              open_comandas_total_brl: Number(extra?.openComandasTotalBrl ?? openTotal),
+              open_comandas_count: Number(extra?.openComandasCount ?? openCount),
+              credit_limit_brl: creditLimit,
+              available_credit_brl: Math.max(0, creditLimit - currentDebt),
+              last_comanda_id: extra?.lastComandaId || custOpenCmds[0]?.id || null,
+              last_comanda_number: extra?.lastComandaNumber || custOpenCmds[0]?.number || null,
+              last_operation_type: extra?.lastOperationType || (latestEntry?.type === 'pagamento_amortizacao' ? 'pagamento_amortizacao' : 'venda_fiado'),
+              last_operation_amount_brl: Number(extra?.lastOperationAmountBrl ?? latestEntry?.amountBrl ?? currentDebt),
+              last_entry_description: extra?.lastEntryDescription || latestEntry?.description || (currentDebt > 0 ? 'Saldo devedor em aberto' : 'Conta em dia'),
+              last_payment_date: lastPaymentDate,
+              last_purchase_date: lastPurchaseDate,
+              status_cobranca: statusCobranca,
+              setor_responsavel: extra?.lastSetorResponsavel || latestEntry?.setorResponsavel || 'Panificação & Confeitaria Artesanal',
+              updated_by: extra?.updatedBy || latestEntry?.recordedBy || 'Sistema',
+              updated_at: extra?.updatedAt || new Date().toISOString(),
+            };
+          });
+
+        if (debtorRows.length > 0) {
+          await supabase.from('saldos_devedores_tempo_real').upsert(debtorRows, { onConflict: 'customer_id' });
+        }
+
+        // Clean up customers who have zero debt and no open comandas from saldos_devedores_tempo_real
+        const clearedCustomerIds = stateData.customers
+          .filter((c: any) => {
+            const currentDebt = Number(c.outstandingBalanceBrl) || 0;
+            const hasOpenCmd = activeComandas.some((cmd: any) => 
+              (cmd.customerId === c.id || (cmd.customerName && cmd.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) &&
+              cmd.status !== 'pago' && cmd.status !== 'cancelado'
+            );
+            return currentDebt <= 0 && !hasOpenCmd;
+          })
+          .map((c: any) => c.id);
+
+        if (clearedCustomerIds.length > 0) {
+          supabase.from('saldos_devedores_tempo_real').delete().in('customer_id', clearedCustomerIds).catch(() => {});
+        }
       } catch {}
     }
 

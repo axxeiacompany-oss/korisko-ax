@@ -170,10 +170,18 @@ export interface LiveDebtorBalanceRecord {
   lastComandaAmountBrl: number;
   currentDebtBalanceBrl: number;
   creditLimitBrl: number;
+  availableCreditBrl?: number;
   openComandasCount: number;
+  openComandasTotalBrl?: number;
+  lastComandaId?: string;
   lastComandaNumber?: string;
   lastSetorResponsavel?: string;
-  lastOperationType: 'comanda_lancada' | 'venda_fiado' | 'pagamento_amortizacao' | 'estorno_comanda';
+  lastOperationType: 'comanda_lancada' | 'venda_fiado' | 'pagamento_amortizacao' | 'estorno_comanda' | 'ajuste_saldo';
+  lastOperationAmountBrl?: number;
+  lastEntryDescription?: string;
+  lastPaymentDate?: string;
+  lastPurchaseDate?: string;
+  statusCobranca?: 'em_dia' | 'atrasado' | 'alerta_limite';
   updatedBy: string;
   updatedAt: string;
 }
@@ -430,6 +438,7 @@ export interface SystemBackupData {
   customerPurchases?: CustomerPurchaseRecord[];
   activeCheckouts?: ActiveCheckoutSession[];
   paymentStages?: PaymentStageRecord[];
+  liveDebtorBalances?: LiveDebtorBalanceRecord[];
 }
 
 // =============================================================

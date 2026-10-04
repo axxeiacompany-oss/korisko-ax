@@ -1264,19 +1264,39 @@ export async function deleteFluxoCobrancaDb(id: string): Promise<void> {
 export function liveDebtorBalanceToRow(d: LiveDebtorBalanceRecord) {
   const currentDebt = Number(d.currentDebtBalanceBrl) || 0;
   const creditLimit = Number(d.creditLimitBrl) || 500000;
-  const lastAmount = Number(d.lastComandaAmountBrl) || 0;
+  const lastAmount = Number(d.lastComandaAmountBrl ?? d.lastOperationAmountBrl) || 0;
+  const openCount = Number(d.openComandasCount) || 0;
+  const openTotal = d.openComandasTotalBrl !== undefined 
+    ? Number(d.openComandasTotalBrl) 
+    : (openCount > 0 ? lastAmount : 0);
+  const availableCredit = Math.max(0, creditLimit - currentDebt);
+  
+  let statusCobranca = d.statusCobranca || 'em_dia';
+  if (currentDebt > creditLimit) {
+    statusCobranca = 'alerta_limite';
+  } else if (currentDebt > 0 && d.lastPurchaseDate) {
+    const daysSince = (Date.now() - new Date(d.lastPurchaseDate).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince > 30) statusCobranca = 'atrasado';
+  }
+
   return {
     customer_id: d.customerId,
     customer_name: d.customerName,
     customer_phone: d.customerPhone || null,
     previous_balance_brl: Number(d.previousBalanceBrl) || 0,
     current_debt_balance_brl: currentDebt,
-    open_comandas_total_brl: d.openComandasCount && d.openComandasCount > 0 ? lastAmount : 0,
+    open_comandas_total_brl: openTotal,
+    open_comandas_count: openCount,
     credit_limit_brl: creditLimit,
-    available_credit_brl: Math.max(0, creditLimit - currentDebt),
+    available_credit_brl: availableCredit,
+    last_comanda_id: d.lastComandaId || null,
     last_comanda_number: d.lastComandaNumber || null,
     last_operation_type: d.lastOperationType || 'comanda_lancada',
     last_operation_amount_brl: lastAmount,
+    last_entry_description: d.lastEntryDescription || null,
+    last_payment_date: d.lastPaymentDate || null,
+    last_purchase_date: d.lastPurchaseDate || null,
+    status_cobranca: statusCobranca,
     setor_responsavel: d.lastSetorResponsavel || 'Panificação & Confeitaria Artesanal',
     updated_by: d.updatedBy || 'Sistema',
     updated_at: d.updatedAt || new Date().toISOString(),
@@ -1284,18 +1304,32 @@ export function liveDebtorBalanceToRow(d: LiveDebtorBalanceRecord) {
 }
 
 export function rowToLiveDebtorBalance(r: any): LiveDebtorBalanceRecord {
+  const currentDebt = Number(r.current_debt_balance_brl) || 0;
+  const creditLimit = Number(r.credit_limit_brl) || 500000;
+  const availableCredit = r.available_credit_brl !== undefined 
+    ? Number(r.available_credit_brl) 
+    : Math.max(0, creditLimit - currentDebt);
+
   return {
     customerId: String(r.customer_id || ''),
     customerName: String(r.customer_name || 'Cliente'),
     customerPhone: r.customer_phone || undefined,
     previousBalanceBrl: Number(r.previous_balance_brl) || 0,
     lastComandaAmountBrl: Number(r.last_comanda_amount_brl ?? r.last_operation_amount_brl) || 0,
-    currentDebtBalanceBrl: Number(r.current_debt_balance_brl) || 0,
-    creditLimitBrl: Number(r.credit_limit_brl) || 0,
+    currentDebtBalanceBrl: currentDebt,
+    creditLimitBrl: creditLimit,
+    availableCreditBrl: availableCredit,
     openComandasCount: Number(r.open_comandas_count) || (Number(r.open_comandas_total_brl) > 0 ? 1 : 0),
+    openComandasTotalBrl: Number(r.open_comandas_total_brl) || 0,
+    lastComandaId: r.last_comanda_id || undefined,
     lastComandaNumber: r.last_comanda_number || undefined,
     lastSetorResponsavel: r.last_setor_responsavel || r.setor_responsavel || undefined,
     lastOperationType: r.last_operation_type || 'comanda_lancada',
+    lastOperationAmountBrl: Number(r.last_operation_amount_brl ?? r.last_comanda_amount_brl) || 0,
+    lastEntryDescription: r.last_entry_description || undefined,
+    lastPaymentDate: r.last_payment_date || undefined,
+    lastPurchaseDate: r.last_purchase_date || undefined,
+    statusCobranca: r.status_cobranca || 'em_dia',
     updatedBy: String(r.updated_by || 'Sistema'),
     updatedAt: r.updated_at || new Date().toISOString(),
   };
@@ -1312,17 +1346,69 @@ export async function listSaldosDevedoresTempoReal(): Promise<LiveDebtorBalanceR
 
 export async function upsertSaldoDevedorTempoRealDb(d: LiveDebtorBalanceRecord): Promise<LiveDebtorBalanceRecord | null> {
   try {
+    const currentDebt = Number(d.currentDebtBalanceBrl) || 0;
+    const openCount = Number(d.openComandasCount) || 0;
+
+    // If debt is fully paid and no open comandas exist, remove from active debtors table
+    if (currentDebt <= 0 && openCount <= 0) {
+      await deleteSaldoDevedorTempoRealDb(d.customerId);
+      return {
+        ...d,
+        currentDebtBalanceBrl: 0,
+        openComandasCount: 0,
+        openComandasTotalBrl: 0,
+        statusCobranca: 'em_dia',
+      };
+    }
+
     const row = liveDebtorBalanceToRow(d);
     const { data, error } = await supabase
       .from('saldos_devedores_tempo_real')
       .upsert(row, { onConflict: 'customer_id' })
       .select()
       .single();
-    if (error || !data) return null;
+
+    if (error) {
+      // Only fallback to core columns if database explicitly rejects non-existent columns (code 42703)
+      if (error.code === '42703' || (error.message && error.message.toLowerCase().includes('column'))) {
+        const {
+          open_comandas_count,
+          last_entry_description,
+          last_payment_date,
+          last_purchase_date,
+          status_cobranca,
+          last_comanda_id,
+          available_credit_brl,
+          open_comandas_total_brl,
+          last_operation_amount_brl,
+          ...coreRow
+        } = row;
+        const { data: fallbackData, error: fallbackErr } = await supabase
+          .from('saldos_devedores_tempo_real')
+          .upsert(coreRow, { onConflict: 'customer_id' })
+          .select()
+          .single();
+        if (fallbackErr) {
+          console.warn('[Supabase saldos_devedores fallback error]:', fallbackErr.message);
+          return null;
+        }
+        return rowToLiveDebtorBalance({ ...fallbackData, ...d });
+      }
+
+      console.warn('[Supabase saldos_devedores error]:', error.message);
+      return null;
+    }
     return rowToLiveDebtorBalance(data);
-  } catch {
+  } catch (err) {
+    console.warn('[Supabase saldos_devedores exception]:', err);
     return null;
   }
+}
+
+export async function deleteSaldoDevedorTempoRealDb(customerId: string): Promise<void> {
+  try {
+    await supabase.from('saldos_devedores_tempo_real').delete().eq('customer_id', customerId);
+  } catch {}
 }
 
 // ==========================================
