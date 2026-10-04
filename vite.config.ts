@@ -11,7 +11,7 @@ export default defineConfig(() => {
       {
         name: 'ai-studio-hmr-suppress',
         transformIndexHtml: {
-          order: 'pre',
+          order: 'pre' as const,
           handler() {
             return [
               {
@@ -103,7 +103,7 @@ export default defineConfig(() => {
                     }
                   })();
                 `,
-                injectTo: 'head-prepend',
+                injectTo: 'head-prepend' as const,
               },
             ];
           },
@@ -114,14 +114,14 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve(import.meta.dirname ?? process.cwd(), '.'),
+        '@': path.resolve('.'),
       },
     },
     build: {
       chunkSizeWarningLimit: 2500,
       rollupOptions: {
         output: {
-          manualChunks(id) {
+          manualChunks(id: string) {
             if (id.includes('node_modules')) {
               if (id.includes('react') || id.includes('react-dom')) {
                 return 'vendor-react';
@@ -141,7 +141,7 @@ export default defineConfig(() => {
     server: {
       host: '0.0.0.0',
       port: 3000,
-      allowedHosts: true,
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio per runtime environment constraints.
       hmr: false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
