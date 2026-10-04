@@ -28,7 +28,8 @@ import {
   CashTransaction,
   CustomerPurchaseRecord,
   CustomerPurchaseItem,
-  PaymentStageRecord
+  PaymentStageRecord,
+  LiveDebtorBalanceRecord
 } from '../types';
 import { translations, I18nDictionary } from '../utils/i18n';
 import { StorageService, INITIAL_EMPLOYEES, INITIAL_PRODUCTS, INITIAL_FICHAS_TECNICAS, INITIAL_GOALS } from '../services/storageService';
@@ -851,7 +852,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           // Reconcile and synchronize saldos_devedores_tempo_real with all debtors
           const initialLiveDebtors: LiveDebtorBalanceRecord[] = [];
-          reconciledCustomers.forEach(c => {
+          reconciledCustomers.forEach((c: Customer) => {
             const currentDebt = Number(c.outstandingBalanceBrl) || 0;
             const custOpenCmds = mergedComandas.filter(cmd => 
               (cmd.customerId === c.id || (cmd.customerName && cmd.customerName.trim().toLowerCase() === c.name.trim().toLowerCase())) &&
@@ -884,6 +885,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 customerName: c.name,
                 customerPhone: c.phone || undefined,
                 previousBalanceBrl: Number(existingDebtor?.previousBalanceBrl ?? latestEntry?.previousBalanceBrl ?? 0),
+                lastComandaAmountBrl: Number(existingDebtor?.lastComandaAmountBrl ?? custOpenCmds[0]?.totalBrl ?? latestEntry?.amountBrl ?? currentDebt),
                 currentDebtBalanceBrl: currentDebt,
                 creditLimitBrl: creditLimit,
                 availableCreditBrl: Math.max(0, creditLimit - currentDebt),
@@ -2058,6 +2060,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     customer: Customer,
     options?: {
       previousBalanceBrl?: number;
+      lastComandaAmountBrl?: number;
       currentDebtBalanceBrl?: number;
       lastOperationType?: LiveDebtorBalanceRecord['lastOperationType'];
       lastOperationAmountBrl?: number;
@@ -2119,6 +2122,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ? Number(options.lastOperationAmountBrl) 
       : (existingDebtor?.lastOperationAmountBrl ?? latestEntry?.amountBrl ?? currentDebt);
 
+    const lastComandaAmountBrl = options?.lastComandaAmountBrl !== undefined
+      ? Number(options.lastComandaAmountBrl)
+      : (existingDebtor?.lastComandaAmountBrl ?? custOpenCmds[0]?.totalBrl ?? lastOperationAmountBrl);
+
     const lastEntryDescription = options?.lastEntryDescription 
       ?? latestEntry?.description 
       ?? existingDebtor?.lastEntryDescription 
@@ -2141,6 +2148,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       customerName: customer.name,
       customerPhone: customer.phone,
       previousBalanceBrl: prevBal,
+      lastComandaAmountBrl,
       currentDebtBalanceBrl: currentDebt,
       creditLimitBrl: creditLimit,
       availableCreditBrl: availableCredit,
@@ -3028,6 +3036,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const debtorRecord = buildDebtorRecord(currentCustomer || {
       id: customerId,
       name: 'Cliente Fiado',
+      phone: '',
+      category: 'varejo',
       creditLimitBrl: 500000,
       outstandingBalanceBrl: newBal,
       totalSpentBrl: newBal,
@@ -3213,6 +3223,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const debtorRecord = buildDebtorRecord(currentCustomer || {
       id: customerId,
       name: 'Cliente Cadastrado',
+      phone: '',
+      category: 'varejo',
       creditLimitBrl: 500000,
       outstandingBalanceBrl: newBal,
       totalSpentBrl: 0,
@@ -4115,7 +4127,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         },
         {
           previousBalanceBrl: initialBalBeforeComanda,
-          lastComandaAmountBrl: fiadoAmountBrl > 0 ? fiadoAmountBrl : finalTotalBrl,
           currentDebtBalanceBrl: newCustomerBal,
           lastComandaNumber: resolvedComandaNumber,
           lastSetorResponsavel: sectorInfo.label,
@@ -4889,6 +4900,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deleteFichaTecnica,
     executeProductionFromRecipe,
     customers: data.customers || [],
+    liveDebtorBalances: data.liveDebtorBalances || [],
     customerEntries: data.customerEntries || [],
     customerPurchases: data.customerPurchases || [],
     activeCheckouts: data.activeCheckouts || [],

@@ -895,7 +895,7 @@ export async function saveStateToSupabase(stateData: any): Promise<boolean> {
           .map((c: any) => c.id);
 
         if (clearedCustomerIds.length > 0) {
-          supabase.from('saldos_devedores_tempo_real').delete().in('customer_id', clearedCustomerIds).catch(() => {});
+          await supabase.from('saldos_devedores_tempo_real').delete().in('customer_id', clearedCustomerIds);
         }
       } catch {}
     }
