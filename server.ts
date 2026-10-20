@@ -11,53 +11,16 @@ dotenv.config();
 const SUPABASE_DEFAULT_URL = 'https://lmbpvdpmrdfxfqednwxd.supabase.co';
 const SUPABASE_DEFAULT_KEY = 'sb_publishable_l0-nPS9D5LQAC_AvzAyYWA_MXIFG0lm';
 
-function normalizeSupabaseUrl(url: string): string {
+function normalizeSupabaseUrl(url?: string): string {
   if (!url) return SUPABASE_DEFAULT_URL;
   return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
 }
-
-const supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_DEFAULT_URL);
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_DEFAULT_KEY;
-
-let supabaseServer: SupabaseClient | null = null;
-try {
-  supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
-} catch (err) {
-  console.warn('[Korisko Server] Supabase client init notice:', err);
-}
-
-function safeSupabaseUpsert(table: string, payload: any, onConflict: string) {
-  if (!supabaseServer) return;
-  try {
-    supabaseServer
-      .from(table)
-      .upsert(payload, { onConflict })
-      .then(
-        ({ error }) => {
-          if (error && error.code !== 'PGRST205') {
-            console.warn(`[Korisko Server] Supabase mirror notice (${table}):`, error.message);
-          }
-        },
-        err => {
-          console.warn(`[Korisko Server] Supabase mirror exception (${table}):`, err);
-        }
-      );
-  } catch {}
-}
-
-const { Pool } = pg;
-const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const isProduction = process.env.NODE_ENV === 'production';
-
-// Increase payload limit for database state and image backups
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Persistent Storage Paths
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const LOCAL_STATE_FILE = path.join(DATA_DIR, 'korisko_state.json');
 const LOCAL_BACKUPS_FILE = path.join(DATA_DIR, 'korisko_backups.json');
+const SUPABASE_CONFIG_FILE = path.join(DATA_DIR, 'supabase_config.json');
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -97,6 +60,128 @@ function safeReadJsonFile<T = any>(filePath: string): T | null {
     return null;
   }
 }
+
+function getActiveServerSupabaseConfig() {
+  const fileConfig = safeReadJsonFile<{ url?: string; anonKey?: string }>(SUPABASE_CONFIG_FILE);
+  const customUrl = fileConfig?.url;
+  const customKey = fileConfig?.anonKey;
+
+  const url = normalizeSupabaseUrl(customUrl || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_DEFAULT_URL);
+  const anonKey = (customKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_DEFAULT_KEY).trim();
+  const isCustom = Boolean(customUrl && customKey);
+  return { url, anonKey, isCustom };
+}
+
+let activeSupabaseConfig = getActiveServerSupabaseConfig();
+let supabaseServer: SupabaseClient | null = null;
+let lastSupabasePingSuccess = false;
+let lastSupabasePingTime = 0;
+let lastSupabasePingError: string | null = null;
+
+function reinitServerSupabase(url: string, key: string) {
+  try {
+    activeSupabaseConfig = { url: normalizeSupabaseUrl(url), anonKey: key.trim(), isCustom: true };
+    supabaseServer = createClient(activeSupabaseConfig.url, activeSupabaseConfig.anonKey);
+    lastSupabasePingTime = 0;
+  } catch (err: any) {
+    console.warn('[Korisko Server] Reinit Supabase notice:', err.message);
+  }
+}
+
+try {
+  supabaseServer = createClient(activeSupabaseConfig.url, activeSupabaseConfig.anonKey);
+} catch (err) {
+  console.warn('[Korisko Server] Supabase client init notice:', err);
+}
+
+async function checkSupabaseServerReachability(force = false): Promise<{ connected: boolean; error?: string; latencyMs?: number }> {
+  const now = Date.now();
+  if (!force && lastSupabasePingTime > 0 && (now - lastSupabasePingTime) < 30000) {
+    return { connected: lastSupabasePingSuccess, error: lastSupabasePingError || undefined };
+  }
+
+  if (!supabaseServer) {
+    lastSupabasePingSuccess = false;
+    lastSupabasePingError = 'Cliente Supabase não inicializado';
+    lastSupabasePingTime = now;
+    return { connected: false, error: lastSupabasePingError };
+  }
+
+  const t0 = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const testRes = await supabaseServer
+      .from('korisko_system_state')
+      .select('id')
+      .limit(1)
+      .abortSignal(controller.signal);
+
+    clearTimeout(timeout);
+
+    if (testRes.error) {
+      const errLower = testRes.error.message.toLowerCase();
+      const isDnsOrNetwork =
+        errLower.includes('fetch failed') ||
+        errLower.includes('enotfound') ||
+        errLower.includes('timeout') ||
+        errLower.includes('aborted');
+      if (isDnsOrNetwork) {
+        lastSupabasePingSuccess = false;
+        lastSupabasePingError = 'Projeto pausado ou endereço DNS não encontrado no Supabase';
+      } else {
+        // Table might not exist yet, but server IS reachable!
+        lastSupabasePingSuccess = true;
+        lastSupabasePingError = null;
+      }
+    } else {
+      lastSupabasePingSuccess = true;
+      lastSupabasePingError = null;
+    }
+  } catch (err: any) {
+    lastSupabasePingSuccess = false;
+    lastSupabasePingError = err.message || 'Falha de conexão com o Supabase';
+  }
+
+  lastSupabasePingTime = now;
+  return {
+    connected: lastSupabasePingSuccess,
+    error: lastSupabasePingError || undefined,
+    latencyMs: Date.now() - t0,
+  };
+}
+
+// Initial reachability check in background
+setTimeout(() => {
+  checkSupabaseServerReachability(true).catch(() => {});
+}, 1000);
+
+function safeSupabaseUpsert(table: string, payload: any, onConflict: string) {
+  if (!supabaseServer || !lastSupabasePingSuccess) return;
+  try {
+    supabaseServer
+      .from(table)
+      .upsert(payload, { onConflict })
+      .then(
+        ({ error }) => {
+          if (error && error.code !== 'PGRST205') {
+            console.warn(`[Korisko Server] Supabase mirror notice (${table}):`, error.message);
+          }
+        },
+        () => {}
+      );
+  } catch {}
+}
+
+const { Pool } = pg;
+const app = express();
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Increase payload limit for database state and image backups
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Optional PostgreSQL setup if DATABASE_URL is provided (e.g. Railway / Supabase direct postgres)
 const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_PUBLIC_URL;
@@ -235,9 +320,9 @@ app.get('/api/health', async (_req, res) => {
   res.json({
     status: 'ok',
     databaseConnected: true,
-    mode: isPgConnected ? 'postgresql' : (supabaseServer ? 'supabase_cloud' : 'banco_operacional'),
-    supabaseConnected: Boolean(supabaseServer),
-    supabaseUrl,
+    mode: isPgConnected ? 'postgresql' : (lastSupabasePingSuccess ? 'supabase_cloud' : 'banco_operacional'),
+    supabaseConnected: lastSupabasePingSuccess,
+    supabaseUrl: activeSupabaseConfig.url,
     totalRecords: productsCount + salesCount + customersCount,
     records: {
       products: productsCount,
@@ -246,6 +331,72 @@ app.get('/api/health', async (_req, res) => {
     },
     persistence: 'tempo_real',
     timestamp: new Date().toISOString(),
+  });
+});
+
+// Supabase Configuration & Status API
+app.get('/api/supabase/config', async (_req, res) => {
+  const cfg = getActiveServerSupabaseConfig();
+  const ping = await checkSupabaseServerReachability(false);
+  res.json({
+    url: cfg.url,
+    anonKey: cfg.anonKey ? (cfg.anonKey.slice(0, 15) + '...' + cfg.anonKey.slice(-4)) : '',
+    fullAnonKey: cfg.anonKey,
+    isCustom: cfg.isCustom,
+    connected: ping.connected,
+    error: ping.error,
+  });
+});
+
+app.post('/api/supabase/config', async (req, res) => {
+  const { url, anonKey, reset } = req.body;
+
+  if (reset) {
+    try {
+      if (fs.existsSync(SUPABASE_CONFIG_FILE)) fs.unlinkSync(SUPABASE_CONFIG_FILE);
+    } catch {}
+    reinitServerSupabase(SUPABASE_DEFAULT_URL, SUPABASE_DEFAULT_KEY);
+    const ping = await checkSupabaseServerReachability(true);
+    return res.json({
+      success: true,
+      reset: true,
+      url: SUPABASE_DEFAULT_URL,
+      connected: ping.connected,
+      error: ping.error,
+    });
+  }
+
+  if (!url || typeof url !== 'string' || !url.includes('supabase.co')) {
+    return res.status(400).json({ error: 'URL do Supabase inválida. Deve conter .supabase.co' });
+  }
+
+  if (!anonKey || typeof anonKey !== 'string') {
+    return res.status(400).json({ error: 'Chave do Supabase inválida.' });
+  }
+
+  const cleanUrl = normalizeSupabaseUrl(url);
+  const cleanKey = anonKey.trim();
+
+  safeWriteJsonFile(SUPABASE_CONFIG_FILE, { url: cleanUrl, anonKey: cleanKey });
+  reinitServerSupabase(cleanUrl, cleanKey);
+
+  const ping = await checkSupabaseServerReachability(true);
+  return res.json({
+    success: true,
+    url: cleanUrl,
+    connected: ping.connected,
+    error: ping.error,
+    latencyMs: ping.latencyMs,
+  });
+});
+
+app.get('/api/supabase/ping', async (_req, res) => {
+  const ping = await checkSupabaseServerReachability(true);
+  res.json({
+    url: activeSupabaseConfig.url,
+    connected: ping.connected,
+    error: ping.error,
+    latencyMs: ping.latencyMs,
   });
 });
 

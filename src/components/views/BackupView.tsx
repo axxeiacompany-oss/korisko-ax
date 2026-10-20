@@ -18,13 +18,21 @@ import {
   Copy,
   ExternalLink,
   Code,
-  Radio
+  Radio,
+  Key,
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   SUPABASE_SETUP_SQL, 
   DEFAULT_SUPABASE_URL, 
   DEFAULT_SUPABASE_ANON_KEY,
-  testSupabaseReadWrite
+  testSupabaseReadWrite,
+  getStoredSupabaseConfig,
+  setCustomSupabaseCredentials,
+  resetToDefaultSupabaseCredentials,
+  getActiveSupabaseUrl,
+  getActiveSupabaseAnonKey,
 } from '../../services/supabaseClient';
 import { SECURITY_SQL_SCRIPT } from '../../utils/security';
 import { ConfirmModal } from '../modals/ConfirmModal';
@@ -57,6 +65,61 @@ export const BackupView: React.FC = () => {
   const [showSqlCode, setShowSqlCode] = useState(false);
   const [copiedSecuritySql, setCopiedSecuritySql] = useState(false);
   const [showSecuritySql, setShowSecuritySql] = useState(false);
+
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState<string>(() => getActiveSupabaseUrl());
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState<string>(() => getActiveSupabaseAnonKey());
+  const [isEditingCredentials, setIsEditingCredentials] = useState(false);
+  const [isSavingCreds, setIsSavingCreds] = useState(false);
+
+  const handleSaveCredentials = async () => {
+    if (!supabaseUrlInput.trim() || !supabaseKeyInput.trim()) {
+      showNotification(language === 'es' ? 'Por favor ingrese la URL y la clave de Supabase.' : 'Por favor, informe a URL e a chave do Supabase.');
+      return;
+    }
+    setIsSavingCreds(true);
+    try {
+      setCustomSupabaseCredentials(supabaseUrlInput.trim(), supabaseKeyInput.trim());
+      await fetch('/api/supabase/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: supabaseUrlInput.trim(), anonKey: supabaseKeyInput.trim() }),
+      });
+      await refreshDbStatus();
+      const testRes = await testSupabaseReadWrite();
+      setTestResult(testRes);
+      if (testRes.success) {
+        showNotification(language === 'es' ? '¡Conexión guardada y verificada con éxito!' : 'Conexão com Supabase salva e verificada com sucesso!');
+        setIsEditingCredentials(false);
+      } else {
+        showNotification(testRes.message);
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'Erro ao salvar credenciais.');
+    } finally {
+      setIsSavingCreds(false);
+    }
+  };
+
+  const handleResetCredentials = async () => {
+    setIsSavingCreds(true);
+    try {
+      resetToDefaultSupabaseCredentials();
+      await fetch('/api/supabase/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset: true }),
+      });
+      setSupabaseUrlInput(DEFAULT_SUPABASE_URL);
+      setSupabaseKeyInput(DEFAULT_SUPABASE_ANON_KEY);
+      await refreshDbStatus();
+      showNotification(language === 'es' ? 'Credenciales predeterminadas restauradas.' : 'Credenciais padrão restauradas.');
+      setIsEditingCredentials(false);
+    } catch {
+      showNotification(language === 'es' ? 'Error al restaurar.' : 'Erro ao restaurar.');
+    } finally {
+      setIsSavingCreds(false);
+    }
+  };
 
   const handleCopySecuritySql = () => {
     navigator.clipboard.writeText(SECURITY_SQL_SCRIPT);
@@ -418,20 +481,36 @@ export const BackupView: React.FC = () => {
                 <h3 className="text-sm font-bold text-neutral-100">
                   {language === 'es' ? 'Conexión Supabase Cloud (PostgreSQL)' : 'Conexão Supabase Cloud (PostgreSQL)'}
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  ● {language === 'es' ? 'Conectado & Autenticado' : 'Conectado & Autenticado'}
-                </span>
+                {dbStatus.connected && dbStatus.mode === 'supabase_cloud' ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    ● {language === 'es' ? 'Conectado & Sincronizado' : 'Conectado & Sincronizado'}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    ● {language === 'es' ? 'Pausado / Inaccesible' : 'Pausado ou Inacessível'}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-neutral-400 mt-0.5">
                 {language === 'es'
-                  ? 'Base de datos en la nube Supabase conectada con credenciales públicas del proyecto.'
-                  : 'Banco de dados em nuvem Supabase integrado com persistência remota e credenciais do projeto.'}
+                  ? 'Base de datos en la nube Supabase con sincronización y persistencia remota.'
+                  : 'Banco de dados em nuvem Supabase com sincronização multi-dispositivo e persistência remota.'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsEditingCredentials(!isEditingCredentials)}
+              className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isEditingCredentials ? (language === 'es' ? 'Cerrar Edición' : 'Fechar Edição') : (language === 'es' ? 'Configurar Credenciales' : 'Configurar Credenciais')}</span>
+            </button>
+
             <button
               type="button"
               disabled={isTestingSupabase}
@@ -454,6 +533,120 @@ export const BackupView: React.FC = () => {
           </div>
         </div>
 
+        {/* Offline Alert Box with Quick Actions */}
+        {(!dbStatus.connected || dbStatus.mode !== 'supabase_cloud') && (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2.5 animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold text-sm block">
+                  {language === 'es' ? 'Proyecto Supabase no responde (Probablemente Pausado por Inactividad)' : 'Projeto Supabase não está respondendo (Provavelmente Pausado por Inatividade)'}
+                </span>
+                <p className="text-xs text-amber-300/90 leading-relaxed">
+                  {language === 'es'
+                    ? 'En el plan gratuito de Supabase, los proyectos sin tráfico se pausan tras 7 días de inactividad. Mientras tanto, el sistema continúa funcionando normalmente con el motor de base de datos nativo local.'
+                    : 'No plano gratuito do Supabase, projetos sem requisições por 7 dias são pausados automaticamente. Enquanto isso, o sistema continua operando normalmente com o banco nativo local sem perder vendas.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-500/20 text-xs">
+              <a
+                href={`https://supabase.com/dashboard/project/${(supabaseUrlInput.match(/https:\/\/([^.]+)\.supabase\.co/) || [])[1] || 'lmbpvdpmrdfxfqednwxd'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-950/20 transition-colors"
+              >
+                <span>{language === 'es' ? 'Reactivar Proyecto en Supabase' : 'Reativar Projeto no Painel Supabase'}</span>
+                <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setIsEditingCredentials(true)}
+                className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Key className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'es' ? 'Insertar Nueva URL / Chave' : 'Inserir Nova URL / Chave'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Credentials Editor Drawer */}
+        {isEditingCredentials && (
+          <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-700 space-y-3 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-neutral-200">
+                <Settings className="w-4 h-4 text-emerald-400" />
+                <span>{language === 'es' ? 'Configurar Credenciales del Proyecto Supabase' : 'Configurar Credenciais do Projeto Supabase'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingCredentials(false)}
+                className="text-xs text-neutral-400 hover:text-neutral-200 cursor-pointer"
+              >
+                ✕ {language === 'es' ? 'Cancelar' : 'Cancelar'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-neutral-300 block">
+                  {language === 'es' ? 'URL del Proyecto Supabase' : 'URL do Projeto Supabase (Project URL)'}
+                </label>
+                <input
+                  type="text"
+                  value={supabaseUrlInput}
+                  onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                  placeholder="https://seu-id.supabase.co"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+                <span className="text-[10px] text-neutral-500 block">
+                  Exemplo: https://lmbpvdpmrdfxfqednwxd.supabase.co
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-neutral-300 block">
+                  {language === 'es' ? 'Clave Anon / Publishable' : 'Chave Pública Anon (anon key)'}
+                </label>
+                <input
+                  type="text"
+                  value={supabaseKeyInput}
+                  onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                  placeholder="sb_publishable_... ou eyJ..."
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+                <span className="text-[10px] text-neutral-500 block">
+                  Encontrada em Supabase &gt; Project Settings &gt; API
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-800">
+              <button
+                type="button"
+                disabled={isSavingCreds}
+                onClick={handleResetCredentials}
+                className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium cursor-pointer transition-colors"
+              >
+                {language === 'es' ? 'Restaurar Predeterminado' : 'Restaurar Credenciais Padrão'}
+              </button>
+
+              <button
+                type="button"
+                disabled={isSavingCreds}
+                onClick={handleSaveCredentials}
+                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-neutral-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-950/30 transition-all"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>{isSavingCreds ? (language === 'es' ? 'Guardando...' : 'Salvando e Testando...') : (language === 'es' ? 'Guardar y Conectar' : 'Salvar e Conectar')}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Real-time Interactive Test Feedback */}
         {testResult && (
           <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs animate-in fade-in ${
@@ -469,7 +662,7 @@ export const BackupView: React.FC = () => {
                 <span className="font-bold block text-sm">
                   {testResult.success 
                     ? (language === 'es' ? '¡Banco Supabase 100% Funcional!' : 'Banco Supabase 100% Funcional & Operacional!') 
-                    : (language === 'es' ? 'Fallo en la prueba' : 'Falha no teste')}
+                    : (language === 'es' ? 'Fallo en la prueba' : 'Falha no teste de conexão')}
                 </span>
                 <span className="text-[11px] opacity-90 block mt-0.5">
                   {testResult.message}
@@ -490,11 +683,11 @@ export const BackupView: React.FC = () => {
             <span className="text-[11px] text-neutral-400 block font-medium">
               {language === 'es' ? 'Punto de Acceso (URL)' : 'Endpoint do Projeto'}
             </span>
-            <span className="font-mono text-neutral-200 text-xs font-semibold block mt-1 truncate" title={DEFAULT_SUPABASE_URL}>
-              {DEFAULT_SUPABASE_URL}
+            <span className="font-mono text-neutral-200 text-xs font-semibold block mt-1 truncate" title={supabaseUrlInput}>
+              {supabaseUrlInput}
             </span>
-            <span className="text-[10px] text-emerald-400 block mt-1 flex items-center gap-1">
-              <Check className="w-3 h-3" /> REST v1 Ativo
+            <span className={`text-[10px] block mt-1 flex items-center gap-1 ${dbStatus.connected && dbStatus.mode === 'supabase_cloud' ? 'text-emerald-400' : 'text-amber-400'}`}>
+              <Check className="w-3 h-3" /> {dbStatus.connected && dbStatus.mode === 'supabase_cloud' ? 'REST v1 Ativo' : 'Aguardando Reativação'}
             </span>
           </div>
 
@@ -502,11 +695,11 @@ export const BackupView: React.FC = () => {
             <span className="text-[11px] text-neutral-400 block font-medium">
               {language === 'es' ? 'Clave de Autenticación' : 'Chave Pública (Anon/Publishable)'}
             </span>
-            <span className="font-mono text-neutral-200 text-xs font-semibold block mt-1 truncate" title={DEFAULT_SUPABASE_ANON_KEY}>
-              {DEFAULT_SUPABASE_ANON_KEY.slice(0, 18)}...{DEFAULT_SUPABASE_ANON_KEY.slice(-6)}
+            <span className="font-mono text-neutral-200 text-xs font-semibold block mt-1 truncate" title={supabaseKeyInput}>
+              {supabaseKeyInput.slice(0, 18)}...{supabaseKeyInput.slice(-6)}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-1 flex items-center gap-1">
-              <Check className="w-3 h-3" /> Token Válido & Autorizado
+              <Check className="w-3 h-3" /> Token Configurado
             </span>
           </div>
 
@@ -515,7 +708,7 @@ export const BackupView: React.FC = () => {
               {language === 'es' ? 'Estado de las Tablas' : 'Status das Tabelas'}
             </span>
             <span className={`font-mono text-xs font-semibold block mt-1 ${dbStatus.supabase?.tablesExist ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {dbStatus.supabase?.tablesExist ? 'Tabelas Criadas & Sincronizadas' : 'Aguardando Execução do SQL'}
+              {dbStatus.supabase?.tablesExist ? 'Tabelas Criadas & Sincronizadas' : (dbStatus.connected ? 'Aguardando Execução do SQL' : 'Aguardando Conexão')}
             </span>
             <span className="text-[10px] text-neutral-400 block mt-1">
               {dbStatus.supabase?.tablesExist ? 'korisko_system_state ativo' : 'Script pronto para criar em 1 clique'}

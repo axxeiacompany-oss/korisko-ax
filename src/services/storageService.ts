@@ -1437,7 +1437,7 @@ export class StorageService {
       console.warn('[Korisko DB] Supabase health check exception:', err);
     }
 
-    if (supabaseHealth && supabaseHealth.reachable) {
+    if (supabaseHealth && supabaseHealth.reachable && supabaseHealth.authenticated) {
       return {
         connected: true,
         mode: 'supabase_cloud',
@@ -1448,7 +1448,7 @@ export class StorageService {
     }
 
     return { 
-      connected: Boolean(supabaseHealth?.authenticated), 
+      connected: false, 
       mode: 'banco_operacional', 
       railwayDetected: false,
       totalRecords: 0,

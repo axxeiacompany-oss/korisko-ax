@@ -1,24 +1,35 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { 
+  supabase, 
+  DEFAULT_SUPABASE_URL, 
+  DEFAULT_SUPABASE_ANON_KEY, 
+  normalizeSupabaseUrl,
+  getStoredSupabaseConfig,
+  setCustomSupabaseCredentials,
+  resetToDefaultSupabaseCredentials,
+} from '../lib/supabase';
 
-// Re-export single client instance
-export { supabase };
+// Re-export single client instance and helpers
+export { 
+  supabase, 
+  DEFAULT_SUPABASE_URL, 
+  DEFAULT_SUPABASE_ANON_KEY, 
+  normalizeSupabaseUrl,
+  getStoredSupabaseConfig,
+  setCustomSupabaseCredentials,
+  resetToDefaultSupabaseCredentials,
+};
 
-// Default configuration with the user-provided Supabase project credentials
-export const DEFAULT_SUPABASE_URL = 'https://lmbpvdpmrdfxfqednwxd.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_l0-nPS9D5LQAC_AvzAyYWA_MXIFG0lm';
+export const supabaseUrl = DEFAULT_SUPABASE_URL;
+export const supabaseAnonKey = DEFAULT_SUPABASE_ANON_KEY;
 
-/**
- * Normalizes Supabase URL, removing any /rest/v1 or trailing slashes
- */
-export function normalizeSupabaseUrl(url: string): string {
-  if (!url) return DEFAULT_SUPABASE_URL;
-  return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+export function getActiveSupabaseUrl(): string {
+  return getStoredSupabaseConfig().url;
 }
 
-const rawEnvUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
-export const supabaseUrl = normalizeSupabaseUrl(rawEnvUrl);
-export const supabaseAnonKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
+export function getActiveSupabaseAnonKey(): string {
+  return getStoredSupabaseConfig().anonKey;
+}
 
 export interface SupabaseHealthResult {
   reachable: boolean;
@@ -590,29 +601,66 @@ $$ LANGUAGE plpgsql;
 -- SELECT public.korisko_reset_factory_zero();
 `;
 
+function isNetworkOrDnsError(msg?: string): boolean {
+  const m = (msg || '').toLowerCase();
+  return (
+    m.includes('fetch failed') ||
+    m.includes('failed to fetch') ||
+    m.includes('enotfound') ||
+    m.includes('econnrefused') ||
+    m.includes('networkerror') ||
+    m.includes('abort') ||
+    m.includes('timeout') ||
+    m.includes('connection refused')
+  );
+}
+
 /**
  * Checks connectivity to the Supabase instance and validates if tables are created
  */
 export async function checkSupabaseHealth(): Promise<SupabaseHealthResult> {
+  const activeUrl = getActiveSupabaseUrl();
+  const activeKey = getActiveSupabaseAnonKey();
+
   try {
-    // Check both system state and functional usuarios table
-    const [stateCheck, userCheck] = await Promise.all([
+    const checkPromise = Promise.all([
       supabase.from('korisko_system_state').select('id').limit(1),
       supabase.from('usuarios').select('id').limit(1)
     ]);
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Tempo limite esgotado ao contatar o Supabase (timeout de 3.5s)')), 3500)
+    );
+
+    const [stateCheck, userCheck] = await Promise.race([checkPromise, timeoutPromise]);
+
+    const stateErrMsg = stateCheck.error?.message || '';
+    const userErrMsg = userCheck.error?.message || '';
+
+    // If network or DNS failed (e.g. paused free tier project or bad domain)
+    if (isNetworkOrDnsError(stateErrMsg) || isNetworkOrDnsError(userErrMsg)) {
+      return {
+        reachable: false,
+        authenticated: false,
+        tablesExist: false,
+        url: activeUrl,
+        keyPrefix: activeKey.slice(0, 16) + '...',
+        error: 'Projeto pausado ou URL inacessível. Reative o projeto no painel Supabase ou atualize as credenciais.',
+      };
+    }
 
     const hasStateTable = !stateCheck.error;
     const hasUserTable = !userCheck.error;
 
     if (!hasStateTable && !hasUserTable) {
-      const errorMsg = stateCheck.error?.message || userCheck.error?.message || '';
+      const errorMsg = stateErrMsg || userErrMsg || '';
       if (errorMsg.includes('schema cache') || errorMsg.includes('does not exist')) {
         return {
           reachable: true,
           authenticated: true,
           tablesExist: false,
-          url: supabaseUrl,
-          keyPrefix: supabaseAnonKey.slice(0, 16) + '...',
+          url: activeUrl,
+          keyPrefix: activeKey.slice(0, 16) + '...',
           error: 'Tabelas (usuarios e korisko_system_state) ainda não criadas no Supabase. Execute o script no SQL Editor.',
         };
       }
@@ -621,8 +669,8 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthResult> {
         reachable: true,
         authenticated: false,
         tablesExist: false,
-        url: supabaseUrl,
-        keyPrefix: supabaseAnonKey.slice(0, 16) + '...',
+        url: activeUrl,
+        keyPrefix: activeKey.slice(0, 16) + '...',
         error: errorMsg || 'Falha de autenticação no Supabase',
       };
     }
@@ -632,8 +680,8 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthResult> {
       authenticated: true,
       tablesExist: true,
       tableCount: (hasStateTable ? 1 : 0) + (hasUserTable ? 1 : 0),
-      url: supabaseUrl,
-      keyPrefix: supabaseAnonKey.slice(0, 16) + '...',
+      url: activeUrl,
+      keyPrefix: activeKey.slice(0, 16) + '...',
       error: null,
     };
   } catch (err: any) {
@@ -641,9 +689,11 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthResult> {
       reachable: false,
       authenticated: false,
       tablesExist: false,
-      url: supabaseUrl,
-      keyPrefix: supabaseAnonKey.slice(0, 16) + '...',
-      error: err.message || 'Falha ao conectar com o Supabase',
+      url: activeUrl,
+      keyPrefix: activeKey.slice(0, 16) + '...',
+      error: isNetworkOrDnsError(err.message)
+        ? 'Projeto pausado ou URL inacessível. Reative o projeto no painel Supabase ou atualize as credenciais.'
+        : (err.message || 'Falha ao conectar com o Supabase'),
     };
   }
 }
@@ -1089,42 +1139,43 @@ export async function testSupabaseReadWrite(): Promise<{
     const testId = `ping-test-${Date.now()}`;
     const pingData = { test: true, timestamp: new Date().toISOString() };
 
-    // 1. Test Write
-    const { error: writeError } = await supabase
-      .from('korisko_backup_points')
-      .upsert({
-        id: testId,
-        data: pingData,
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+    const pingPromise = (async () => {
+      // 1. Test Write
+      const { error: writeError } = await supabase
+        .from('korisko_backup_points')
+        .upsert({
+          id: testId,
+          data: pingData,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
 
-    if (writeError) {
-      return {
-        success: false,
-        latencyMs: Math.round(performance.now() - t0),
-        message: 'Falha na gravação no Supabase: ' + writeError.message,
-        error: writeError.message,
-      };
-    }
+      if (writeError) {
+        throw new Error(writeError.message);
+      }
 
-    // 2. Test Read
-    const { data: readData, error: readError } = await supabase
-      .from('korisko_backup_points')
-      .select('id, data')
-      .eq('id', testId)
-      .maybeSingle();
+      // 2. Test Read
+      const { data: readData, error: readError } = await supabase
+        .from('korisko_backup_points')
+        .select('id, data')
+        .eq('id', testId)
+        .maybeSingle();
 
-    if (readError || !readData) {
-      return {
-        success: false,
-        latencyMs: Math.round(performance.now() - t0),
-        message: 'Falha na leitura no Supabase: ' + (readError?.message || 'Registro não encontrado'),
-        error: readError?.message,
-      };
-    }
+      if (readError || !readData) {
+        throw new Error(readError?.message || 'Falha na leitura');
+      }
 
-    // 3. Cleanup test ping
-    await supabase.from('korisko_backup_points').delete().eq('id', testId);
+      // 3. Cleanup test ping
+      try {
+        await supabase.from('korisko_backup_points').delete().eq('id', testId);
+      } catch {}
+      return true;
+    })();
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Tempo limite esgotado (timeout de 4s). Servidor inacessível.')), 4000)
+    );
+
+    await Promise.race([pingPromise, timeoutPromise]);
 
     const latencyMs = Math.round(performance.now() - t0);
     return {
@@ -1133,11 +1184,16 @@ export async function testSupabaseReadWrite(): Promise<{
       message: `Comunicação com Supabase 100% verificada! Gravação, leitura e confirmação em ${latencyMs}ms.`,
     };
   } catch (err: any) {
+    const latencyMs = Math.round(performance.now() - t0);
+    const msg = err.message || 'Erro ao conectar ao Supabase';
+    const isOffline = isNetworkOrDnsError(msg);
     return {
       success: false,
-      latencyMs: Math.round(performance.now() - t0),
-      message: err.message || 'Erro ao conectar ao Supabase',
-      error: err.message,
+      latencyMs,
+      message: isOffline
+        ? 'Falha de conexão: O endereço do Supabase não respondeu (projeto pode estar pausado ou URL inválida).'
+        : `Erro no Supabase: ${msg}`,
+      error: msg,
     };
   }
 }
