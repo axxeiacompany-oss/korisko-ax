@@ -86,13 +86,19 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
       const matchCat = categoryFilter === 'todas' || c.category === categoryFilter;
 
       let matchAffiliate = true;
-      if (affiliateFilter === 'sem_afiliado') {
+      if (isAffiliateUser) {
+        matchAffiliate = Boolean(
+          c.affiliateId === currentUser?.id ||
+          (currentUser?.affiliateCode && c.affiliateId?.toUpperCase() === currentUser.affiliateCode.toUpperCase()) ||
+          (currentUser?.name && c.affiliateName && c.affiliateName.toLowerCase().trim() === currentUser.name.toLowerCase()) ||
+          (currentUser?.name?.toLowerCase().includes('guilherme') && (c.affiliateId === 'emp-afiliado-guilherme' || c.affiliateName?.toLowerCase().includes('guilherme')))
+        );
+      } else if (affiliateFilter === 'sem_afiliado') {
         matchAffiliate = !c.affiliateId && !c.affiliateName;
       } else if (affiliateFilter !== 'todas') {
         matchAffiliate = Boolean(
           c.affiliateId === affiliateFilter || 
-          (c.affiliateName && employees.find(e => e.id === affiliateFilter)?.name?.toLowerCase() === c.affiliateName.toLowerCase()) ||
-          (isAffiliateUser && c.affiliateName && currentUser?.name && c.affiliateName.toLowerCase() === currentUser.name.toLowerCase())
+          (c.affiliateName && employees.find(e => e.id === affiliateFilter)?.name?.toLowerCase() === c.affiliateName.toLowerCase())
         );
       }
 
@@ -172,8 +178,13 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
       const empMatch = employees.find(e => e.id === formAffiliateId);
       if (empMatch) resolvedAffName = empMatch.name;
     }
-    const finalAffId = isDireto ? undefined : (formAffiliateId.trim() || 'emp-afiliado-guilherme');
-    const finalAffName = isDireto ? undefined : (resolvedAffName || 'Guilherme');
+    let finalAffId = isDireto ? undefined : (formAffiliateId.trim() || 'emp-afiliado-guilherme');
+    let finalAffName = isDireto ? undefined : (resolvedAffName || 'Guilherme');
+
+    if (isAffiliateUser && currentUser) {
+      finalAffId = currentUser.id;
+      finalAffName = currentUser.name;
+    }
 
     if (editingCustomer) {
       await updateCustomer({
@@ -376,24 +387,31 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
 
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
           {/* Affiliate filter */}
-          <select
-            id="clientes-affiliate-filter"
-            name="clientesAffiliateFilter"
-            value={affiliateFilter}
-            onChange={(e) => setAffiliateFilter(e.target.value)}
-            className="px-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-neutral-300 focus:outline-none focus:border-indigo-500 shrink-0 cursor-pointer"
-          >
-            <option value="todas">Todos os Clientes & Afiliados</option>
-            <option value="sem_afiliado">Clientes Diretos da Loja (Sem Afiliado)</option>
-            {employees.map(emp => {
-              const count = customers.filter(c => c.affiliateId === emp.id || (c.affiliateName && c.affiliateName.toLowerCase() === emp.name.toLowerCase())).length;
-              return (
-                <option key={emp.id} value={emp.id}>
-                  {emp.role === 'afiliado' ? 'Afiliado: ' : 'Vendedor: '}{emp.name} ({count})
-                </option>
-              );
-            })}
-          </select>
+          {isAffiliateUser ? (
+            <div className="px-3 py-1.5 bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5 shadow-sm">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Sua Carteira: {currentUser?.name}</span>
+            </div>
+          ) : (
+            <select
+              id="clientes-affiliate-filter"
+              name="clientesAffiliateFilter"
+              value={affiliateFilter}
+              onChange={(e) => setAffiliateFilter(e.target.value)}
+              className="px-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-neutral-300 focus:outline-none focus:border-indigo-500 shrink-0 cursor-pointer"
+            >
+              <option value="todas">Todos os Clientes & Afiliados</option>
+              <option value="sem_afiliado">Clientes Diretos da Loja (Sem Afiliado)</option>
+              {employees.map(emp => {
+                const count = customers.filter(c => c.affiliateId === emp.id || (c.affiliateName && c.affiliateName.toLowerCase() === emp.name.toLowerCase())).length;
+                return (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.role === 'afiliado' ? 'Afiliado: ' : 'Vendedor: '}{emp.name} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          )}
 
           {/* Category filter */}
           <select

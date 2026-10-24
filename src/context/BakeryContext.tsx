@@ -2851,15 +2851,20 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Saves single row with await to Supabase
   // ==========================================
   const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>): Promise<Customer> => {
+    const isAffiliate = currentUser?.role === 'afiliado';
     const guilhermeEmp = data.employees?.find(e => e.name?.toLowerCase().includes('guilherme') || e.role === 'afiliado') 
       || INITIAL_EMPLOYEES.find(e => e.id === 'emp-afiliado-guilherme');
-    const defaultAffiliateId = currentUser?.role === 'afiliado' ? currentUser.id : (guilhermeEmp?.id || 'emp-afiliado-guilherme');
-    const defaultAffiliateName = currentUser?.role === 'afiliado' ? currentUser.name : (guilhermeEmp?.name || 'Guilherme');
+    const defaultAffiliateId = isAffiliate ? currentUser.id : (guilhermeEmp?.id || 'emp-afiliado-guilherme');
+    const defaultAffiliateName = isAffiliate ? currentUser.name : (guilhermeEmp?.name || 'Guilherme');
 
     let assignedAffiliateId: string | undefined = undefined;
     let assignedAffiliateName: string | undefined = undefined;
 
-    if (custData.affiliateId === 'direto') {
+    if (isAffiliate) {
+      // Mandate: Affiliates can ONLY add customers directly into their own portfolio
+      assignedAffiliateId = currentUser.id;
+      assignedAffiliateName = currentUser.name;
+    } else if (custData.affiliateId === 'direto') {
       assignedAffiliateId = undefined;
       assignedAffiliateName = undefined;
     } else if (custData.affiliateId && custData.affiliateId.trim() !== '') {
@@ -2902,6 +2907,27 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentUser, data.employees]);
 
   const updateCustomer = useCallback(async (updated: Customer) => {
+    // Mandate: An affiliate cannot modify customers belonging to another affiliate
+    if (currentUser?.role === 'afiliado') {
+      const myId = currentUser.id;
+      const myCode = currentUser.affiliateCode?.toUpperCase();
+      const myName = currentUser.name?.toLowerCase().trim();
+      const isGuilherme = Boolean(myName?.includes('guilherme') || myId === 'emp-afiliado-guilherme');
+      const existing = (data.customers || []).find(c => c.id === updated.id);
+      const isOwner = existing && (
+        existing.affiliateId === myId ||
+        (myCode && existing.affiliateId?.toUpperCase() === myCode) ||
+        (myName && existing.affiliateName && existing.affiliateName.toLowerCase().trim() === myName) ||
+        (isGuilherme && (existing.affiliateId === 'emp-afiliado-guilherme' || existing.affiliateName?.toLowerCase().includes('guilherme')))
+      );
+      if (!isOwner) {
+        console.warn('[BakeryContext] Bloqueio de segurança: afiliado não tem permissão para alterar cliente de outro afiliado.');
+        return;
+      }
+      updated.affiliateId = myId;
+      updated.affiliateName = currentUser.name;
+    }
+
     let persisted = updated;
     try {
       persisted = await upsertCliente(updated);
@@ -2927,9 +2953,28 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       saveSystemStateDoc(nextState);
       return nextState;
     });
-  }, [buildDebtorRecord]);
+  }, [buildDebtorRecord, currentUser, data.customers]);
 
   const deleteCustomer = useCallback(async (id: string) => {
+    // Mandate: An affiliate cannot delete customers belonging to another affiliate
+    if (currentUser?.role === 'afiliado') {
+      const myId = currentUser.id;
+      const myCode = currentUser.affiliateCode?.toUpperCase();
+      const myName = currentUser.name?.toLowerCase().trim();
+      const isGuilherme = Boolean(myName?.includes('guilherme') || myId === 'emp-afiliado-guilherme');
+      const existing = (data.customers || []).find(c => c.id === id);
+      const isOwner = existing && (
+        existing.affiliateId === myId ||
+        (myCode && existing.affiliateId?.toUpperCase() === myCode) ||
+        (myName && existing.affiliateName && existing.affiliateName.toLowerCase().trim() === myName) ||
+        (isGuilherme && (existing.affiliateId === 'emp-afiliado-guilherme' || existing.affiliateName?.toLowerCase().includes('guilherme')))
+      );
+      if (!isOwner) {
+        console.warn('[BakeryContext] Bloqueio de segurança: afiliado não tem permissão para excluir cliente de outro afiliado.');
+        return;
+      }
+    }
+
     try {
       await deleteCliente(id);
     } catch (err: any) {
@@ -2947,7 +2992,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       saveSystemStateDoc(nextState);
       return nextState;
     });
-  }, []);
+  }, [currentUser, data.customers]);
 
   // Live Checkout Broadcast & Persistence ("Na hora de cobrar e colocar Fiado ou outro método")
   const broadcastCheckoutSession = useCallback((
@@ -4980,6 +5025,45 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [data.employees]);
 
+  // Strict portfolio isolation for users with role 'afiliado'
+  const isAffiliateUser = currentUser?.role === 'afiliado';
+
+  const affiliateVisibleCustomers = useMemo(() => {
+    if (!isAffiliateUser) return data.customers || [];
+    const myId = currentUser.id;
+    const myCode = currentUser.affiliateCode?.toUpperCase();
+    const myName = currentUser.name?.toLowerCase().trim();
+    const isGuilherme = Boolean(myName?.includes('guilherme') || myId === 'emp-afiliado-guilherme');
+
+    return (data.customers || []).filter(c => {
+      if (c.affiliateId === myId) return true;
+      if (myCode && c.affiliateId?.toUpperCase() === myCode) return true;
+      if (myName && c.affiliateName && c.affiliateName.toLowerCase().trim() === myName) return true;
+      if (isGuilherme && (c.affiliateId === 'emp-afiliado-guilherme' || c.affiliateName?.toLowerCase().includes('guilherme'))) return true;
+      return false;
+    });
+  }, [isAffiliateUser, currentUser, data.customers]);
+
+  const affiliateAllowedCustomerIds = useMemo(() => {
+    if (!isAffiliateUser) return null;
+    return new Set(affiliateVisibleCustomers.map(c => c.id));
+  }, [isAffiliateUser, affiliateVisibleCustomers]);
+
+  const affiliateVisibleEntries = useMemo(() => {
+    if (!isAffiliateUser || !affiliateAllowedCustomerIds) return data.customerEntries || [];
+    return (data.customerEntries || []).filter(e => affiliateAllowedCustomerIds.has(e.customerId));
+  }, [isAffiliateUser, affiliateAllowedCustomerIds, data.customerEntries]);
+
+  const affiliateVisiblePurchases = useMemo(() => {
+    if (!isAffiliateUser || !affiliateAllowedCustomerIds) return data.customerPurchases || [];
+    return (data.customerPurchases || []).filter(p => affiliateAllowedCustomerIds.has(p.customerId));
+  }, [isAffiliateUser, affiliateAllowedCustomerIds, data.customerPurchases]);
+
+  const affiliateVisibleDebtors = useMemo(() => {
+    if (!isAffiliateUser || !affiliateAllowedCustomerIds) return data.liveDebtorBalances || [];
+    return (data.liveDebtorBalances || []).filter(d => affiliateAllowedCustomerIds.has(d.customerId));
+  }, [isAffiliateUser, affiliateAllowedCustomerIds, data.liveDebtorBalances]);
+
   const contextValue = useMemo<BakeryContextType>(() => ({
     language,
     setLanguage,
@@ -5021,10 +5105,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateFichaTecnica,
     deleteFichaTecnica,
     executeProductionFromRecipe,
-    customers: data.customers || [],
-    liveDebtorBalances: data.liveDebtorBalances || [],
-    customerEntries: data.customerEntries || [],
-    customerPurchases: data.customerPurchases || [],
+    customers: isAffiliateUser ? affiliateVisibleCustomers : (data.customers || []),
+    liveDebtorBalances: isAffiliateUser ? affiliateVisibleDebtors : (data.liveDebtorBalances || []),
+    customerEntries: isAffiliateUser ? affiliateVisibleEntries : (data.customerEntries || []),
+    customerPurchases: isAffiliateUser ? affiliateVisiblePurchases : (data.customerPurchases || []),
     activeCheckouts: data.activeCheckouts || [],
     broadcastCheckoutSession,
     clearCheckoutSession,
@@ -5090,7 +5174,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     recordSangria, recordSuprimento, getCurrentGoal, updateGoal,
     backupPoints, lastBackupTime, isCloudSyncing, createManualBackup,
     exportDatabaseBackup, importDatabaseBackup, restoreFromPoint,
-    resetToSampleData, resetToFactoryZero, dbStatus, refreshDbStatus
+    resetToSampleData, resetToFactoryZero, dbStatus, refreshDbStatus,
+    isAffiliateUser, affiliateVisibleCustomers, affiliateVisibleDebtors,
+    affiliateVisibleEntries, affiliateVisiblePurchases
   ]);
 
   return (

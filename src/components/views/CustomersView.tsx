@@ -270,7 +270,14 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
       }
 
       let matchAffiliate = true;
-      if (affiliateFilter === 'direto') {
+      if (isAffiliateUser) {
+        matchAffiliate = Boolean(
+          c.affiliateId === currentUser?.id ||
+          (currentUser?.affiliateCode && c.affiliateId?.toUpperCase() === currentUser.affiliateCode.toUpperCase()) ||
+          (currentUser?.name && c.affiliateName && c.affiliateName.toLowerCase().trim() === currentUser.name.toLowerCase()) ||
+          (currentUser?.name?.toLowerCase().includes('guilherme') && (c.affiliateId === 'emp-afiliado-guilherme' || c.affiliateName?.toLowerCase().includes('guilherme')))
+        );
+      } else if (affiliateFilter === 'direto') {
         matchAffiliate = !c.affiliateId;
       } else if (affiliateFilter !== 'todos') {
         matchAffiliate = c.affiliateId === affiliateFilter;
@@ -278,7 +285,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
 
       return matchSearch && matchCat && matchTab && matchAffiliate;
     });
-  }, [customers, search, categoryFilter, activeViewTab, onlyDebtors, currentMonthNum, affiliateFilter]);
+  }, [customers, search, categoryFilter, activeViewTab, onlyDebtors, currentMonthNum, affiliateFilter, isAffiliateUser, currentUser]);
 
   // Birthday customers count for current month
   const birthdayCount = useMemo(() => {
@@ -390,8 +397,13 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
       const empMatch = employees.find(emp => emp.id === formAffiliateId);
       if (empMatch) resolvedAffName = empMatch.name;
     }
-    const finalAffId = isDireto ? undefined : (formAffiliateId.trim() || 'emp-afiliado-guilherme');
-    const finalAffName = isDireto ? undefined : (resolvedAffName || 'Guilherme');
+    let finalAffId = isDireto ? undefined : (formAffiliateId.trim() || 'emp-afiliado-guilherme');
+    let finalAffName = isDireto ? undefined : (resolvedAffName || 'Guilherme');
+
+    if (isAffiliateUser && currentUser) {
+      finalAffId = currentUser.id;
+      finalAffName = currentUser.name;
+    }
 
     if (editingCustomer) {
       await updateCustomer({
@@ -1461,21 +1473,28 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ initialTab, onNavi
               </select>
 
               {/* Affiliate filter */}
-              <select
-                id="crm-affiliate-filter"
-                name="affiliateFilter"
-                value={affiliateFilter}
-                onChange={(e) => setAffiliateFilter(e.target.value)}
-                className="px-3 py-1.5 bg-[#080B12] border border-purple-500/30 text-purple-300 rounded-xl text-xs focus:outline-none focus:border-purple-400 shrink-0 cursor-pointer"
-              >
-                <option value="todos">Todos os Afiliados / Carteiras</option>
-                <option value="direto">Loja Direta (Sem Afiliado)</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} {emp.role === 'afiliado' ? '⭐ (Afiliado)' : `(${emp.role})`}
-                  </option>
-                ))}
-              </select>
+              {isAffiliateUser ? (
+                <div className="px-3 py-1.5 bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5 shadow-sm">
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Sua Carteira: {currentUser?.name}</span>
+                </div>
+              ) : (
+                <select
+                  id="crm-affiliate-filter"
+                  name="affiliateFilter"
+                  value={affiliateFilter}
+                  onChange={(e) => setAffiliateFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-[#080B12] border border-purple-500/30 text-purple-300 rounded-xl text-xs focus:outline-none focus:border-purple-400 shrink-0 cursor-pointer"
+                >
+                  <option value="todos">Todos os Afiliados / Carteiras</option>
+                  <option value="direto">Loja Direta (Sem Afiliado)</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} {emp.role === 'afiliado' ? '⭐ (Afiliado)' : `(${emp.role})`}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               {/* Modo de exibição: Cartões vs Tabela */}
               <div className="flex items-center rounded-xl bg-[#080B12] border border-[#1C2538] p-0.5 shrink-0">
