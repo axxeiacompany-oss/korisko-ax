@@ -255,6 +255,8 @@ export interface Customer {
   purchaseCount: number;
   lastPurchaseDate?: string;
   createdAt: string;
+  affiliateId?: string; // ID do Afiliado / Vendedor responsável
+  affiliateName?: string; // Nome do Afiliado / Vendedor
 }
 
 export interface CustomerAccountEntry {

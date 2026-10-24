@@ -34,7 +34,8 @@ import {
   RefreshCw,
   Unlock,
   Store,
-  ExternalLink
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
 import { AppFeature, Employee, UserRole } from '../../types';
 import { ConfirmModal } from '../modals/ConfirmModal';
@@ -168,6 +169,7 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
   const { 
     currentUser, 
     employees, 
+    customers,
     addEmployee, 
     updateEmployee, 
     deleteEmployee,
@@ -860,6 +862,35 @@ export const AfiliadosView: React.FC<Props> = ({ onNavigate }) => {
                     <span>{isThisPasswordVisible ? 'Ocultar' : 'Ver Senha'}</span>
                   </button>
                 </div>
+
+                {/* Carteira de Clientes deste Colaborador / Afiliado */}
+                {(() => {
+                  const empClients = (customers || []).filter(c => 
+                    c.affiliateId === emp.id || 
+                    (c.affiliateName && c.affiliateName.trim().toLowerCase() === emp.name.trim().toLowerCase())
+                  );
+                  return (
+                    <div className="mt-2.5 p-2.5 rounded-xl bg-[#080B12] border border-[#182030] flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="text-neutral-400">Carteira de Clientes:</span>
+                        <span className="font-bold text-white font-mono">
+                          {empClients.length} {empClients.length === 1 ? 'cliente' : 'clientes'}
+                        </span>
+                      </div>
+                      {onNavigate && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('crm')}
+                          className="text-[11px] text-[#C89B6E] hover:text-[#F2D6B8] font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Ver no CRM</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Functions allowed breakdown (Interactive 1-click toggles for Admin) */}
                 <div className="mt-3.5 pt-3 border-t border-[#182030] space-y-2">

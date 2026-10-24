@@ -237,6 +237,8 @@ export function customerToRow(c: Customer) {
     total_spent_brl: Number(c.totalSpentBrl) || 0,
     purchase_count: Math.round(Number(c.purchaseCount) || 0),
     last_purchase_date: validLastPurchase,
+    affiliate_id: c.affiliateId?.trim() ? c.affiliateId.trim() : null,
+    affiliate_name: c.affiliateName?.trim() ? c.affiliateName.trim() : null,
     active: true,
   };
 }
@@ -259,6 +261,8 @@ export function rowToCustomer(r: any): Customer {
     purchaseCount: Number(r.purchase_count) || 0,
     lastPurchaseDate: r.last_purchase_date || undefined,
     createdAt: r.created_at || new Date().toISOString(),
+    affiliateId: r.affiliate_id || undefined,
+    affiliateName: r.affiliate_name || undefined,
   };
 }
 
@@ -526,6 +530,8 @@ export async function upsertCliente(c: Customer): Promise<Customer> {
       category,
       birthday,
       notes,
+      affiliate_id,
+      affiliate_name,
       ...legacyRow
     } = row;
     const { data: legacyData, error: legacyError } = await supabase
@@ -547,6 +553,8 @@ export async function upsertCliente(c: Customer): Promise<Customer> {
       category,
       birthday,
       notes,
+      affiliate_id,
+      affiliate_name,
     });
   }
   return rowToCustomer(data);

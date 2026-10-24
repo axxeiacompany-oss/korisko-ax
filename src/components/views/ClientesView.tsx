@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   Check,
   Building,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
 import { ConfirmModal } from '../modals/ConfirmModal';
 
@@ -34,6 +35,7 @@ interface Props {
 export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
   const { 
     customers, 
+    employees,
     currentUser, 
     addCustomer, 
     updateCustomer, 
@@ -46,6 +48,9 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
   const [displayMode, setDisplayMode] = useState<'cards' | 'table'>('cards');
+
+  const isAffiliateUser = currentUser?.role === 'afiliado';
+  const [affiliateFilter, setAffiliateFilter] = useState<string>(isAffiliateUser ? currentUser.id : 'todas');
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -62,8 +67,10 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
   const [formCreditLimit, setFormCreditLimit] = useState('500000');
   const [formBirthday, setFormBirthday] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [formAffiliateId, setFormAffiliateId] = useState('');
+  const [formAffiliateName, setFormAffiliateName] = useState('');
 
-  const canManage = hasPermission(['admin', 'gerente', 'caixa']);
+  const canManage = hasPermission(['admin', 'gerente', 'caixa', 'afiliado']);
   const currentMonthNum = (new Date().getMonth() + 1).toString().padStart(2, '0');
 
   // Filtered customers
@@ -73,13 +80,25 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.phone.includes(search) ||
         (c.documentCpf && c.documentCpf.includes(search)) ||
-        (c.address && c.address.toLowerCase().includes(search.toLowerCase()));
+        (c.address && c.address.toLowerCase().includes(search.toLowerCase())) ||
+        (c.affiliateName && c.affiliateName.toLowerCase().includes(search.toLowerCase()));
 
       const matchCat = categoryFilter === 'todas' || c.category === categoryFilter;
 
-      return matchSearch && matchCat;
+      let matchAffiliate = true;
+      if (affiliateFilter === 'sem_afiliado') {
+        matchAffiliate = !c.affiliateId && !c.affiliateName;
+      } else if (affiliateFilter !== 'todas') {
+        matchAffiliate = Boolean(
+          c.affiliateId === affiliateFilter || 
+          (c.affiliateName && employees.find(e => e.id === affiliateFilter)?.name?.toLowerCase() === c.affiliateName.toLowerCase()) ||
+          (isAffiliateUser && c.affiliateName && currentUser?.name && c.affiliateName.toLowerCase() === currentUser.name.toLowerCase())
+        );
+      }
+
+      return matchSearch && matchCat && matchAffiliate;
     });
-  }, [customers, search, categoryFilter]);
+  }, [customers, search, categoryFilter, affiliateFilter, employees, isAffiliateUser, currentUser]);
 
   // KPIs
   const stats = useMemo(() => {
@@ -108,6 +127,13 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
     setFormCreditLimit('500000');
     setFormBirthday('');
     setFormNotes('');
+    if (isAffiliateUser) {
+      setFormAffiliateId(currentUser.id);
+      setFormAffiliateName(currentUser.name);
+    } else {
+      setFormAffiliateId('');
+      setFormAffiliateName('');
+    }
     setIsFormOpen(true);
   };
 
@@ -123,6 +149,8 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
     setFormCreditLimit((c.creditLimitBrl || 500000).toString());
     setFormBirthday(c.birthday || '');
     setFormNotes(c.notes || '');
+    setFormAffiliateId(c.affiliateId || '');
+    setFormAffiliateName(c.affiliateName || '');
     setIsFormOpen(true);
   };
 
@@ -140,6 +168,11 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
     }
 
     const creditLimit = parseFloat(formCreditLimit) || 0;
+    let resolvedAffName = formAffiliateName.trim();
+    if (formAffiliateId && !resolvedAffName) {
+      const empMatch = employees.find(e => e.id === formAffiliateId);
+      if (empMatch) resolvedAffName = empMatch.name;
+    }
 
     if (editingCustomer) {
       await updateCustomer({
@@ -153,6 +186,8 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         creditLimitBrl: creditLimit,
         birthday: formBirthday.trim() || undefined,
         notes: formNotes.trim() || undefined,
+        affiliateId: formAffiliateId.trim() || undefined,
+        affiliateName: resolvedAffName || undefined,
       });
       showToast(
         language === 'es' ? '¡Cliente actualizado con éxito!' : 'Cliente atualizado com sucesso!',
@@ -169,6 +204,8 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         creditLimitBrl: creditLimit,
         birthday: formBirthday.trim() || undefined,
         notes: formNotes.trim() || undefined,
+        affiliateId: formAffiliateId.trim() || undefined,
+        affiliateName: resolvedAffName || undefined,
       });
       showToast(
         language === 'es' ? '¡Nuevo cliente registrado!' : 'Novo cliente cadastrado com sucesso!',
@@ -337,6 +374,26 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
+          {/* Affiliate filter */}
+          <select
+            id="clientes-affiliate-filter"
+            name="clientesAffiliateFilter"
+            value={affiliateFilter}
+            onChange={(e) => setAffiliateFilter(e.target.value)}
+            className="px-3 py-1.5 bg-[#080B12] border border-[#1C2538] rounded-xl text-xs text-neutral-300 focus:outline-none focus:border-indigo-500 shrink-0 cursor-pointer"
+          >
+            <option value="todas">Todos os Clientes & Afiliados</option>
+            <option value="sem_afiliado">Clientes Diretos da Loja (Sem Afiliado)</option>
+            {employees.map(emp => {
+              const count = customers.filter(c => c.affiliateId === emp.id || (c.affiliateName && c.affiliateName.toLowerCase() === emp.name.toLowerCase())).length;
+              return (
+                <option key={emp.id} value={emp.id}>
+                  {emp.role === 'afiliado' ? 'Afiliado: ' : 'Vendedor: '}{emp.name} ({count})
+                </option>
+              );
+            })}
+          </select>
+
           {/* Category filter */}
           <select
             id="clientes-category-filter"
@@ -415,15 +472,27 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
                       </div>
                     </div>
 
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 border ${
-                      cust.category === 'mensalista' 
-                        ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                        : cust.category === 'empresa'
-                        ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                        : 'bg-neutral-800 text-neutral-300 border-neutral-700'
-                    }`}>
-                      {cust.category}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                        cust.category === 'mensalista' 
+                          ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                          : cust.category === 'empresa'
+                          ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                          : 'bg-neutral-800 text-neutral-300 border-neutral-700'
+                      }`}>
+                        {cust.category}
+                      </span>
+                      {cust.affiliateName ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                          <span>{cust.affiliateName}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-neutral-900 text-neutral-500 border border-neutral-800">
+                          Loja Direta
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Informações de Contato e Localização */}
@@ -549,6 +618,7 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
                   <th className="p-3.5 font-semibold">Cliente</th>
                   <th className="p-3.5 font-semibold">WhatsApp / Telefone</th>
                   <th className="p-3.5 font-semibold">Categoria</th>
+                  <th className="p-3.5 font-semibold">Afiliado / Carteira</th>
                   <th className="p-3.5 font-semibold">CPF / Documento</th>
                   <th className="p-3.5 font-semibold">Aniversário</th>
                   <th className="p-3.5 font-semibold text-right">Limite de Crédito</th>
@@ -585,6 +655,18 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
                       <span className="px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 text-[10px] font-semibold uppercase">
                         {cust.category}
                       </span>
+                    </td>
+                    <td className="p-3.5">
+                      {cust.affiliateName ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-medium">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span className="truncate max-w-[120px]">{cust.affiliateName}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-800/80 text-neutral-400 text-[10px]">
+                          Loja Direta
+                        </span>
+                      )}
                     </td>
                     <td className="p-3.5 font-mono text-neutral-400">
                       {cust.documentCpf || '—'}
@@ -795,6 +877,44 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
                     className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Afiliado Responsável / Carteira */}
+              <div>
+                <label htmlFor="cliente-form-affiliate" className="text-xs font-semibold text-neutral-300 block mb-1">
+                  Afiliado Responsável / Carteira
+                </label>
+                {isAffiliateUser ? (
+                  <div className="w-full bg-purple-950/20 border border-purple-500/30 rounded-xl px-3 py-2 text-xs text-purple-300 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <strong>{currentUser.name}</strong> (Sua carteira de afiliado)
+                    </span>
+                    <span className="text-[10px] bg-purple-500/20 px-2 py-0.5 rounded text-purple-200 uppercase font-bold tracking-wider">
+                      Automático
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    id="cliente-form-affiliate"
+                    name="formAffiliate"
+                    value={formAffiliateId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setFormAffiliateId(selectedId);
+                      const empMatch = employees.find(emp => emp.id === selectedId);
+                      setFormAffiliateName(empMatch ? empMatch.name : '');
+                    }}
+                    className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="">Nenhum (Cliente Direto da Padaria)</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} {emp.role === 'afiliado' ? '⭐ (Afiliado)' : `(${emp.role})`}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Data de Aniversário (DD/MM) */}

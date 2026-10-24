@@ -53,6 +53,7 @@ export const StoreView: React.FC<Props> = ({
   const { user, profile, isAuthenticated, role } = useAuth();
   const {
     products,
+    employees,
     language,
     t,
     completeSale,
@@ -63,6 +64,8 @@ export const StoreView: React.FC<Props> = ({
     isFeatureAllowed,
     hasStorePermission,
     validateStoreAccess,
+    recordAffiliateClick,
+    recordAffiliateOrderSale,
     showToast,
   } = useBakery();
 
@@ -229,31 +232,35 @@ export const StoreView: React.FC<Props> = ({
   const shippingFee = 0;
   const cartTotal = cartSubtotal;
 
+  const [activeAffiliateBanner, setActiveAffiliateBanner] = useState<{
+    code: string;
+    name?: string;
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('KORISKO_AFFILIATE_REF') || sessionStorage.getItem('KORISKO_AFFILIATE_REF');
+      return stored ? { code: stored } : null;
+    }
+    return null;
+  });
+
   // Track affiliate click if present in URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const refCode = urlParams.get('ref');
+    const refCode = urlParams.get('ref') || sessionStorage.getItem('KORISKO_AFFILIATE_REF') || localStorage.getItem('KORISKO_AFFILIATE_REF');
     if (refCode) {
       const cleanRef = refCode.trim().toUpperCase();
       sessionStorage.setItem('KORISKO_AFFILIATE_REF', cleanRef);
       localStorage.setItem('KORISKO_AFFILIATE_REF', cleanRef);
 
-      supabase
-        .from('affiliates')
-        .select('id, clicks_count')
-        .eq('affiliate_code', cleanRef)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) {
-            supabase
-              .from('affiliates')
-              .update({ clicks_count: (data.clicks_count || 0) + 1 })
-              .eq('id', data.id)
-              .then(() => {});
-          }
-        });
+      const matchedEmp = employees.find(e => e.affiliateCode?.toUpperCase() === cleanRef);
+      setActiveAffiliateBanner({
+        code: cleanRef,
+        name: matchedEmp?.name,
+      });
+
+      recordAffiliateClick(cleanRef);
     }
-  }, []);
+  }, [employees, recordAffiliateClick]);
 
   // Quick Save Product Edit by Admin
   const handleSaveProductEdit = async (e: React.FormEvent) => {
@@ -466,6 +473,14 @@ export const StoreView: React.FC<Props> = ({
         const existingList = JSON.parse(localStorage.getItem(storageKey) || '[]');
         localStorage.setItem(storageKey, JSON.stringify([completedOrderObj, ...existingList]));
       } catch {}
+
+      if (affiliateCode) {
+        try {
+          await recordAffiliateOrderSale(affiliateCode, cartTotal, orderId);
+        } catch (comErr) {
+          console.warn('[StoreView] Erro ao registrar comissão de afiliado:', comErr);
+        }
+      }
 
       setCart([]);
       try {
@@ -680,6 +695,32 @@ export const StoreView: React.FC<Props> = ({
           embeddedInAdmin ? 'w-full space-y-5' : 'flex-1 max-w-7xl w-full mx-auto px-3 sm:px-8 py-4 sm:py-6 space-y-5 pb-28 sm:pb-12'
         }`}
       >
+        {/* Banner do Afiliado Exclusivo */}
+        {activeAffiliateBanner && (
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-[#17130F] via-[#1C1814] to-[#120F0C] border border-[#C89B6E]/40 flex flex-wrap items-center justify-between gap-3 shadow-lg animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#C89B6E]/20 text-[#F2D6B8] flex items-center justify-center shrink-0 border border-[#C89B6E]/30">
+                <Sparkles className="w-4 h-4 text-[#C89B6E]" />
+              </div>
+              <div className="text-xs">
+                <p className="text-neutral-400 text-[11px]">Indicação Especial de Afiliado Parceiro:</p>
+                <p className="text-white font-bold">
+                  {activeAffiliateBanner.name ? (
+                    <>
+                      <span>{activeAffiliateBanner.name}</span>
+                      <span className="text-[#C89B6E] font-mono ml-2 font-normal">({activeAffiliateBanner.code})</span>
+                    </>
+                  ) : (
+                    <span className="font-mono text-[#F2D6B8]">{activeAffiliateBanner.code}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-[#C89B6E]/20 border border-[#C89B6E]/40 text-[#F2D6B8] text-[10px] font-bold font-mono">
+              Comissão & Parceria Vinculadas
+            </span>
+          </div>
+        )}
 
         {/* Category Navigation Bar - Responsive swipeable on mobile, centered pills on desktop */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">

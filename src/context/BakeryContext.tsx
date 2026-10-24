@@ -2839,9 +2839,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Saves single row with await to Supabase
   // ==========================================
   const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>): Promise<Customer> => {
+    const assignedAffiliateId = custData.affiliateId || (currentUser?.role === 'afiliado' ? currentUser.id : undefined);
+    const assignedAffiliateName = custData.affiliateName || (assignedAffiliateId ? (data.employees?.find(e => e.id === assignedAffiliateId)?.name || (currentUser?.role === 'afiliado' ? currentUser.name : undefined)) : undefined);
+
     const newCustomer: Customer = {
       ...custData,
       id: `cust-${Date.now()}`,
+      affiliateId: assignedAffiliateId,
+      affiliateName: assignedAffiliateName,
       outstandingBalanceBrl: 0,
       loyaltyPoints: 0,
       totalSpentBrl: 0,
@@ -2865,7 +2870,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return nextState;
     });
     return persisted;
-  }, []);
+  }, [currentUser, data.employees]);
 
   const updateCustomer = useCallback(async (updated: Customer) => {
     let persisted = updated;
