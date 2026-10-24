@@ -769,10 +769,25 @@ app.post('/api/factory-zero', async (_req, res) => {
       active: true,
     };
 
+    const guilhermeUser = {
+      id: 'emp-afiliado-guilherme',
+      name: 'Guilherme',
+      email: 'guilherme@korisko.com',
+      role: 'afiliado',
+      password: '1234',
+      pin: '1234',
+      avatarColor: 'bg-purple-600',
+      affiliateCode: 'GUILHERME',
+      allowedFeatures: [
+        'dashboard', 'crm', 'clientes', 'loja', 'portal_afiliado'
+      ],
+      active: true,
+    };
+
     const zeroState = {
       version: '2.0.0',
       timestamp: new Date().toISOString(),
-      employees: [adminUser],
+      employees: [adminUser, guilhermeUser],
       products: [],
       stockMovements: [],
       sales: [],

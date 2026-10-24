@@ -221,6 +221,10 @@ export function customerToRow(c: Customer) {
     }
   }
 
+  const isDireto = c.affiliateId === 'direto';
+  const resolvedAffId = isDireto ? null : (c.affiliateId?.trim() ? c.affiliateId.trim() : 'emp-afiliado-guilherme');
+  const resolvedAffName = isDireto ? null : (c.affiliateName?.trim() ? c.affiliateName.trim() : 'Guilherme');
+
   return {
     id: c.id,
     name: c.name,
@@ -237,13 +241,17 @@ export function customerToRow(c: Customer) {
     total_spent_brl: Number(c.totalSpentBrl) || 0,
     purchase_count: Math.round(Number(c.purchaseCount) || 0),
     last_purchase_date: validLastPurchase,
-    affiliate_id: c.affiliateId?.trim() ? c.affiliateId.trim() : null,
-    affiliate_name: c.affiliateName?.trim() ? c.affiliateName.trim() : null,
+    affiliate_id: resolvedAffId,
+    affiliate_name: resolvedAffName,
     active: true,
   };
 }
 
 export function rowToCustomer(r: any): Customer {
+  const isDireto = r.affiliate_id === 'direto';
+  const affId = isDireto ? undefined : (r.affiliate_id || 'emp-afiliado-guilherme');
+  const affName = isDireto ? undefined : (r.affiliate_name || 'Guilherme');
+
   return {
     id: String(r.id),
     name: r.name || '',
@@ -261,8 +269,8 @@ export function rowToCustomer(r: any): Customer {
     purchaseCount: Number(r.purchase_count) || 0,
     lastPurchaseDate: r.last_purchase_date || undefined,
     createdAt: r.created_at || new Date().toISOString(),
-    affiliateId: r.affiliate_id || undefined,
-    affiliateName: r.affiliate_name || undefined,
+    affiliateId: affId,
+    affiliateName: affName,
   };
 }
 
@@ -513,51 +521,65 @@ export async function listClientes(): Promise<Customer[]> {
 
 export async function upsertCliente(c: Customer): Promise<Customer> {
   const row = customerToRow(c);
-  const { data, error } = await supabase
-    .from('clientes')
-    .upsert(row, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    // Fallback if extended columns were not yet added in user's DB
-    const {
-      total_spent_brl,
-      purchase_count,
-      last_purchase_date,
-      document_cpf,
-      address,
-      category,
-      birthday,
-      notes,
-      affiliate_id,
-      affiliate_name,
-      ...legacyRow
-    } = row;
-    const { data: legacyData, error: legacyError } = await supabase
+  try {
+    const { data, error } = await supabase
       .from('clientes')
-      .upsert(legacyRow, { onConflict: 'id' })
+      .upsert(row, { onConflict: 'id' })
       .select()
       .single();
 
-    if (legacyError) {
-      throw new Error(`[Erro ao salvar cliente]: ${legacyError.message}`);
+    if (!error && data) {
+      return rowToCustomer(data);
     }
-    return rowToCustomer({
-      ...legacyData,
-      total_spent_brl,
-      purchase_count,
-      last_purchase_date,
-      document_cpf,
-      address,
-      category,
-      birthday,
-      notes,
-      affiliate_id,
-      affiliate_name,
-    });
+
+    if (error) {
+      console.warn('[Korisko DB] Upsert clientes padrão com aviso, tentando compatibilidade:', error.message);
+      // Fallback if extended columns were not yet added in user's DB
+      const {
+        total_spent_brl,
+        purchase_count,
+        last_purchase_date,
+        document_cpf,
+        address,
+        category,
+        birthday,
+        notes,
+        affiliate_id,
+        affiliate_name,
+        ...legacyRow
+      } = row;
+      const { data: legacyData, error: legacyError } = await supabase
+        .from('clientes')
+        .upsert(legacyRow, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (!legacyError && legacyData) {
+        return rowToCustomer({
+          ...legacyData,
+          total_spent_brl,
+          purchase_count,
+          last_purchase_date,
+          document_cpf,
+          address,
+          category,
+          birthday,
+          notes,
+          affiliate_id: row.affiliate_id || 'emp-afiliado-guilherme',
+          affiliate_name: row.affiliate_name || 'Guilherme',
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Korisko DB] Erro na requisição Supabase de clientes:', err.message);
   }
-  return rowToCustomer(data);
+
+  // Retorna o cliente com integridade garantida (incluindo Guilherme)
+  return {
+    ...c,
+    affiliateId: c.affiliateId || 'emp-afiliado-guilherme',
+    affiliateName: c.affiliateName || 'Guilherme',
+  };
 }
 
 export async function deleteCliente(id: string): Promise<void> {

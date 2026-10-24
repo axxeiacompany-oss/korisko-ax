@@ -292,6 +292,24 @@
         "afiliados",
         "portal_afiliado"
       ]
+    },
+    {
+      "id": "emp-afiliado-guilherme",
+      "name": "Guilherme",
+      "email": "guilherme@korisko.com",
+      "role": "afiliado",
+      "password": "1234",
+      "pin": "1234",
+      "avatarColor": "bg-purple-600",
+      "affiliateCode": "GUILHERME",
+      "allowedFeatures": [
+        "dashboard",
+        "crm",
+        "clientes",
+        "loja",
+        "portal_afiliado"
+      ],
+      "active": true
     }
   ],
   "openComandas": [],
@@ -307,7 +325,9 @@
       "purchaseCount": 1,
       "creditLimitBrl": 500000,
       "category": "varejo",
-      "loyaltyPoints": 17
+      "loyaltyPoints": 17,
+      "affiliateId": "emp-afiliado-guilherme",
+      "affiliateName": "Guilherme"
     }
   ],
   "customerEntries": [

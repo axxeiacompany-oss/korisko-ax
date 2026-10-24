@@ -39,6 +39,7 @@ export interface Employee {
   password?: string;
   allowedFeatures?: AppFeature[];
   createdAt?: string;
+  affiliateCode?: string;
 }
 
 export type ProductCategory = 

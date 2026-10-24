@@ -127,13 +127,11 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
     setFormCreditLimit('500000');
     setFormBirthday('');
     setFormNotes('');
-    if (isAffiliateUser) {
-      setFormAffiliateId(currentUser.id);
-      setFormAffiliateName(currentUser.name);
-    } else {
-      setFormAffiliateId('');
-      setFormAffiliateName('');
-    }
+    const guilhermeEmp = employees.find(e => e.name?.toLowerCase().includes('guilherme') || e.role === 'afiliado');
+    const defaultAffId = isAffiliateUser ? currentUser.id : (guilhermeEmp?.id || 'emp-afiliado-guilherme');
+    const defaultAffName = isAffiliateUser ? currentUser.name : (guilhermeEmp?.name || 'Guilherme');
+    setFormAffiliateId(defaultAffId);
+    setFormAffiliateName(defaultAffName);
     setIsFormOpen(true);
   };
 
@@ -168,11 +166,14 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
     }
 
     const creditLimit = parseFloat(formCreditLimit) || 0;
+    const isDireto = formAffiliateId === 'direto';
     let resolvedAffName = formAffiliateName.trim();
-    if (formAffiliateId && !resolvedAffName) {
+    if (!isDireto && formAffiliateId && !resolvedAffName) {
       const empMatch = employees.find(e => e.id === formAffiliateId);
       if (empMatch) resolvedAffName = empMatch.name;
     }
+    const finalAffId = isDireto ? undefined : (formAffiliateId.trim() || 'emp-afiliado-guilherme');
+    const finalAffName = isDireto ? undefined : (resolvedAffName || 'Guilherme');
 
     if (editingCustomer) {
       await updateCustomer({
@@ -186,8 +187,8 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         creditLimitBrl: creditLimit,
         birthday: formBirthday.trim() || undefined,
         notes: formNotes.trim() || undefined,
-        affiliateId: formAffiliateId.trim() || undefined,
-        affiliateName: resolvedAffName || undefined,
+        affiliateId: finalAffId,
+        affiliateName: finalAffName,
       });
       showToast(
         language === 'es' ? '¡Cliente actualizado con éxito!' : 'Cliente atualizado com sucesso!',
@@ -204,8 +205,8 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
         creditLimitBrl: creditLimit,
         birthday: formBirthday.trim() || undefined,
         notes: formNotes.trim() || undefined,
-        affiliateId: formAffiliateId.trim() || undefined,
-        affiliateName: resolvedAffName || undefined,
+        affiliateId: finalAffId,
+        affiliateName: finalAffName,
       });
       showToast(
         language === 'es' ? '¡Nuevo cliente registrado!' : 'Novo cliente cadastrado com sucesso!',
@@ -902,13 +903,18 @@ export const ClientesView: React.FC<Props> = ({ onNavigateCrm }) => {
                     onChange={(e) => {
                       const selectedId = e.target.value;
                       setFormAffiliateId(selectedId);
-                      const empMatch = employees.find(emp => emp.id === selectedId);
-                      setFormAffiliateName(empMatch ? empMatch.name : '');
+                      if (selectedId === 'direto') {
+                        setFormAffiliateName('');
+                      } else {
+                        const empMatch = employees.find(emp => emp.id === selectedId);
+                        setFormAffiliateName(empMatch ? empMatch.name : (selectedId === 'emp-afiliado-guilherme' ? 'Guilherme' : ''));
+                      }
                     }}
                     className="w-full bg-[#080B12] border border-[#1C2538] rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
-                    <option value="">Nenhum (Cliente Direto da Padaria)</option>
-                    {employees.map(emp => (
+                    <option value="emp-afiliado-guilherme">Guilherme ⭐ (Afiliado - Carteira Principal)</option>
+                    <option value="direto">Nenhum (Cliente Direto da Padaria)</option>
+                    {employees.filter(emp => emp.id !== 'emp-afiliado-guilherme').map(emp => (
                       <option key={emp.id} value={emp.id}>
                         {emp.name} {emp.role === 'afiliado' ? '⭐ (Afiliado)' : `(${emp.role})`}
                       </option>

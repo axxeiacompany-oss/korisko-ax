@@ -49,7 +49,25 @@ export const INITIAL_EMPLOYEES: Employee[] = [
       'metas', 
       'cambio', 
       'backup', 
-      'afiliados'
+      'afiliados',
+      'portal_afiliado'
+    ],
+  },
+  {
+    id: 'emp-afiliado-guilherme',
+    name: 'Guilherme',
+    role: 'afiliado',
+    pin: '1234',
+    avatarColor: 'bg-purple-600',
+    email: 'guilherme@korisko.com',
+    password: '1234',
+    affiliateCode: 'GUILHERME',
+    allowedFeatures: [
+      'dashboard',
+      'crm',
+      'clientes',
+      'loja',
+      'portal_afiliado'
     ],
   },
 ];
@@ -1282,6 +1300,27 @@ export class StorageService {
                   password: '9APG_47z-EgF4yz' 
                 } : e
               );
+            }
+
+            // Ensure Guilherme affiliate is always present in employees list
+            const hasGuilherme = parsed.employees.some((e: any) => e.name?.toLowerCase().includes('guilherme') || e.id === 'emp-afiliado-guilherme');
+            if (!hasGuilherme) {
+              const guilhermeEmp = INITIAL_EMPLOYEES.find(e => e.id === 'emp-afiliado-guilherme');
+              if (guilhermeEmp) parsed.employees.push(guilhermeEmp);
+            }
+
+            // Ensure customers belong to Guilherme
+            if (Array.isArray(parsed.customers)) {
+              parsed.customers = parsed.customers.map((c: any) => {
+                if (!c.affiliateId || !c.affiliateName) {
+                  return {
+                    ...c,
+                    affiliateId: 'emp-afiliado-guilherme',
+                    affiliateName: 'Guilherme',
+                  };
+                }
+                return c;
+              });
             }
           }
           return parsed;

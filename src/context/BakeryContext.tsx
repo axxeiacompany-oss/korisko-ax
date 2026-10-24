@@ -124,6 +124,8 @@ interface BakeryContextType {
   updateEmployee: (emp: Employee) => Promise<void>;
   deleteEmployee: (id: string) => Promise<void>;
   updateEmployeePermissions: (id: string, allowedFeatures: AppFeature[]) => Promise<void>;
+  recordAffiliateClick: (affiliateCode: string) => Promise<void>;
+  recordAffiliateOrderSale: (affiliateCode: string, orderTotal: number, orderId: string) => Promise<void>;
 
   // Venda Direta / Rápida (Apenas Valor & Confirme)
   registerDirectSale: (
@@ -554,6 +556,10 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (!employees.some(e => e.id === 'emp-admin-ax' || e.email === 'axxeiacompany@gmail.com')) {
             employees = [INITIAL_EMPLOYEES[0], ...employees];
           }
+          if (!employees.some(e => e.name?.toLowerCase().includes('guilherme') || e.id === 'emp-afiliado-guilherme')) {
+            const guilhermeEmp = INITIAL_EMPLOYEES.find(e => e.id === 'emp-afiliado-guilherme');
+            if (guilhermeEmp) employees.push(guilhermeEmp);
+          }
 
           // Active session
           let currentSession = prev.currentSession;
@@ -833,8 +839,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ? custPurchases.length
               : (custEntries.length > 0 ? custEntries.filter(e => e.type === 'debito_compra').length : (c.purchaseCount || 0));
             const latestDate = custPurchases[0]?.purchaseDate || c.lastPurchaseDate;
+            const hasExplicitDireto = c.affiliateId === 'direto';
+            const assignedAffId = hasExplicitDireto ? undefined : (c.affiliateId || 'emp-afiliado-guilherme');
+            const assignedAffName = hasExplicitDireto ? undefined : (c.affiliateName || 'Guilherme');
+
             const reconciled: Customer = {
               ...c,
+              affiliateId: assignedAffId,
+              affiliateName: assignedAffName,
               outstandingBalanceBrl: computedOutstanding,
               totalSpentBrl: finalSpent,
               purchaseCount: finalCount,
@@ -2839,8 +2851,25 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Saves single row with await to Supabase
   // ==========================================
   const addCustomer = useCallback(async (custData: Omit<Customer, 'id' | 'createdAt' | 'totalSpentBrl' | 'purchaseCount' | 'outstandingBalanceBrl' | 'loyaltyPoints'>): Promise<Customer> => {
-    const assignedAffiliateId = custData.affiliateId || (currentUser?.role === 'afiliado' ? currentUser.id : undefined);
-    const assignedAffiliateName = custData.affiliateName || (assignedAffiliateId ? (data.employees?.find(e => e.id === assignedAffiliateId)?.name || (currentUser?.role === 'afiliado' ? currentUser.name : undefined)) : undefined);
+    const guilhermeEmp = data.employees?.find(e => e.name?.toLowerCase().includes('guilherme') || e.role === 'afiliado') 
+      || INITIAL_EMPLOYEES.find(e => e.id === 'emp-afiliado-guilherme');
+    const defaultAffiliateId = currentUser?.role === 'afiliado' ? currentUser.id : (guilhermeEmp?.id || 'emp-afiliado-guilherme');
+    const defaultAffiliateName = currentUser?.role === 'afiliado' ? currentUser.name : (guilhermeEmp?.name || 'Guilherme');
+
+    let assignedAffiliateId: string | undefined = undefined;
+    let assignedAffiliateName: string | undefined = undefined;
+
+    if (custData.affiliateId === 'direto') {
+      assignedAffiliateId = undefined;
+      assignedAffiliateName = undefined;
+    } else if (custData.affiliateId && custData.affiliateId.trim() !== '') {
+      assignedAffiliateId = custData.affiliateId.trim();
+      assignedAffiliateName = custData.affiliateName || data.employees?.find(e => e.id === assignedAffiliateId)?.name || defaultAffiliateName;
+    } else {
+      // By mandate: added customers belong to Guilherme
+      assignedAffiliateId = defaultAffiliateId;
+      assignedAffiliateName = defaultAffiliateName;
+    }
 
     const newCustomer: Customer = {
       ...custData,
@@ -4865,6 +4894,92 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  const recordAffiliateClick = useCallback(async (affiliateCode: string) => {
+    if (!affiliateCode) return;
+    try {
+      try {
+        const { data: aff } = await supabase
+          .from('affiliates')
+          .select('id, clicks_count')
+          .eq('affiliate_code', affiliateCode.toUpperCase())
+          .maybeSingle();
+
+        if (aff) {
+          await supabase
+            .from('affiliates')
+            .update({ clicks_count: (aff.clicks_count || 0) + 1, updated_at: new Date().toISOString() })
+            .eq('id', aff.id);
+        }
+      } catch (e) {
+        console.warn('[BakeryContext] Error recording affiliate click in db:', e);
+      }
+
+      const clickKey = `AFF_CLICKS_${affiliateCode.toUpperCase()}`;
+      const current = parseInt(localStorage.getItem(clickKey) || '0', 10);
+      localStorage.setItem(clickKey, String(current + 1));
+    } catch {}
+  }, []);
+
+  const recordAffiliateOrderSale = useCallback(async (affiliateCode: string, orderTotal: number, orderId: string) => {
+    if (!affiliateCode || !orderTotal) return;
+    try {
+      let affId: string | null = null;
+      let commissionRate = 10;
+
+      try {
+        const { data: aff } = await supabase
+          .from('affiliates')
+          .select('id, commission_rate')
+          .eq('affiliate_code', affiliateCode.toUpperCase())
+          .maybeSingle();
+
+        if (aff) {
+          affId = aff.id;
+          commissionRate = Number(aff.commission_rate) || 10;
+        }
+      } catch {}
+
+      if (!affId) {
+        const matchedEmp = data.employees.find(e => e.affiliateCode?.toUpperCase() === affiliateCode.toUpperCase());
+        if (matchedEmp) affId = `aff-${matchedEmp.id}`;
+      }
+
+      const commissionAmount = Math.round((orderTotal * (commissionRate / 100)) * 100) / 100;
+
+      if (affId) {
+        try {
+          await supabase.from('commissions').insert({
+            affiliate_id: affId,
+            order_id: orderId,
+            amount: commissionAmount,
+            rate: commissionRate,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+          });
+        } catch (comErr) {
+          console.warn('[BakeryContext] Error inserting commission in supabase:', comErr);
+        }
+
+        try {
+          const comKey = `KORISKO_AFFILIATE_COMMISSIONS_${affId}`;
+          const currentList = JSON.parse(localStorage.getItem(comKey) || '[]');
+          currentList.push({
+            id: `com-${Date.now()}`,
+            affiliateId: affId,
+            orderId,
+            amount: commissionAmount,
+            rate: commissionRate,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem(comKey, JSON.stringify(currentList));
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('[BakeryContext] recordAffiliateOrderSale error:', err);
+    }
+  }, [data.employees]);
+
   const contextValue = useMemo<BakeryContextType>(() => ({
     language,
     setLanguage,
@@ -4885,6 +5000,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateEmployee,
     deleteEmployee,
     updateEmployeePermissions,
+    recordAffiliateClick,
+    recordAffiliateOrderSale,
     registerDirectSale,
     exchangeRates: data.exchangeRates,
     updateExchangeRates,
@@ -4960,6 +5077,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentUser, data, switchUser, updateEmployeePin, hasPermission, isFeatureAllowed,
     hasStorePermission, validateStoreAccess,
     addEmployee, updateEmployee, deleteEmployee, updateEmployeePermissions,
+    recordAffiliateClick, recordAffiliateOrderSale,
     registerDirectSale, updateExchangeRates, liveRateStatus, fetchLiveRates,
     toggleAutoRateRefresh, addProduct, updateProduct, deleteProduct, adjustStock,
     registerFornada, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica,

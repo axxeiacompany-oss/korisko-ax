@@ -86,6 +86,17 @@ VALUES
     'bg-emerald-600',
     '["dashboard","pdv","venda_direta","loja","crm"]'::jsonb,
     true
+  ),
+  (
+    'emp-afiliado-guilherme',
+    'Guilherme',
+    'guilherme@korisko.com',
+    'afiliado',
+    '1234',
+    '1234',
+    'bg-purple-600',
+    '["dashboard","crm","clientes","loja","portal_afiliado"]'::jsonb,
+    true
   )
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
@@ -135,6 +146,8 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   last_purchase_date TIMESTAMPTZ,
   birthday TEXT,
   notes TEXT,
+  affiliate_id TEXT DEFAULT 'emp-afiliado-guilherme',
+  affiliate_name TEXT DEFAULT 'Guilherme',
   active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -143,6 +156,9 @@ CREATE TABLE IF NOT EXISTS public.clientes (
 ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS total_spent_brl NUMERIC(14, 2) DEFAULT 0.00;
 ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS purchase_count INTEGER DEFAULT 0;
 ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS last_purchase_date TIMESTAMPTZ;
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS affiliate_id TEXT DEFAULT 'emp-afiliado-guilherme';
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS affiliate_name TEXT DEFAULT 'Guilherme';
+UPDATE public.clientes SET affiliate_id = 'emp-afiliado-guilherme', affiliate_name = 'Guilherme' WHERE affiliate_id IS NULL OR affiliate_name IS NULL OR affiliate_id = '';
 
 -- 4. TABELA DE REGISTRO DE COMPRAS DE CADA CLIENTE (Análise Financeira Entradas x Saídas)
 CREATE TABLE IF NOT EXISTS public.registro_compras_clientes (
