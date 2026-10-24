@@ -427,9 +427,6 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
             <div>
               <h1 className="text-base font-bold text-white flex items-center gap-2">
                 <span>{language === 'es' ? 'Portal de Afiliados' : 'Portal de Afiliados'}</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
-                  {affiliate?.commissionRate || 10}% Comissão
-                </span>
               </h1>
               <p className="text-xs text-neutral-400">
                 {profile?.fullName || user?.email} • Código: <strong className="text-amber-400 font-mono">{affiliateCode}</strong>
@@ -473,7 +470,7 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
                 <Sparkles className="w-3 h-3 text-amber-400" /> Seu Link Oficial de Divulgação
               </span>
               <h2 className="text-lg sm:text-xl font-bold text-white">
-                Compartilhe e Ganhe {affiliate?.commissionRate || 10}% em Cada Pedido
+                Compartilhe seu Link e Acompanhe Cada Pedido
               </h2>
               <p className="text-xs text-neutral-400 leading-relaxed">
                 Qualquer cliente que entrar na loja através do seu link terá a compra vinculada automaticamente a você.
@@ -871,7 +868,7 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
                             </span>
                           </div>
                           <span className="text-[10px] text-neutral-500 font-mono-nums">
-                            {new Date(c.createdAt).toLocaleString(language === 'es' ? 'es-PY' : 'pt-BR', { dateStyle: 'short', timeStyle: 'short' })} • Taxa: {c.rate}%
+                            {new Date(c.createdAt).toLocaleString(language === 'es' ? 'es-PY' : 'pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                           </span>
                         </div>
 
@@ -890,9 +887,9 @@ export const AffiliateDashboardView: React.FC<Props> = ({ onNavigateStore, onLog
             {/* Card Lateral: Resumo de Performance */}
             <section className="lg:col-span-4 space-y-4">
               <div className="p-5 rounded-2xl bg-[#0D121D] border border-[#1E273A] space-y-3">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Regras de Comissionamento</h4>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Regras de Afiliado</h4>
                 <div className="space-y-2 text-xs text-neutral-400 leading-relaxed">
-                  <p>• Você recebe <b className="text-emerald-400">{affiliate?.commissionRate || 10}%</b> do valor de cada compra concluída por seus clientes.</p>
+                  <p>• As vendas realizadas pelos seus clientes cadastrados são vinculadas diretamente a você.</p>
                   <p>• Comissões são liberadas após a confirmação e entrega do pedido.</p>
                   <p>• Repasses são efetuados via Pix diretamente na chave informada na aba de pagamento.</p>
                 </div>
