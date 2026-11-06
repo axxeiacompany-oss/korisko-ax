@@ -312,7 +312,13 @@ const dbInitPromise = initPostgres();
 app.get('/api/health', async (_req, res) => {
   if (dbInitPromise) await dbInitPromise;
 
-  const currentState = safeReadJsonFile(LOCAL_STATE_FILE);
+  let currentState = safeReadJsonFile(LOCAL_STATE_FILE);
+  if ((!currentState || !currentState.products || currentState.products.length === 0) && supabaseServer) {
+    try {
+      currentState = await assembleFullStateFromSupabase();
+    } catch {}
+  }
+
   const productsCount = currentState?.products?.length || 0;
   const salesCount = currentState?.sales?.length || 0;
   const customersCount = currentState?.customers?.length || 0;
@@ -500,62 +506,259 @@ app.get('/api/exchange-rates', async (_req, res) => {
   return res.json(fallback);
 });
 
+// Assemble complete state from live Supabase relational tables (produtos, clientes, vendas, etc.)
+async function assembleFullStateFromSupabase(): Promise<any | null> {
+  if (!supabaseServer) return null;
+  try {
+    const [prodRes, custRes, salesRes, userRes, sessRes, cmdRes, fiadoRes, debtorsRes, purchRes, extraRes] = await Promise.all([
+      supabaseServer.from('produtos').select('*'),
+      supabaseServer.from('clientes').select('*'),
+      supabaseServer.from('vendas').select('*').order('created_at', { ascending: false }),
+      supabaseServer.from('usuarios').select('*'),
+      supabaseServer.from('caixa_sessoes').select('*').order('opened_at', { ascending: false }),
+      supabaseServer.from('comandas').select('*'),
+      supabaseServer.from('lancamentos_fiado').select('*'),
+      supabaseServer.from('saldos_devedores_tempo_real').select('*'),
+      supabaseServer.from('registro_compras_clientes').select('*'),
+      supabaseServer.from('korisko_system_state').select('data').eq('id', 'active_state').maybeSingle()
+    ]);
+
+    const prodRows = prodRes.data || [];
+    const custRows = custRes.data || [];
+    const salesRows = salesRes.data || [];
+    const userRows = userRes.data || [];
+    const sessRows = sessRes.data || [];
+    const extra = extraRes.data?.data || {};
+
+    if (prodRows.length === 0 && custRows.length === 0 && salesRows.length === 0) {
+      if (extra && Array.isArray(extra.products) && extra.products.length > 0) {
+        return extra;
+      }
+      return null;
+    }
+
+    const products = prodRows.map((r: any) => ({
+      id: String(r.id),
+      code: r.code || '',
+      name: r.name || '',
+      category: r.category || 'paes',
+      priceBrl: Number(r.price_brl) || 0,
+      costPriceBrl: Number(r.cost_price_brl) || 0,
+      stock: Number(r.stock) || 0,
+      minStock: Number(r.min_stock) || 0,
+      unit: r.unit || 'un',
+      active: r.active !== false,
+      isIngredient: Boolean(r.is_ingredient),
+      imageUrl: r.image_url || undefined,
+      description: r.description || undefined,
+      slug: r.slug || undefined,
+      compareAtPrice: r.compare_at_price != null ? Number(r.compare_at_price) : undefined,
+      featured: Boolean(r.featured),
+      expirationDate: r.expiration_date || undefined,
+    }));
+
+    const customers = custRows.map((c: any) => ({
+      id: String(c.id),
+      name: c.name || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      documentCpf: c.document_cpf || '',
+      address: c.address || '',
+      category: c.category || 'varejo',
+      creditLimitBrl: Number(c.credit_limit_brl) || 0,
+      outstandingBalanceBrl: Number(c.outstanding_balance_brl) || 0,
+      loyaltyPoints: Number(c.loyalty_points) || 0,
+      totalSpentBrl: Number(c.total_spent_brl) || 0,
+      purchaseCount: Number(c.purchase_count) || 0,
+      lastPurchaseDate: c.last_purchase_date || undefined,
+      birthday: c.birthday || '',
+      notes: c.notes || '',
+      affiliateId: c.affiliate_id || undefined,
+      affiliateName: c.affiliate_name || undefined,
+      createdAt: c.created_at || new Date().toISOString(),
+    }));
+
+    const sales = salesRows.map((r: any) => ({
+      id: String(r.id),
+      saleNumber: Number(r.sale_number) || 0,
+      timestamp: r.created_at || new Date().toISOString(),
+      employeeId: r.employee_id || '',
+      employeeName: r.employee_name || '',
+      items: Array.isArray(r.items) ? r.items : [],
+      subtotalBrl: Number(r.subtotal_brl) || Number(r.total_brl) || 0,
+      discountBrl: Number(r.discount_brl) || 0,
+      totalBrl: Number(r.total_brl) || 0,
+      payments: Array.isArray(r.payments) ? r.payments : [],
+      changeGiven: r.change_given || undefined,
+      customerId: r.customer_id || undefined,
+      customerName: r.customer_name || undefined,
+      comandaNumber: r.comanda_number || undefined,
+      setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+      confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
+      status: 'completed',
+      registerSessionId: '',
+    }));
+
+    const employees = userRows.map((r: any) => ({
+      id: String(r.id),
+      name: r.name || '',
+      email: r.email || '',
+      role: r.role || 'caixa',
+      password: r.password || r.pin || '',
+      pin: r.pin || r.password || '',
+      avatarColor: r.avatar_color || 'bg-indigo-600',
+      allowedFeatures: Array.isArray(r.allowed_features) ? r.allowed_features : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+      active: r.active !== false,
+    }));
+
+    const currentSession = sessRows.find((s: any) => s.status === 'aberto') || sessRows[0] || extra?.currentSession || {
+      id: `sess-${Date.now()}`,
+      sessionNumber: 1,
+      openedAt: new Date().toISOString(),
+      openedBy: 'Ax',
+      status: 'aberto',
+      initialFloat: { brl: 0, pyg: 0, usd: 0 },
+      transactions: [],
+    };
+
+    const sessionHistory = sessRows.filter((s: any) => s.id !== currentSession.id);
+
+    const assembledState = {
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      products,
+      customers,
+      sales,
+      employees: employees.length > 0 ? employees : (extra.employees || []),
+      currentSession,
+      sessionHistory,
+      openComandas: (cmdRes.data || []).map((c: any) => ({
+        id: String(c.id),
+        number: String(c.number || ''),
+        customerId: c.customer_id || undefined,
+        customerName: c.customer_name || undefined,
+        customerPhone: c.customer_phone || undefined,
+        items: Array.isArray(c.items) ? c.items : [],
+        openedAt: c.opened_at || c.created_at || new Date().toISOString(),
+        openedBy: c.opened_by || 'Balcão',
+        notes: c.notes || undefined,
+        status: c.status || 'confirmado',
+        setorResponsavel: c.setor_responsavel || 'panificacao',
+        setoresEnvolvidos: Array.isArray(c.setores_envolvidos) ? c.setores_envolvidos : ['panificacao'],
+        confirmedByCustomer: c.confirmed_by_customer !== undefined ? Boolean(c.confirmed_by_customer) : true,
+        confirmedAt: c.confirmed_at || c.opened_at || new Date().toISOString(),
+        updatedAt: c.updated_at || new Date().toISOString(),
+        source: c.source || 'pdv',
+        totalBrl: Number(c.total_brl) || 0,
+      })),
+      fornadas: extra.fornadas || [],
+      fichasTecnicas: extra.fichasTecnicas || [],
+      goals: extra.goals || [],
+      exchangeRates: extra.exchangeRates || { BRL_TO_PYG: 1400, USD_TO_BRL: 5.65, USD_TO_PYG: 7910 },
+      stockMovements: extra.stockMovements || [],
+      customerEntries: (fiadoRes.data || []).map((r: any) => ({
+        id: String(r.id),
+        customerId: String(r.customer_id || ''),
+        customerName: r.customer_name || undefined,
+        date: r.date || r.created_at || new Date().toISOString(),
+        type: r.type || 'debito_compra',
+        amountBrl: Number(r.amount_brl) || 0,
+        previousBalanceBrl: r.previous_balance_brl !== undefined ? Number(r.previous_balance_brl) : undefined,
+        resultingBalanceBrl: r.resulting_balance_brl !== undefined ? Number(r.resulting_balance_brl) : undefined,
+        paymentMethod: r.payment_method || 'fiado',
+        description: String(r.description || ''),
+        saleId: r.sale_id || undefined,
+        comandaNumber: r.comanda_number || undefined,
+        setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+        confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
+        recordedBy: String(r.recorded_by || 'Caixa'),
+      })),
+      customerPurchases: (purchRes.data || []).map((r: any) => ({
+        id: String(r.id),
+        customerId: String(r.customer_id || ''),
+        customerName: r.customer_name || undefined,
+        customerPhone: r.customer_phone || undefined,
+        saleId: r.sale_id || undefined,
+        saleNumber: r.sale_number || undefined,
+        comandaNumber: r.comanda_number || undefined,
+        items: Array.isArray(r.items) ? r.items : [],
+        itemsSummary: r.items_summary || '',
+        totalAmountBrl: Number(r.total_amount_brl) || 0,
+        estimatedCostBrl: Number(r.estimated_cost_brl) || 0,
+        paidAmountBrl: Number(r.paid_amount_brl) || 0,
+        fiadoAmountBrl: Number(r.fiado_amount_brl) || 0,
+        paymentMethod: r.payment_method || 'dinheiro',
+        flowType: r.flow_type || 'entrada_avista',
+        setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+        recordedBy: r.recorded_by || 'Caixa',
+        purchaseDate: r.purchase_date || r.created_at || new Date().toISOString(),
+      })),
+      activeCheckouts: extra.activeCheckouts || [],
+      liveDebtorBalances: (debtorsRes.data || []).map((r: any) => ({
+        customerId: String(r.customer_id),
+        customerName: r.customer_name || '',
+        customerPhone: r.customer_phone || undefined,
+        previousBalanceBrl: Number(r.previous_balance_brl) || 0,
+        currentDebtBalanceBrl: Number(r.current_debt_balance_brl) || 0,
+        openComandasTotalBrl: Number(r.open_comandas_total_brl) || 0,
+        openComandasCount: Number(r.open_comandas_count) || 0,
+        creditLimitBrl: Number(r.credit_limit_brl) || 500000,
+        availableCreditBrl: Number(r.available_credit_brl) || 500000,
+        lastComandaId: r.last_comanda_id || undefined,
+        lastComandaNumber: r.last_comanda_number || undefined,
+        lastOperationType: r.last_operation_type || 'comanda_lancada',
+        lastOperationAmountBrl: Number(r.last_operation_amount_brl) || 0,
+        lastEntryDescription: r.last_entry_description || undefined,
+        lastPaymentDate: r.last_payment_date || undefined,
+        lastPurchaseDate: r.last_purchase_date || undefined,
+        statusCobranca: r.status_cobranca || 'em_dia',
+        lastSetorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+        updatedBy: r.updated_by || 'Sistema',
+        updatedAt: r.updated_at || new Date().toISOString(),
+      })),
+    };
+
+    // Cache locally
+    safeWriteJsonFile(LOCAL_STATE_FILE, assembledState);
+
+    // Keep korisko_system_state updated with complete assembled data
+    safeSupabaseUpsert('korisko_system_state', {
+      id: 'active_state',
+      data: assembledState,
+      updated_at: new Date().toISOString(),
+    }, 'id');
+
+    return assembledState;
+  } catch (err: any) {
+    console.warn('[Korisko Server] assembleFullStateFromSupabase notice:', err.message);
+    return null;
+  }
+}
+
 // GET System State
 app.get('/api/state', async (_req, res) => {
   if (dbInitPromise) await dbInitPromise;
 
   try {
-    // 1. Try PostgreSQL if active
-    if (isPgConnected && pool) {
-      try {
-        const result = await pool.query(
-          'SELECT data, updated_at FROM korisko_system_state WHERE id = $1',
-          ['active_state']
-        );
-        if (result.rows.length > 0 && result.rows[0].data) {
-          return res.json({
-            source: 'postgresql',
-            updatedAt: result.rows[0].updated_at,
-            data: result.rows[0].data,
-          });
-        }
-      } catch (err) {
-        console.warn('[Korisko DB] Read PG fallback to local:', err);
-      }
-    }
-
-    // 2. Try Supabase Cloud
+    // 1. Prioritize live Supabase cloud database
     if (supabaseServer) {
       try {
-        const { data: supaRow, error } = await supabaseServer
-          .from('korisko_system_state')
-          .select('data, updated_at')
-          .eq('id', 'active_state')
-          .maybeSingle();
-        if (!error && supaRow && supaRow.data && supaRow.data.products?.length > 0) {
-          safeWriteJsonFile(LOCAL_STATE_FILE, supaRow.data);
+        const liveState = await assembleFullStateFromSupabase();
+        if (liveState && Array.isArray(liveState.products) && liveState.products.length > 0) {
           return res.json({
             source: 'supabase_cloud',
-            updatedAt: supaRow.updated_at,
-            data: supaRow.data,
+            updatedAt: liveState.timestamp,
+            data: liveState,
           });
         }
       } catch (err) {
-        console.warn('[Korisko DB] Read Supabase fallback to local:', err);
+        console.warn('[Korisko DB] Live Supabase read error, checking local:', err);
       }
     }
 
-    // 3. Read from persistent local file
-    let localData = safeReadJsonFile(LOCAL_STATE_FILE);
-    if (!localData || !localData.products || localData.products.length === 0) {
-      const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
-      if (defaultSeed && defaultSeed.products && defaultSeed.products.length > 0) {
-        safeWriteJsonFile(LOCAL_STATE_FILE, defaultSeed);
-        localData = defaultSeed;
-      }
-    }
-
-    if (localData && localData.products && localData.products.length > 0) {
+    // 2. Read from persistent local file
+    const localData = safeReadJsonFile(LOCAL_STATE_FILE);
+    if (localData && Array.isArray(localData.products) && localData.products.length > 0) {
       return res.json({
         source: 'banco_operacional',
         updatedAt: localData.timestamp || new Date().toISOString(),
@@ -563,7 +766,17 @@ app.get('/api/state', async (_req, res) => {
       });
     }
 
-    // No valid state saved yet
+    // 3. Fallback: seed data
+    const defaultSeed = safeReadJsonFile(path.join(DATA_DIR, 'korisko_default_seed.json'));
+    if (defaultSeed && defaultSeed.products && defaultSeed.products.length > 0) {
+      safeWriteJsonFile(LOCAL_STATE_FILE, defaultSeed);
+      return res.json({
+        source: 'seed_fallback',
+        updatedAt: defaultSeed.timestamp || new Date().toISOString(),
+        data: defaultSeed,
+      });
+    }
+
     return res.json({
       source: 'none',
       data: null,
@@ -586,6 +799,20 @@ app.post('/api/state', async (req, res) => {
   try {
     data.timestamp = new Date().toISOString();
 
+    // Anti-loss guard: If incoming data has empty products/customers, merge with existing
+    const currentState = safeReadJsonFile(LOCAL_STATE_FILE);
+    if (currentState) {
+      if ((!data.products || data.products.length === 0) && currentState.products?.length > 0) {
+        data.products = currentState.products;
+      }
+      if ((!data.customers || data.customers.length === 0) && currentState.customers?.length > 0) {
+        data.customers = currentState.customers;
+      }
+      if ((!data.sales || data.sales.length === 0) && currentState.sales?.length > 0) {
+        data.sales = currentState.sales;
+      }
+    }
+
     // 1. Primary write: persistent file
     safeWriteJsonFile(LOCAL_STATE_FILE, data);
 
@@ -605,6 +832,55 @@ app.post('/api/state', async (req, res) => {
       data,
       updated_at: new Date().toISOString(),
     }, 'id');
+
+    // 4. Sync products to Supabase produtos table
+    if (supabaseServer && Array.isArray(data.products) && data.products.length > 0) {
+      const prodRows = data.products.map((p: any) => ({
+        id: p.id,
+        code: p.code || '',
+        name: p.name,
+        category: p.category || 'paes',
+        price_brl: Number(p.priceBrl) || 0,
+        cost_price_brl: Number(p.costPriceBrl) || 0,
+        stock: Number(p.stock) || 0,
+        min_stock: Number(p.minStock) || 0,
+        unit: p.unit || 'un',
+        active: p.active !== false,
+        image_url: p.imageUrl || null,
+        description: p.description || null,
+        slug: p.slug || null,
+        compare_at_price: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+        featured: Boolean(p.featured),
+        updated_at: new Date().toISOString(),
+      }));
+      supabaseServer.from('produtos').upsert(prodRows, { onConflict: 'id' }).then(() => {}, () => {});
+    }
+
+    // 5. Sync customers to Supabase clientes table
+    if (supabaseServer && Array.isArray(data.customers) && data.customers.length > 0) {
+      const custRows = data.customers.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone || '',
+        email: c.email || null,
+        document_cpf: c.documentCpf || null,
+        address: c.address || null,
+        category: c.category || 'varejo',
+        credit_limit_brl: Number(c.creditLimitBrl) || 0,
+        outstanding_balance_brl: Number(c.outstandingBalanceBrl) || 0,
+        loyalty_points: Math.round(Number(c.loyaltyPoints) || 0),
+        total_spent_brl: Number(c.totalSpentBrl) || 0,
+        purchase_count: Number(c.purchaseCount) || 0,
+        last_purchase_date: c.lastPurchaseDate || null,
+        birthday: c.birthday || null,
+        notes: c.notes || null,
+        affiliate_id: c.affiliateId || 'emp-afiliado-guilherme',
+        affiliate_name: c.affiliateName || 'Guilherme',
+        active: true,
+        updated_at: new Date().toISOString(),
+      }));
+      supabaseServer.from('clientes').upsert(custRows, { onConflict: 'id' }).then(() => {}, () => {});
+    }
 
     return res.json({
       success: true,
@@ -1046,6 +1322,14 @@ async function start() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+  }
+
+  // Immediately hydrate and synchronize state from Supabase Cloud on server startup
+  try {
+    await assembleFullStateFromSupabase();
+    console.log('[Korisko Server] Estado inicial sincronizado com sucesso a partir do banco de dados na nuvem.');
+  } catch (syncErr: any) {
+    console.warn('[Korisko Server] Aviso na sincronização inicial do banco:', syncErr.message);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

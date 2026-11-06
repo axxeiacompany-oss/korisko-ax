@@ -725,13 +725,86 @@ export async function fetchStateFromSupabase(): Promise<any | null> {
       .eq('id', 'active_state')
       .maybeSingle();
 
-    if (error || !data) {
-      // Fallback: If only functional 'usuarios' table was created in Supabase
+    let state = (!error && data && data.data) ? data.data : null;
+
+    // If state is missing or has empty products, construct from live Supabase tables
+    if (!state || !Array.isArray(state.products) || state.products.length === 0) {
       try {
-        const { data: dbUsers } = await supabase.from('usuarios').select('*');
-        if (Array.isArray(dbUsers) && dbUsers.length > 0) {
-          return {
-            employees: dbUsers.map((u: any) => ({
+        const [prodRes, custRes, salesRes, userRes] = await Promise.all([
+          supabase.from('produtos').select('*'),
+          supabase.from('clientes').select('*'),
+          supabase.from('vendas').select('*').order('created_at', { ascending: false }),
+          supabase.from('usuarios').select('*'),
+        ]);
+
+        const dbProds = prodRes.data || [];
+        const dbCusts = custRes.data || [];
+        const dbSales = salesRes.data || [];
+        const dbUsers = userRes.data || [];
+
+        if (dbProds.length > 0 || dbCusts.length > 0 || dbSales.length > 0) {
+          state = {
+            ...(state || {}),
+            products: dbProds.map((r: any) => ({
+              id: String(r.id),
+              code: r.code || '',
+              name: r.name || '',
+              category: r.category || 'paes',
+              priceBrl: Number(r.price_brl) || 0,
+              costPriceBrl: Number(r.cost_price_brl) || 0,
+              stock: Number(r.stock) || 0,
+              minStock: Number(r.min_stock) || 0,
+              unit: r.unit || 'un',
+              active: r.active !== false,
+              isIngredient: Boolean(r.is_ingredient),
+              imageUrl: r.image_url || undefined,
+              description: r.description || undefined,
+              slug: r.slug || undefined,
+              compareAtPrice: r.compare_at_price != null ? Number(r.compare_at_price) : undefined,
+              featured: Boolean(r.featured),
+              expirationDate: r.expiration_date || undefined,
+            })),
+            customers: dbCusts.map((r: any) => ({
+              id: String(r.id),
+              name: r.name || '',
+              phone: r.phone || '',
+              email: r.email || '',
+              documentCpf: r.document_cpf || '',
+              address: r.address || '',
+              category: r.category || 'varejo',
+              creditLimitBrl: Number(r.credit_limit_brl) || 0,
+              outstandingBalanceBrl: Number(r.outstanding_balance_brl) || 0,
+              loyaltyPoints: Number(r.loyalty_points) || 0,
+              totalSpentBrl: Number(r.total_spent_brl) || 0,
+              purchaseCount: Number(r.purchase_count) || 0,
+              lastPurchaseDate: r.last_purchase_date || undefined,
+              birthday: r.birthday || '',
+              notes: r.notes || '',
+              affiliateId: r.affiliate_id || undefined,
+              affiliateName: r.affiliate_name || undefined,
+              createdAt: r.created_at || new Date().toISOString(),
+            })),
+            sales: dbSales.map((r: any) => ({
+              id: String(r.id),
+              saleNumber: Number(r.sale_number) || 0,
+              timestamp: r.created_at || new Date().toISOString(),
+              employeeId: r.employee_id || '',
+              employeeName: r.employee_name || '',
+              items: Array.isArray(r.items) ? r.items : [],
+              subtotalBrl: Number(r.subtotal_brl) || Number(r.total_brl) || 0,
+              discountBrl: Number(r.discount_brl) || 0,
+              totalBrl: Number(r.total_brl) || 0,
+              payments: Array.isArray(r.payments) ? r.payments : [],
+              changeGiven: r.change_given || undefined,
+              customerId: r.customer_id || undefined,
+              customerName: r.customer_name || undefined,
+              comandaNumber: r.comanda_number || undefined,
+              setorResponsavel: r.setor_responsavel || 'Panificação & Confeitaria Artesanal',
+              confirmedByCustomer: r.confirmed_by_customer !== undefined ? Boolean(r.confirmed_by_customer) : true,
+              status: 'completed',
+              registerSessionId: '',
+            })),
+            employees: dbUsers.length > 0 ? dbUsers.map((u: any) => ({
               id: u.id,
               name: u.name,
               email: u.email || '',
@@ -739,15 +812,15 @@ export async function fetchStateFromSupabase(): Promise<any | null> {
               password: u.password,
               pin: u.pin || u.password,
               avatarColor: u.avatar_color || 'bg-indigo-600',
-              allowedFeatures: Array.isArray(u.allowed_features) ? u.allowed_features : ['dashboard', 'pdv', 'venda_direta', 'crm']
-            }))
+              allowedFeatures: Array.isArray(u.allowed_features) ? u.allowed_features : ['dashboard', 'pdv', 'venda_direta', 'crm'],
+              active: u.active !== false,
+            })) : (state?.employees || []),
           };
         }
       } catch {}
-      return null;
     }
 
-    const state = data.data;
+    if (!state) return null;
 
     // Check if user edited or added employees directly in Supabase Table Editor (usuarios)
     try {
@@ -764,9 +837,7 @@ export async function fetchStateFromSupabase(): Promise<any | null> {
           allowedFeatures: Array.isArray(u.allowed_features) ? u.allowed_features : ['dashboard', 'pdv', 'venda_direta', 'crm']
         }));
       }
-    } catch {
-      // Functional table optional until user runs the script
-    }
+    } catch {}
 
     return state;
   } catch {
@@ -779,6 +850,11 @@ export async function fetchStateFromSupabase(): Promise<any | null> {
  */
 export async function saveStateToSupabase(stateData: any): Promise<boolean> {
   try {
+    // Guard: never overwrite state if incoming products is empty
+    if (!stateData || (!Array.isArray(stateData.products) || stateData.products.length === 0)) {
+      return false;
+    }
+
     const { error } = await supabase
       .from('korisko_system_state')
       .upsert({

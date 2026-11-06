@@ -1223,21 +1223,10 @@ export class StorageService {
    */
   static loadState(): SystemBackupData {
     try {
-      // Auto-purge old mock data to deliver zeroed factory state
-      if (typeof localStorage !== 'undefined' && localStorage.getItem('KORISKO_ZERO_CLEANSED_V4') !== 'true') {
-        localStorage.removeItem(DB_KEY);
-        localStorage.removeItem('KORISKO_STATE_V1');
-        localStorage.removeItem('PANETTIERE_STATE_V1');
-        localStorage.removeItem(BACKUPS_KEY);
-        localStorage.removeItem('KORISKO_BACKUP_POINTS_V1');
-        localStorage.removeItem('PANETTIERE_BACKUP_POINTS_V1');
-        localStorage.setItem('KORISKO_ZERO_CLEANSED_V4', 'true');
-      }
-
       const serialized = typeof localStorage !== 'undefined' ? localStorage.getItem(DB_KEY) : null;
       if (serialized) {
         const parsed = JSON.parse(serialized);
-        if (parsed && Array.isArray(parsed.products)) {
+        if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
           if (!parsed.openComandas) parsed.openComandas = [];
           if (!parsed.fornadas) parsed.fornadas = [];
           if (!parsed.fichasTecnicas) parsed.fichasTecnicas = [];
@@ -1245,46 +1234,11 @@ export class StorageService {
           if (!parsed.customerEntries) parsed.customerEntries = [];
           if (!parsed.customerPurchases) parsed.customerPurchases = [];
           if (!parsed.activeCheckouts) parsed.activeCheckouts = [];
-
-          // Zero out all numbers for Real Test initiation
-          if (typeof localStorage !== 'undefined' && localStorage.getItem('KORIZKO_REAL_TEST_ZERO_V3') !== 'true') {
-            parsed.sales = [];
-            parsed.openComandas = [];
-            parsed.fornadas = [];
-            parsed.stockMovements = [];
-            parsed.customerEntries = [];
-            parsed.customerPurchases = [];
-            parsed.activeCheckouts = [];
-            parsed.sessionHistory = [];
-            parsed.customers = (parsed.customers || [])
-              .filter((c: any) => !['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5'].includes(c.id))
-              .map((c: any) => ({
-                ...c,
-                outstandingBalanceBrl: 0,
-                totalSpentBrl: 0,
-                purchaseCount: 0,
-                loyaltyPoints: 0,
-              }));
-            parsed.currentSession = {
-              id: `sess-${Date.now()}`,
-              sessionNumber: 1,
-              openedAt: new Date().toISOString(),
-              openedBy: 'Ax',
-              status: 'aberto',
-              initialFloat: { brl: 0, pyg: 0, usd: 0 },
-              transactions: [],
-            };
-          }
+          if (!parsed.sales) parsed.sales = [];
 
           if (!parsed.employees || parsed.employees.length === 0) {
             parsed.employees = INITIAL_EMPLOYEES;
           } else {
-            // Remove old demo profiles (Roberto Silveira, Luciana Mendes, Carlos Eduardo, Seu Zé Padeiro)
-            parsed.employees = parsed.employees.filter((e: any) => !['emp-1', 'emp-2', 'emp-3', 'emp-4'].includes(e.id));
-            if (parsed.employees.length === 0) {
-              parsed.employees = INITIAL_EMPLOYEES;
-            }
-
             // Ensure Ax admin is always present and updated
             const hasAx = parsed.employees.some((e: any) => e.email === 'axxeiacompany@gmail.com');
             if (!hasAx) {
@@ -1308,31 +1262,16 @@ export class StorageService {
               const guilhermeEmp = INITIAL_EMPLOYEES.find(e => e.id === 'emp-afiliado-guilherme');
               if (guilhermeEmp) parsed.employees.push(guilhermeEmp);
             }
-
-            // Ensure customers belong to Guilherme
-            if (Array.isArray(parsed.customers)) {
-              parsed.customers = parsed.customers.map((c: any) => {
-                if (!c.affiliateId || !c.affiliateName) {
-                  return {
-                    ...c,
-                    affiliateId: 'emp-afiliado-guilherme',
-                    affiliateName: 'Guilherme',
-                  };
-                }
-                return c;
-              });
-            }
           }
           return parsed;
         }
       }
     } catch (e) {
-      console.warn('Could not read from localStorage, using factory zero data', e);
+      console.warn('Could not read from localStorage, using initial memory state', e);
     }
 
-    const initialState = StorageService.getFactoryDefaultState();
-    StorageService.saveState(initialState);
-    return initialState;
+    // Return factory defaults without calling saveState (never push empty state to backend before DB load)
+    return StorageService.getFactoryDefaultState();
   }
 
   /**
@@ -1397,6 +1336,11 @@ export class StorageService {
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(async () => {
+      // Guard: do not sync if data has 0 products and 0 customers (protect existing DB from being cleared)
+      if (!data || ((!data.products || data.products.length === 0) && (!data.customers || data.customers.length === 0))) {
+        return;
+      }
+
       // 1. Sync with local server API /api/state
       try {
         fetch('/api/state', {
@@ -1416,10 +1360,22 @@ export class StorageService {
   }
 
   /**
-   * Fetch current state from Supabase cloud or initialize
+   * Fetch current state from Supabase cloud or backend API
    */
   static async fetchServerState(): Promise<SystemBackupData | null> {
-    // 1. Try fetching from Supabase cloud directly
+    // 1. Try fetching from Express backend server /api/state (which queries Supabase authoritative tables)
+    try {
+      const res = await fetch('/api/state');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && json.data.products && json.data.products.length > 0) {
+          StorageService.saveState(json.data, false);
+          return json.data;
+        }
+      }
+    } catch {}
+
+    // 2. Try fetching from Supabase cloud directly
     try {
       const supabaseData = await fetchStateFromSupabase();
       if (supabaseData && supabaseData.products && supabaseData.products.length > 0) {
@@ -1443,18 +1399,6 @@ export class StorageService {
     } catch (err) {
       console.warn('[Korisko DB] Supabase state fetch notice:', err);
     }
-
-    // 2. Fallback to Express backend server /api/state
-    try {
-      const res = await fetch('/api/state');
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.data && json.data.products && json.data.products.length > 0) {
-          StorageService.saveState(json.data, false);
-          return json.data;
-        }
-      }
-    } catch {}
 
     return null;
   }
